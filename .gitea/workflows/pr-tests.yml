@@ -1,0 +1,46 @@
+name: OpenCode Validation
+
+"on":
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Load managed validation settings
+        run: |
+          python3 scripts/lib/opencode-managed-workflow-context.py --context validation --emit env
+
+      - name: Show Python version
+        if: ${{ github.event_name != 'pull_request' || github.head_ref != env.OPENCODE_SETUP_BRANCH }}
+        run: python3 --version
+
+      - name: Run repository validation command
+        if: ${{ github.event_name != 'pull_request' || github.head_ref != env.OPENCODE_SETUP_BRANCH }}
+        run: /bin/bash -lc "$OPENCODE_VALIDATION_COMMAND"
+
+      - name: Skip repo validation for bootstrap setup PR
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == env.OPENCODE_SETUP_BRANCH }}
+        run: echo "Bootstrap setup PR detected; skipping repository validation command."

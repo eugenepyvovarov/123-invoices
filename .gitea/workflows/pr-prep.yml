@@ -1,0 +1,334 @@
+name: OpenCode PR Prep
+run-name: OpenCode PR Prep pr=${{ inputs.pull_request_number }} head=${{ inputs.head_sha }}
+
+"on":
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: Pull request number to prepare for review
+        required: true
+      head_sha:
+        description: Expected pull request head SHA
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      validation_supported: ${{ steps.managed-config.outputs.validation_supported }}
+      playwright_smoke_supported: ${{ steps.managed-config.outputs.playwright_smoke_supported }}
+      visual_validation_supported: ${{ steps.managed-config.outputs.visual_validation_supported }}
+      controller_repository: ${{ steps.managed-config.outputs.controller_repository }}
+      setup_branch: ${{ steps.managed-config.outputs.setup_branch }}
+      project_key: ${{ steps.managed-config.outputs.project_key }}
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+      OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE: "git.ultramac.work/eugene/opencode-gitea-automation/playwright-evidence-runner:1.54.0-r3"
+      OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_CONTRACT_VERSION: "1"
+      OPENCODE_REPO_OWNER: ${{ secrets.OPENCODE_REPO_OWNER }}
+      OPENCODE_REPO_NAME: ${{ secrets.OPENCODE_REPO_NAME }}
+      OPENCODE_ACTIVITY_INGEST_URL: ${{ secrets.OPENCODE_ACTIVITY_INGEST_URL }}
+      OPENCODE_ACTIVITY_INGEST_TOKEN: ${{ secrets.OPENCODE_ACTIVITY_INGEST_TOKEN }}
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Check out default branch workflow definition
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve managed PR-prep stages
+        id: managed-config
+        run: |
+          python3 scripts/lib/opencode-managed-workflow-context.py --context pr-prep-preflight --emit output
+
+  validation:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head_sha }}
+
+      - name: Load managed validation settings
+        run: |
+          python3 scripts/lib/opencode-managed-workflow-context.py --context validation --emit env
+
+      - name: Run repository validation command
+        run: /bin/bash -lc "$OPENCODE_VALIDATION_COMMAND"
+
+  playwright-smoke:
+    needs:
+      - preflight
+      - validation
+    if: ${{ needs.preflight.outputs.playwright_smoke_supported == 'true' }}
+    uses: ./.gitea/workflows/playwright-smoke.yml
+    with:
+      head_sha: ${{ inputs.head_sha }}
+    secrets: inherit
+
+  visual-validation:
+    needs:
+      - preflight
+      - validation
+      - playwright-smoke
+    if: ${{ always() && needs.preflight.result == 'success' && needs.validation.result == 'success' && (needs['playwright-smoke'].result == 'success' || needs['playwright-smoke'].result == 'skipped') && needs.preflight.outputs.visual_validation_supported == 'true' }}
+    runs-on: macos-ultramac
+    timeout-minutes: 15
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+      OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE: "git.ultramac.work/eugene/opencode-gitea-automation/playwright-evidence-runner:1.54.0-r3"
+      OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_CONTRACT_VERSION: "1"
+      OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_ENTRYPOINT: "/usr/local/bin/playwright-evidence-runner"
+      OPENCODE_REPO_OWNER: ${{ secrets.OPENCODE_REPO_OWNER }}
+      OPENCODE_REPO_NAME: ${{ secrets.OPENCODE_REPO_NAME }}
+      OPENCODE_ACTIVITY_INGEST_URL: ${{ secrets.OPENCODE_ACTIVITY_INGEST_URL }}
+      OPENCODE_ACTIVITY_INGEST_TOKEN: ${{ secrets.OPENCODE_ACTIVITY_INGEST_TOKEN }}
+      OPENCODE_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+      OPENCODE_CONTROLLER_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+      OPENCODE_PERSONA_REVIEW_BOT_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Load managed visual validation settings
+        run: |
+          python3 scripts/lib/opencode-managed-workflow-context.py --context visual-validation --emit env
+
+      - name: Skip repositories without visual validation capture support
+        if: ${{ env.OPENCODE_VISUAL_VALIDATION_EVIDENCE_SUPPORTED != 'true' }}
+        run: echo "Managed repository does not declare supported visual validation capture; skipping."
+
+      - name: Authenticate shared Playwright evidence runner image pull access
+        if: ${{ env.OPENCODE_PREVIEW_SUPPORTED == 'true' && env.OPENCODE_VISUAL_VALIDATION_PLAYWRIGHT_WEB == 'true' }}
+        run: echo "${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}" | docker login git.ultramac.work -u "review-bot" --password-stdin
+
+      - name: Check out controller repository
+        if: ${{ env.OPENCODE_VISUAL_VALIDATION_EVIDENCE_SUPPORTED == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPENCODE_CONTROLLER_REPOSITORY }}
+          path: controller
+          token: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Resolve Python with working venv
+        if: ${{ env.OPENCODE_VISUAL_VALIDATION_EVIDENCE_SUPPORTED == 'true' }}
+        run: |
+          HOST_HOME="$(eval echo "~$(whoami)")"
+          echo "HOST_HOME=$HOST_HOME" >> "$GITHUB_ENV"
+          echo "$HOST_HOME/.opencode/bin" >> "$GITHUB_PATH"
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          export PATH="$HOST_HOME/.opencode/bin:/opt/homebrew/bin:$PATH"
+          source controller/scripts/lib/python_runtime.sh
+          opencode_export_python_bin
+          echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
+          echo "VISUAL_VALIDATION_VENV=$PWD/.visual-validation-venv" >> "$GITHUB_ENV"
+
+      - name: Install controller dependencies
+        if: ${{ env.OPENCODE_VISUAL_VALIDATION_EVIDENCE_SUPPORTED == 'true' }}
+        run: |
+          "$PYTHON_BIN" --version
+          "$PYTHON_BIN" -m venv "$VISUAL_VALIDATION_VENV"
+          "$VISUAL_VALIDATION_VENV/bin/python" --version
+          "$VISUAL_VALIDATION_VENV/bin/python" -m pip install -r controller/shared/requirements.txt
+
+      - name: Configure live preview state access on host runners
+        if: ${{ env.OPENCODE_PREVIEW_SUPPORTED == 'true' && env.OPENCODE_VISUAL_VALIDATION_PLAYWRIGHT_WEB == 'true' }}
+        run: |
+          if [[ -z "${OPENCODE_STATE_ROOT:-}" ]]; then
+            DEFAULT_PREVIEW_STATE_ROOT="${HOST_HOME}/www/10-opencode-gitea-automation-state/preview"
+            if [[ -d "${DEFAULT_PREVIEW_STATE_ROOT}" ]]; then
+              echo "OPENCODE_STATE_ROOT=${DEFAULT_PREVIEW_STATE_ROOT}" >> "$GITHUB_ENV"
+            fi
+          fi
+
+          LIVE_CONTROLLER_ROOT="${HOST_HOME}/www/10-opencode-gitea-automation"
+          if [[ -d "${LIVE_CONTROLLER_ROOT}" ]]; then
+            printf '%s\n' "OPENCODE_PREVIEW_ROUTER_RELOAD_COMMAND=/bin/zsh -lc 'cd ${LIVE_CONTROLLER_ROOT} && docker compose exec -T preview-router caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile'" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run visual validation capture worker
+        if: ${{ env.OPENCODE_VISUAL_VALIDATION_EVIDENCE_SUPPORTED == 'true' }}
+        run: |
+          export HOME="$HOST_HOME"
+          export PATH="$HOME/.opencode/bin:/opt/homebrew/bin:$PATH"
+          OPENCODE_DEFAULT_BRANCH="${GITHUB_BASE_REF:-}"
+          if [[ -z "$OPENCODE_DEFAULT_BRANCH" ]]; then
+            OPENCODE_DEFAULT_BRANCH="$(git ls-remote --symref origin HEAD | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')"
+          fi
+          if [[ -z "$OPENCODE_DEFAULT_BRANCH" ]]; then
+            OPENCODE_DEFAULT_BRANCH="main"
+          fi
+          export OPENCODE_DEFAULT_BRANCH
+          "$VISUAL_VALIDATION_VENV/bin/python" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path(".opencode-visual-validation-project.json").write_text(
+              json.dumps(
+                  {
+                      "project_key": os.environ["OPENCODE_PROJECT_KEY"],
+                      "repo_owner": os.environ["OPENCODE_REPO_OWNER"],
+                      "repo_name": os.environ["OPENCODE_REPO_NAME"],
+                      "default_branch": os.environ["OPENCODE_DEFAULT_BRANCH"],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+          ACTIVITY_LOG="$PWD/.opencode-visual-validation-activity.log"
+          ACTIVITY_KEY="visual-validation:pr-${{ inputs.pull_request_number }}:${{ inputs.head_sha }}"
+          "$VISUAL_VALIDATION_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type visual-validation --phase capture --status running --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "${{ inputs.head_sha }}" --external-key "$ACTIVITY_KEY" --summary "Visual validation capture running"
+          set +e
+          "$VISUAL_VALIDATION_VENV/bin/python" controller/scripts/visual_validation_worker.py \
+            --repo-root "$PWD" \
+            --config "$PWD/.opencode-visual-validation-project.json" \
+            --automation-config "$PWD/controller/automation.json" \
+            --event-name "workflow_dispatch" \
+            --event-path "$GITHUB_EVENT_PATH" 2>&1 | tee "$ACTIVITY_LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
+            "$VISUAL_VALIDATION_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type visual-validation --phase capture --status success --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "${{ inputs.head_sha }}" --external-key "$ACTIVITY_KEY" --summary "Visual validation capture completed"
+          else
+            "$VISUAL_VALIDATION_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type visual-validation --phase capture --status failed --reason "worker-exit-$STATUS" --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "${{ inputs.head_sha }}" --external-key "$ACTIVITY_KEY" --summary "Visual validation capture failed" --failed-log-file "$ACTIVITY_LOG"
+            exit "$STATUS"
+          fi
+
+  handoff:
+    needs:
+      - preflight
+      - validation
+      - playwright-smoke
+      - visual-validation
+    if: ${{ always() && needs.preflight.result == 'success' && needs.validation.result == 'success' && (needs['playwright-smoke'].result == 'success' || needs['playwright-smoke'].result == 'skipped') && (needs['visual-validation'].result == 'success' || needs['visual-validation'].result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+      OPENCODE_REPO_OWNER: ${{ secrets.OPENCODE_REPO_OWNER }}
+      OPENCODE_REPO_NAME: ${{ secrets.OPENCODE_REPO_NAME }}
+      OPENCODE_PROJECT_KEY: ${{ needs.preflight.outputs.project_key }}
+      OPENCODE_ACTIVITY_INGEST_URL: ${{ secrets.OPENCODE_ACTIVITY_INGEST_URL }}
+      OPENCODE_ACTIVITY_INGEST_TOKEN: ${{ secrets.OPENCODE_ACTIVITY_INGEST_TOKEN }}
+      OPENCODE_REVIEW_PERSONA: "review-bot"
+      OPENCODE_CONTROLLER_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+      OPENCODE_PERSONA_REVIEW_BOT_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Install handoff prerequisites
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-venv python3-pip
+
+      - name: Check out repository and controller
+        run: |
+          umask 077
+          cat > "$HOME/.netrc" <<EOF
+          machine git.ultramac.work
+          login "review-bot"
+          password ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+          EOF
+          git clone --no-checkout "https://git.ultramac.work/${OPENCODE_REPO_OWNER}/${OPENCODE_REPO_NAME}.git" repo
+          cd repo
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          git checkout "${{ inputs.head_sha }}"
+          cd ..
+          git clone "https://git.ultramac.work/${{ needs.preflight.outputs.controller_repository }}.git" controller
+          rm -f "$HOME/.netrc"
+
+      - name: Resolve Python with working venv
+        run: |
+          cd controller
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          export PATH="/opt/homebrew/bin:$PATH"
+          source scripts/lib/python_runtime.sh
+          opencode_export_python_bin
+          echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
+          echo "PR_PREP_CONTROLLER_ROOT=$PWD" >> "$GITHUB_ENV"
+          echo "PR_PREP_REPO_ROOT=$PWD/../repo" >> "$GITHUB_ENV"
+          echo "PR_PREP_VENV=$PWD/.pr-prep-venv" >> "$GITHUB_ENV"
+
+      - name: Install controller dependencies
+        run: |
+          "$PYTHON_BIN" --version
+          "$PYTHON_BIN" -m venv "$PR_PREP_VENV"
+          "$PR_PREP_VENV/bin/python" --version
+          "$PR_PREP_VENV/bin/python" -m pip install -r "$PR_PREP_CONTROLLER_ROOT/shared/requirements.txt"
+
+      - name: Explicit review handoff
+        run: |
+          cd "$PR_PREP_REPO_ROOT"
+          ACTIVITY_LOG="$PR_PREP_REPO_ROOT/.opencode-pr-prep-activity.log"
+          "$PR_PREP_VENV/bin/python" "$PR_PREP_CONTROLLER_ROOT/scripts/activity_event.py" \
+            --repo-root "$PR_PREP_REPO_ROOT" \
+            --best-effort \
+            --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" \
+            --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" \
+            --project-key "${OPENCODE_PROJECT_KEY:-${OPENCODE_REPO_OWNER}-${OPENCODE_REPO_NAME}}" \
+            --repo-owner "$OPENCODE_REPO_OWNER" \
+            --repo-name "$OPENCODE_REPO_NAME" \
+            --worker workflow \
+            --action-type pr-prep \
+            --phase review-handoff \
+            --status running \
+            --pull-request-number "${{ inputs.pull_request_number }}" \
+            --head-sha "${{ inputs.head_sha }}" \
+            --external-key "pr-prep:pr-${{ inputs.pull_request_number }}:${{ inputs.head_sha }}" \
+            --summary "PR prep handoff running"
+          set +e
+          "$PR_PREP_VENV/bin/python" "$PR_PREP_CONTROLLER_ROOT/scripts/pr_prep_worker.py" \
+            --repo-root "$PR_PREP_REPO_ROOT" \
+            --automation-config "$PR_PREP_CONTROLLER_ROOT/automation.json" \
+            --managed-config "$PR_PREP_REPO_ROOT/project/opencode-managed.json" \
+            --pull-request-number "${{ inputs.pull_request_number }}" \
+            --head-sha "${{ inputs.head_sha }}" \
+            --handoff-review 2>&1 | tee "$ACTIVITY_LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
+            "$PR_PREP_VENV/bin/python" "$PR_PREP_CONTROLLER_ROOT/scripts/activity_event.py" --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PR_PREP_REPO_ROOT" --project-key "${OPENCODE_PROJECT_KEY:-${OPENCODE_REPO_OWNER}-${OPENCODE_REPO_NAME}}" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type pr-prep --phase review-handoff --status success --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "${{ inputs.head_sha }}" --external-key "pr-prep:pr-${{ inputs.pull_request_number }}:${{ inputs.head_sha }}" --summary "PR prep handoff completed"
+          else
+            "$PR_PREP_VENV/bin/python" "$PR_PREP_CONTROLLER_ROOT/scripts/activity_event.py" --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PR_PREP_REPO_ROOT" --project-key "${OPENCODE_PROJECT_KEY:-${OPENCODE_REPO_OWNER}-${OPENCODE_REPO_NAME}}" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type pr-prep --phase review-handoff --status failed --reason "worker-exit-$STATUS" --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "${{ inputs.head_sha }}" --external-key "pr-prep:pr-${{ inputs.pull_request_number }}:${{ inputs.head_sha }}" --summary "PR prep handoff failed" --failed-log-file "$ACTIVITY_LOG"
+            exit "$STATUS"
+          fi

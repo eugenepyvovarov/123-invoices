@@ -1,0 +1,2 @@
+Date,"Date Time",Amount,Currency,"Description","Payment Reference","Transaction Type"
+07-11-2025,"07-11-2025 09:06:18.060",-500.00,EUR,"Malformed smoke import row","SMOKE-ERR-001",DEBIT

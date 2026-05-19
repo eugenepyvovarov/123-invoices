@@ -1,0 +1,198 @@
+name: OpenCode Production Artifact
+
+"on":
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: Merged pull request number to build the pinned production artifact for
+        required: true
+      build_commit_sha:
+        description: Optional manual repair override; defaults to the PR merge commit
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  production-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GIT_SSL_NO_VERIFY: "1"
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      OPENCODE_MANAGED_CONFIG: "project/opencode-managed.json"
+      OPENCODE_REPO_OWNER: ${{ secrets.OPENCODE_REPO_OWNER }}
+      OPENCODE_REPO_NAME: ${{ secrets.OPENCODE_REPO_NAME }}
+      OPENCODE_ACTIVITY_INGEST_URL: ${{ secrets.OPENCODE_ACTIVITY_INGEST_URL }}
+      OPENCODE_ACTIVITY_INGEST_TOKEN: ${{ secrets.OPENCODE_ACTIVITY_INGEST_TOKEN }}
+      OPENCODE_CONTROLLER_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+      OPENCODE_PERSONA_REVIEW_BOT_TOKEN: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+      OPENCODE_REGISTRY_USER: ${{ secrets.OPENCODE_REGISTRY_USER }}
+      OPENCODE_REGISTRY_TOKEN: ${{ secrets.OPENCODE_REGISTRY_TOKEN }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      OPENCODE_PRODUCTION_ARTIFACT_RUN_NUMBER: ${{ gitea.run_number }}
+      SPARKLE_ED25519_PRIVATE_KEY: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY }}
+      SPARKLE_ED25519_PRIVATE_KEY_B64: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY_B64 }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+      SPARKLE_PRIVATE_KEY_B64: ${{ secrets.SPARKLE_PRIVATE_KEY_B64 }}
+      SPARKLE_PRIVATE_KEY_PEM: ${{ secrets.SPARKLE_PRIVATE_KEY_PEM }}
+      DEVELOPER_ID_IDENTITY: ${{ secrets.DEVELOPER_ID_IDENTITY }}
+      CODESIGN_ENTITLEMENTS: ${{ secrets.CODESIGN_ENTITLEMENTS }}
+      CODESIGN_ADDITIONAL_FLAGS: ${{ secrets.CODESIGN_ADDITIONAL_FLAGS }}
+      NOTARIZE_APP: ${{ secrets.NOTARIZE_APP }}
+      NOTARYTOOL_PROFILE: ${{ secrets.NOTARYTOOL_PROFILE }}
+      NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
+      NOTARY_PRIMARY_BUNDLE_ID: ${{ secrets.NOTARY_PRIMARY_BUNDLE_ID }}
+      DOWNLOAD_BASE: ${{ secrets.DOWNLOAD_BASE }}
+      RELEASE_NOTES_BASE_URL: ${{ secrets.RELEASE_NOTES_BASE_URL }}
+      SPARKLE_CHANNEL_LINK: ${{ secrets.SPARKLE_CHANNEL_LINK }}
+      PHASE_SERVICE_TOKEN: ${{ secrets.PHASE_SERVICE_TOKEN }}
+      PHASE_HOST: ${{ secrets.PHASE_HOST }}
+    steps:
+      - name: Allow internal self-signed Git over HTTPS
+        run: git config --global http.sslVerify false
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load managed production-artifact settings
+        run: |
+          python3 scripts/lib/opencode-managed-workflow-context.py --context production-artifact --emit env
+
+      - name: Skip bootstrap setup PR production-artifact workflow
+        if: ${{ github.ref_name == env.OPENCODE_SETUP_BRANCH }}
+        run: echo "Bootstrap setup PR detected; skipping production-artifact workflow."
+
+      - name: Skip repositories without production-artifact support
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED != 'true' }}
+        run: echo "Managed repository does not declare supported production-artifact finalization; skipping."
+
+      - name: Check out controller repository
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPENCODE_CONTROLLER_REPOSITORY }}
+          path: controller
+          token: ${{ secrets.OPENCODE_PERSONA_REVIEW_BOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Resolve Python with working venv
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED == 'true' }}
+        run: |
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          export PATH="/opt/homebrew/bin:$PATH"
+          source controller/scripts/lib/python_runtime.sh
+          opencode_export_python_bin
+          echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
+          echo "PRODUCTION_ARTIFACT_VENV=$PWD/.production-artifact-venv" >> "$GITHUB_ENV"
+
+      - name: Install controller dependencies
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED == 'true' }}
+        run: |
+          "$PYTHON_BIN" --version
+          "$PYTHON_BIN" -m venv "$PRODUCTION_ARTIFACT_VENV"
+          "$PRODUCTION_ARTIFACT_VENV/bin/python" --version
+          "$PRODUCTION_ARTIFACT_VENV/bin/python" -m pip install -r controller/shared/requirements.txt
+
+      - name: Select production registry credentials
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED == 'true' }}
+        run: |
+          if [ -n "${OPENCODE_REGISTRY_USER:-}" ] || [ -n "${OPENCODE_REGISTRY_TOKEN:-}" ]; then
+            if [ -z "${OPENCODE_REGISTRY_USER:-}" ] || [ -z "${OPENCODE_REGISTRY_TOKEN:-}" ]; then
+              echo "Incomplete OPENCODE_REGISTRY_USER/OPENCODE_REGISTRY_TOKEN credential pair. Configure both repository secrets, or remove the partial pair and configure REGISTRY_USERNAME/REGISTRY_PASSWORD." >&2
+              exit 1
+            fi
+            echo "REGISTRY_USER=${OPENCODE_REGISTRY_USER}" >> "$GITHUB_ENV"
+            echo "REGISTRY_PASSWORD=${OPENCODE_REGISTRY_TOKEN}" >> "$GITHUB_ENV"
+          elif [ -n "${REGISTRY_USERNAME:-}" ] || [ -n "${REGISTRY_PASSWORD:-}" ]; then
+            if [ -z "${REGISTRY_USERNAME:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+              echo "Incomplete REGISTRY_USERNAME/REGISTRY_PASSWORD credential pair. Configure both repository secrets, or configure OPENCODE_REGISTRY_USER/OPENCODE_REGISTRY_TOKEN." >&2
+              exit 1
+            fi
+            echo "REGISTRY_USER=${REGISTRY_USERNAME}" >> "$GITHUB_ENV"
+            echo "REGISTRY_PASSWORD=${REGISTRY_PASSWORD}" >> "$GITHUB_ENV"
+          else
+            echo "No production registry credentials configured; continuing because non-registry production artifacts do not require them." >&2
+          fi
+
+      - name: Run pinned production-artifact worker
+        if: ${{ github.ref_name != env.OPENCODE_SETUP_BRANCH && env.OPENCODE_PRODUCTION_ARTIFACT_SUPPORTED == 'true' }}
+        run: |
+          OPENCODE_DEFAULT_BRANCH="${GITHUB_BASE_REF:-}"
+          if [[ -z "$OPENCODE_DEFAULT_BRANCH" ]]; then
+            OPENCODE_DEFAULT_BRANCH="$(git ls-remote --symref origin HEAD | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')"
+          fi
+          if [[ -z "$OPENCODE_DEFAULT_BRANCH" ]]; then
+            OPENCODE_DEFAULT_BRANCH="main"
+          fi
+          export OPENCODE_DEFAULT_BRANCH
+          cat > .opencode-production-artifact-project.json <<EOF
+          {
+            "project_key": "$OPENCODE_PROJECT_KEY",
+            "repo_owner": "$OPENCODE_REPO_OWNER",
+            "repo_name": "$OPENCODE_REPO_NAME",
+            "default_branch": "$OPENCODE_DEFAULT_BRANCH"
+          }
+          EOF
+          cat > .opencode-run-production-artifact-worker.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          "$PRODUCTION_ARTIFACT_VENV/bin/python" controller/scripts/production_artifact_worker.py \
+            --repo-root "$PWD" \
+            --config "$PWD/.opencode-production-artifact-project.json" \
+            --automation-config "$PWD/controller/automation.json" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --event-path "$GITHUB_EVENT_PATH"
+          EOF
+          chmod +x .opencode-run-production-artifact-worker.sh
+          ACTIVITY_SHA="${{ inputs.build_commit_sha || github.sha }}"
+          ACTIVITY_KEY="production-artifact:pr-${{ inputs.pull_request_number }}:${ACTIVITY_SHA}"
+          ACTIVITY_LOG="$PWD/.opencode-production-artifact-activity.log"
+          "$PRODUCTION_ARTIFACT_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type production-artifact --phase artifact-upload --status running --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "$ACTIVITY_SHA" --external-key "$ACTIVITY_KEY" --summary "Production artifact finalization running"
+          if [ "${OPENCODE_PRODUCTION_ARTIFACT_PHASE_ENABLED:-false}" = "true" ]; then
+            if ! command -v phase >/dev/null 2>&1; then
+              if [ -x /opt/homebrew/bin/phase ]; then
+                export PATH="/opt/homebrew/bin:$PATH"
+              else
+                echo "Phase CLI is required for production_artifact.phase but was not found on PATH or /opt/homebrew/bin/phase." >&2
+                exit 1
+              fi
+            fi
+            phase --version
+            run_phase() {
+              phase run \
+                --app-id "$OPENCODE_PRODUCTION_ARTIFACT_PHASE_APP_ID" \
+                --env "$OPENCODE_PRODUCTION_ARTIFACT_PHASE_ENV" \
+                --path "$OPENCODE_PRODUCTION_ARTIFACT_PHASE_PATH" \
+                "$@"
+            }
+            if [ -n "${PHASE_SERVICE_TOKEN:-}" ]; then
+              if ! run_phase "true" >/tmp/opencode-phase-preflight.log 2>&1; then
+                echo "PHASE_SERVICE_TOKEN was provided but Phase rejected it; falling back to runner keychain auth." >&2
+                unset PHASE_SERVICE_TOKEN
+              fi
+            else
+              echo "PHASE_SERVICE_TOKEN is not set; trying runner keychain auth." >&2
+            fi
+            set +e
+            run_phase \
+              "bash .opencode-run-production-artifact-worker.sh" 2>&1 | tee "$ACTIVITY_LOG"
+            STATUS=${PIPESTATUS[0]}
+            set -e
+          else
+            set +e
+            bash .opencode-run-production-artifact-worker.sh 2>&1 | tee "$ACTIVITY_LOG"
+            STATUS=${PIPESTATUS[0]}
+            set -e
+          fi
+          if [ "$STATUS" -eq 0 ]; then
+            "$PRODUCTION_ARTIFACT_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type production-artifact --phase artifact-upload --status success --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "$ACTIVITY_SHA" --external-key "$ACTIVITY_KEY" --summary "Production artifact finalization completed"
+          else
+            "$PRODUCTION_ARTIFACT_VENV/bin/python" controller/scripts/activity_event.py --best-effort --ingest-url "$OPENCODE_ACTIVITY_INGEST_URL" --ingest-token "$OPENCODE_ACTIVITY_INGEST_TOKEN" --repo-root "$PWD" --project-key "$OPENCODE_PROJECT_KEY" --repo-owner "$OPENCODE_REPO_OWNER" --repo-name "$OPENCODE_REPO_NAME" --worker workflow --action-type production-artifact --phase artifact-upload --status failed --reason "worker-exit-$STATUS" --pull-request-number "${{ inputs.pull_request_number }}" --head-sha "$ACTIVITY_SHA" --external-key "$ACTIVITY_KEY" --summary "Production artifact finalization failed" --failed-log-file "$ACTIVITY_LOG"
+            exit "$STATUS"
+          fi

@@ -1,0 +1,49 @@
+{% extends 'invoices/base.html' %}
+{% load table_tags %}
+{% block main %}
+<section class="page customers-page">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Customers</h1>
+    </div>
+    <a href="{% url 'customers:add' %}" class="btn btn-primary">New customer</a>
+  </header>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <input type="hidden" name="status" value="{{ status_filter }}" />
+      <input type="hidden" name="order" value="{{ order_filter }}" />
+      <div class="filters-grid">
+        <div class="form-field page-filter-panel__period">
+          <label class="form-field__label" for="filters-period">Period</label>
+          <div class="form-field__control">
+            <select id="filters-period" name="date_range" class="field-control" onchange="this.form.submit()">
+              {% for option in global_date_filter.options %}
+                <option value="{{ option.value }}" {% if option.value == global_date_filter.key %}selected{% endif %}>
+                  {{ option.label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <span class="form-field__label">Customers</span>
+          <div class="form-field__control">
+            <div class="filter-toggle-group" role="group" aria-label="Filter customers by status">
+              {% for value, label in status_options %}
+                <button type="submit" name="status" value="{{ value }}" class="filter-toggle{% if status_filter == value %} is-active{% endif %}" aria-pressed="{% if status_filter == value %}true{% else %}false{% endif %}"{% if status_filter == value %} aria-current="true"{% endif %}>
+                  {{ label }}
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <article class="surface surface--padded">
+    {% render_data_table order_columns customer_rows query_without_order empty_message='No customers match the selected filters.' %}
+  </article>
+</section>
+{% endblock %}

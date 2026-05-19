@@ -1,0 +1,3 @@
+Txn Date,Merchant,Card Debit,ISO Currency,Reference Number,Category
+2025-11-12,Acme Office Supply,42.35,EUR,CARD-FIXTURE-001,Office supplies
+2025-11-13,SaaS Tools Ltd,19.99,EUR,CARD-FIXTURE-002,Software

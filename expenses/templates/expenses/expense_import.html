@@ -1,0 +1,134 @@
+{% extends 'invoices/base.html' %}
+{% load static table_tags %}
+{% block main %}
+<section class="page expenses-import-page" data-expense-import-flow>
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Import expense statement</h1>
+      <p class="page-subtitle">Upload a CSV, XLS, XLSX, or ZIP-with-CSV statement, review its mapping, then choose which rows become expenses.</p>
+    </div>
+    <div class="page-actions">
+      <a href="{% url 'expenses:list' %}" class="btn btn-outline-secondary">Back to expenses</a>
+    </div>
+  </header>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if stage == 'result' and result %}
+    <article class="surface surface--padded" data-testid="expense-import-result">
+      <h2>Import complete</h2>
+      <p>
+        Rows: {{ result.rows_processed }} · Created: {{ result.created }} · Skipped existing: {{ result.skipped_existing }} ·
+        Unselected: {{ result.skipped_unselected }} · Invalid: {{ result.skipped_invalid }}
+      </p>
+      {% if result.errors %}
+        <ul>{% for item in result.errors %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      <a href="{% url 'expenses:list' %}" class="btn btn-primary">View expenses</a>
+    </article>
+  {% else %}
+    <article class="surface surface--padded" data-testid="expense-import-upload">
+      <h2>1. Upload export</h2>
+      <form method="post" enctype="multipart/form-data" class="stack-gap-md">
+        {% csrf_token %}
+        <div class="form-field">
+          <label class="form-field__label" for="expense-import-files">Statement files (CSV, XLS, XLSX, or ZIP)</label>
+          <div class="form-field__control">
+            <input id="expense-import-files" type="file" name="statements" accept=".csv,.xls,.xlsx,.zip" multiple required class="field-control" data-testid="expense-import-file-input" />
+          </div>
+          <p class="form-field__help text-muted small mb-0">Supported uploads: CSV, XLS, XLSX, and ZIP files that contain CSV statements.</p>
+        </div>
+        <div class="form-field">
+          <label class="form-field__label" for="expense-import-mapping">Use saved mapping (optional)</label>
+          <div class="form-field__control">
+            <select id="expense-import-mapping" name="mapping" class="field-control">
+              <option value="">Auto-detect matching mapping</option>
+              {% for mapping in available_mappings %}
+                <option value="{{ mapping.pk }}">{{ mapping.name }} ({{ mapping.get_scope_display }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" data-testid="expense-import-upload-submit">Review mapping</button>
+      </form>
+    </article>
+  {% endif %}
+
+  {% if batch and stage != 'result' %}
+    <article class="surface surface--padded mt-3" data-testid="expense-import-mapping-review">
+      <h2>2. Review mapping</h2>
+      <p class="text-muted small">
+        Mapping source: {{ batch.metadata.mapping_source|default:'saved' }}{% if selected_mapping %} · {{ selected_mapping.name }}{% endif %}
+      </p>
+      <form method="post" action="{% url 'expenses:csv_import_review' batch.pk %}" class="stack-gap-md">
+        {% csrf_token %}
+        <div class="filters-grid">
+          {% for field in mapping_fields %}
+            <div class="form-field">
+              <label class="form-field__label" for="mapping-{{ field }}">{{ field|title }}</label>
+              <div class="form-field__control">
+                <select id="mapping-{{ field }}" name="{{ field }}" class="field-control" {% if field == 'description' %}multiple size="4"{% endif %}>
+                  <option value="">Not mapped</option>
+                  {% for header in batch.raw_headers %}
+                    <option value="{{ header }}" {% if mapping_json|get_item:field|mapping_column_selected:header %}selected{% endif %}>{{ header }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% if field == 'description' %}
+                <p class="form-field__help text-muted small mb-0">Select multiple columns to combine them into the expense description.</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="amount_mode" value="{{ mapping_json.amount_mode|default:'absolute' }}" />
+        <input type="hidden" name="date_formats" value="{{ mapping_json.date_formats|join:',' }}" />
+        <div class="form-field">
+          <label class="form-field__label" for="save-mapping-name">Save as my mapping (optional)</label>
+          <div class="form-field__control">
+            <input id="save-mapping-name" type="text" name="save_mapping_name" class="field-control" placeholder="Corporate card export" />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" data-testid="expense-import-mapping-submit">Continue to row selection</button>
+      </form>
+    </article>
+
+  {% endif %}
+
+  {% if batch and stage == 'preview' %}
+    <article class="surface surface--padded mt-3" data-testid="expense-import-row-selection">
+      <h2>3. Select rows</h2>
+      <form method="post" action="{% url 'expenses:csv_import_confirm' batch.pk %}" data-expense-import-selection>
+        {% csrf_token %}
+        <label class="bulk-toolbar__label">
+          <input type="checkbox" class="field-control--checkbox" data-expense-import-select-all checked /> Select all rows
+        </label>
+        <div class="table-responsive">
+          <table class="table">
+            <thead><tr><th></th><th>#</th><th>Date</th><th>Description</th><th class="text-end">Amount</th><th>Errors</th></tr></thead>
+            <tbody>
+              {% for row in preview_rows %}
+                <tr>
+                  <td><input type="checkbox" name="selected_rows" value="{{ row.row_index }}" class="field-control--checkbox" data-expense-import-row {% if row.selected %}checked{% endif %} /></td>
+                  <td>{{ row.row_index }}</td>
+                  <td>{{ row.mapped_data.paid_date|default:'—' }}</td>
+                  <td>{{ row.mapped_data.description|default:'—' }}</td>
+                  <td class="text-end">{{ row.mapped_data.amount|default:'0.00' }}</td>
+                  <td>{% if row.validation_errors %}{{ row.validation_errors|join:', ' }}{% else %}—{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-primary" data-testid="expense-import-confirm">Import selected rows</button>
+      </form>
+    </article>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script src="{% static 'invoices/js/expense_import.js' %}"></script>
+{% endblock %}

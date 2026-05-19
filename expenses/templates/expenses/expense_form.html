@@ -1,0 +1,24 @@
+{% extends 'invoices/base.html' %}
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <header class="mb-3">
+    <h1 class="h4">Edit expense</h1>
+  </header>
+  <form method="post" class="drawer-section stack-gap-md">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="row">
+      {% include 'invoices/partials/form_field.html' with field=form.date cls='col-md-4' %}
+      {% include 'invoices/partials/form_field.html' with field=form.amount cls='col-md-4' %}
+      {% include 'invoices/partials/form_field.html' with field=form.category cls='col-md-4' %}
+      {% include 'invoices/partials/form_field.html' with field=form.project cls='col-md-6' %}
+      {% include 'invoices/partials/form_field.html' with field=form.invoice cls='col-md-6' %}
+      {% include 'invoices/partials/form_field.html' with field=form.description cls="col-md-12" %}
+    </div>
+    <footer class="d-flex justify-content-between mt-3">
+      <a href="{% url 'expenses:list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save changes</button>
+    </footer>
+  </form>
+</section>
+{% endblock %}

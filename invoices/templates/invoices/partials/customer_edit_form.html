@@ -1,0 +1,36 @@
+<div class="stack-gap-md">
+  <div class="card">
+    <div class="card-body stack-gap-md">
+      <h2 class="section-title">Company</h2>
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=company_form.name cls='col-md-6' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.customer_information_file_number cls='col-md-3' label='VAT number' %}
+        {% include 'invoices/partials/form_field.html' with field=status_form.is_active cls='col-md-3' label='Active client' %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body stack-gap-md">
+      <h2 class="section-title">Address</h2>
+      {% include 'invoices/partials/form_field.html' with field=address_form.full_address %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body stack-gap-md">
+      <h2 class="section-title">Primary contact</h2>
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_name cls='col-md-6' label='Name' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_email cls='col-md-6' label='Email' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_cc_email cls='col-md-6' label='CC email' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_phone_number cls='col-md-6' label='Phone' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_country cls='col-md-6' label='Country' %}
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end">
+    <button type="submit" class="btn btn-primary">Save customer</button>
+  </div>
+</div>

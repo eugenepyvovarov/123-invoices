@@ -1,0 +1,64 @@
+<!doctype html>
+{% load static %}
+<html lang="en">
+  <head>
+    <title>Invoices App</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{% static 'invoices/images/favicon.ico' %}"
+    />
+
+    {% block css %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" integrity="sha384-CG4m6qBPdZiZsaAJ+lZeXqIuAv89xDSHLVQQP4SRrped1IovnHgwlHGawEq+yLKw" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/components.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/base.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/navbar.css' %}" />
+    <!-- Additional CSS files specific to each template -->
+    {% endblock %}
+  </head>
+
+  <body class="app-body">
+    <header class="app-topbar" aria-label="Mobile navigation">
+      <div class="app-topbar__inner">
+        <button
+          type="button"
+          class="icon-button app-topbar__menu"
+          data-nav-open
+          aria-controls="appSidebar"
+          aria-expanded="false"
+          aria-label="Open navigation"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-menu-2" width="22" height="22" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 6l16 0" />
+            <path d="M4 12l16 0" />
+            <path d="M4 18l16 0" />
+          </svg>
+        </button>
+        <span class="app-topbar__title">Invoices</span>
+      </div>
+    </header>
+    <div class="app-nav-backdrop" data-nav-backdrop></div>
+    <div class="app-layout">
+      <aside class="app-sidebar" id="appSidebar" data-nav-drawer aria-hidden="false">{% include 'invoices/navbar.html' %}</aside>
+      <main class="app-main">
+        <div class="app-shell">
+          {% include 'invoices/partials/messages.html' %}
+          {% block main %}
+          <!-- Here goes the content of the page -->
+          {% endblock %}
+        </div>
+      </main>
+    </div>
+    {% block javascript %}
+    <script src="{% static 'invoices/js/nav_drawer.js' %}"></script>
+    <!-- Additional JavaScript files specific to each template -->
+    {% endblock %}
+
+
+  </body>
+</html>

@@ -1,0 +1,43 @@
+{% if column.sortable is False %}
+  <th scope="col"{% if column.align %} class="{{ column.align }}"{% endif %}>
+    <span class="table-sort__label">{{ column.label }}</span>
+  </th>
+{% elif column.direction == 'asc' %}
+  <th scope="col"{% if column.align %} class="{{ column.align }}"{% endif %} aria-sort="ascending">
+    <a href="{{ href }}" class="table-sort table-sort--active table-sort--asc">
+      <span>{{ column.label }}</span>
+      <span class="table-sort__icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-narrow-up" width="16" height="16" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5l0 14" />
+          <path d="M16 9l-4 -4" />
+          <path d="M8 9l4 -4" />
+        </svg>
+      </span>
+    </a>
+  </th>
+{% elif column.direction == 'desc' %}
+  <th scope="col"{% if column.align %} class="{{ column.align }}"{% endif %} aria-sort="descending">
+    <a href="{{ href }}" class="table-sort table-sort--active table-sort--desc">
+      <span>{{ column.label }}</span>
+      <span class="table-sort__icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-narrow-down" width="16" height="16" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5l0 14" />
+          <path d="M16 15l-4 4" />
+          <path d="M8 15l4 4" />
+        </svg>
+      </span>
+    </a>
+  </th>
+{% else %}
+  <th scope="col"{% if column.align %} class="{{ column.align }}"{% endif %} aria-sort="none">
+    <a href="{{ href }}" class="table-sort">
+      <span>{{ column.label }}</span>
+      <span class="table-sort__icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrows-sort" width="16" height="16" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l4 -4l4 4m-4 -4v14" />
+          <path d="M21 15l-4 4l-4 -4m4 4v-14" />
+        </svg>
+      </span>
+    </a>
+  </th>
+{% endif %}

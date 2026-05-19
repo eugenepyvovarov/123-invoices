@@ -1,0 +1,129 @@
+{% extends 'invoices/base.html' %}
+
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <header class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <p class="mb-2"><a href="{% url 'backup_settings' %}">← Back to backup settings</a></p>
+      <h1 class="mb-1">Backup run #{{ backup_run.id }}</h1>
+      <p class="text-muted small mb-0">Per-run summary and persisted diagnostic details for this backup attempt.</p>
+    </div>
+    <div>
+      {% if backup_run.status == 'succeeded' %}
+        <span class="status-badge status-badge--success">{{ backup_run.get_status_display }}</span>
+      {% elif backup_run.status == 'failed' %}
+        <span class="status-badge">{{ backup_run.get_status_display }}</span>
+      {% else %}
+        <span class="status-badge status-badge--muted">{{ backup_run.get_status_display }}</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="drawer-section drawer-section--flat stack-gap-md">
+    <div>
+      <h2 class="section-title mb-3">Summary</h2>
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Started</dt>
+        <dd class="col-sm-9">{{ backup_run.started_at|date:'M j, Y, P' }}</dd>
+
+        <dt class="col-sm-3">Source</dt>
+        <dd class="col-sm-9">{{ backup_run.get_trigger_source_display }}</dd>
+
+        <dt class="col-sm-3">Finished</dt>
+        <dd class="col-sm-9">{% if backup_run.finished_at %}{{ backup_run.finished_at|date:'M j, Y, P' }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+        <dt class="col-sm-3">Object key</dt>
+        <dd class="col-sm-9">{% if backup_run.storage_object_key %}<code>{{ backup_run.storage_object_key }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+        <dt class="col-sm-3">Artifact size</dt>
+        <dd class="col-sm-9">{% if backup_run.artifact_size_bytes %}{{ backup_run.artifact_size_bytes|filesizeformat }} ({{ backup_run.artifact_size_bytes }} bytes){% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+        <dt class="col-sm-3">Retention bucket</dt>
+        <dd class="col-sm-9">{% if backup_run.retention_bucket %}{{ backup_run.get_retention_bucket_display }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+        <dt class="col-sm-3">Error summary</dt>
+        <dd class="col-sm-9">{% if backup_run.error_summary %}{{ backup_run.error_summary }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="drawer-section drawer-section--flat stack-gap-md">
+    <div>
+      <h2 class="section-title mb-1">Failure diagnostics</h2>
+      <p class="text-muted small mb-0">Stored failure metadata is shown when this run captured an exception.</p>
+    </div>
+    {% with failure=backup_run.diagnostics.failure %}
+      {% if failure.stage or failure.exception_class or failure.message or failure.context %}
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Failed stage</dt>
+          <dd class="col-sm-9">{% if failure.stage %}<code>{{ failure.stage }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+          <dt class="col-sm-3">Exception class</dt>
+          <dd class="col-sm-9">{% if failure.exception_class %}<code>{{ failure.exception_class }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+          <dt class="col-sm-3">Message</dt>
+          <dd class="col-sm-9">{% if failure.message %}{{ failure.message }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+
+          <dt class="col-sm-3">Context</dt>
+          <dd class="col-sm-9">
+            {% if failure.context %}
+              <dl class="mb-0">
+                {% for key, value in failure.context.items %}
+                  <dt><code>{{ key }}</code></dt>
+                  <dd>{% if value or value == 0 %}<code>{{ value }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+                {% endfor %}
+              </dl>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </dd>
+        </dl>
+      {% else %}
+        <p class="mb-0 text-muted small">No failure diagnostics were recorded for this run.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <section class="drawer-section drawer-section--flat stack-gap-md">
+    <div>
+      <h2 class="section-title mb-1">Diagnostic events</h2>
+      <p class="text-muted small mb-0">Events are ordered as they were persisted during backup execution.</p>
+    </div>
+
+    {% with events=backup_run.diagnostics.events %}
+      {% if events %}
+        <div class="stack-gap-md">
+          {% for event in events %}
+            <article class="drawer-section drawer-section--flat stack-gap-sm">
+              <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+                <div>
+                  <h3 class="h6 mb-1"><code>{{ event.stage }}</code></h3>
+                  {% if event.message %}
+                    <p class="mb-0">{{ event.message }}</p>
+                  {% endif %}
+                </div>
+                <div>
+                  <code>{{ event.timestamp }}</code>
+                </div>
+              </div>
+
+              {% if event.context %}
+                <dl class="row mb-0">
+                  {% for key, value in event.context.items %}
+                    <dt class="col-sm-3"><code>{{ key }}</code></dt>
+                    <dd class="col-sm-9">{% if value or value == 0 %}<code>{{ value }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+                  {% endfor %}
+                </dl>
+              {% else %}
+                <p class="mb-0 text-muted small">No structured context recorded for this event.</p>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="mb-0 text-muted small">No diagnostic events were recorded for this run.</p>
+      {% endif %}
+    {% endwith %}
+  </section>
+</section>
+{% endblock %}

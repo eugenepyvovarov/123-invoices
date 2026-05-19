@@ -1,0 +1,34 @@
+{% load static %}
+<div class="invoice-drawer" data-wise-import-modal aria-hidden="true" data-testid="wise-import-modal" data-modal-state="closed">
+  <div class="invoice-drawer__backdrop" data-wise-import-close></div>
+  <section class="invoice-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="wiseImportHeading" data-testid="wise-import-panel">
+    <header class="invoice-drawer__header">
+      <h2 id="wiseImportHeading">Import from Wise</h2>
+      <button type="button" aria-label="Close" class="icon-button" data-wise-import-close data-testid="wise-import-close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6l-12 12" />
+          <path d="M6 6l12 12" />
+        </svg>
+      </button>
+    </header>
+    <div class="invoice-drawer__body">
+      <form method="post" class="stack-gap-md" data-wise-import-form enctype="multipart/form-data" data-testid="wise-import-form">
+        {% csrf_token %}
+        <section class="drawer-section stack-gap-sm">
+          <div class="stack-gap-xs">
+            <h3 class="section-title mb-1">Upload statements</h3>
+            <p class="text-muted small mb-0">Drop Wise CSV exports or a ZIP bundle. We will import DEBIT transactions (excluding internal conversions) using the full timestamp.</p>
+          </div>
+          <input type="file" name="statements" accept=".csv,.zip" multiple required class="form-control" data-testid="wise-import-file-input" />
+        </section>
+        <div class="stack-gap-xs">
+          <div class="text-muted small" data-wise-import-status data-testid="wise-import-status" data-status-kind="idle" role="status" aria-live="polite"></div>
+        </div>
+        <footer class="drawer-footer d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-wise-import-close data-testid="wise-import-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-wise-import-submit data-testid="wise-import-submit">Start import</button>
+        </footer>
+      </form>
+    </div>
+  </section>
+</div>

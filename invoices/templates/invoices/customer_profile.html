@@ -1,0 +1,351 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+{% load l10n %}
+{% block main %}
+<section class="page customer-profile">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>{{ customer.company.name|default:'Customer' }}</h1>
+      <p class="page-subtitle">
+        {% if customer.billing_email %}{{ customer.billing_email }} · {% endif %}
+        {% if customer.billing_contact_name %}Contact: {{ customer.billing_contact_name }}{% endif %}
+      </p>
+    </div>
+    <div class="page-actions">
+      <a href="{% url 'invoices:add' %}?customer={{ customer.id }}" class="btn btn-primary">New invoice</a>
+      <a href="{% url 'projects:add' %}?customer={{ customer.id }}" class="btn btn-outline-secondary">New project</a>
+      <button type="button" class="btn btn-primary" data-payment-drawer-open data-payment-post="{% url 'customers:add_payment' customer.id %}">New payment</button>
+      <a href="{% url 'expenses:csv_import' %}" class="btn btn-outline-secondary">
+        <span class="btn__icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+            <path d="M7 11l5 5l5 -5" />
+            <path d="M12 4v12" />
+          </svg>
+        </span>
+        Import expense statement
+      </a>
+    </div>
+  </header>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <input type="hidden" name="tab" value="{{ active_tab }}" />
+      <div class="filters-grid">
+        <div class="form-field page-filter-panel__period">
+          <label class="form-field__label" for="customer-period">Period</label>
+          <div class="form-field__control">
+            <select id="customer-period" name="date_range" class="field-control" onchange="this.form.submit()">
+              {% for option in global_date_filter.options %}
+                <option value="{{ option.value }}" {% if option.value == global_date_filter.key %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <div class="surface surface--padded">
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="label">Invoiced amount</div>
+        <div class="value">{{ invoice_totals.invoiced_total|floatformat:2 }} €</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Paid amount</div>
+        <div class="value">{{ invoice_totals.paid_total|floatformat:2 }} €</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Pending</div>
+        <div class="value">
+          {{ invoice_totals.pending_total|floatformat:2 }} €
+          <span class="kpi__meta">
+            {% if invoice_totals.overdue_total %}
+              (Overdue <span class="text-danger">{{ invoice_totals.overdue_total|floatformat:2 }} €</span>)
+            {% else %}
+              (Overdue 0.00 €)
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="kpi">
+        <div class="label">Account balance</div>
+        <div class="value">{{ account_balance|floatformat:2 }} €</div>
+      </div>
+    </div>
+  </div>
+
+  <article class="card">
+    <header class="card__header card__header--split">
+      <h2>Customer details</h2>
+      <nav class="tab-nav" data-tab-group>
+        <a href="#activity" class="tab-nav__link{% if active_tab == 'activity' %} is-active{% endif %}" data-tab-target>Activity</a>
+        <a href="#invoices" class="tab-nav__link{% if active_tab == 'invoices' %} is-active{% endif %}" data-tab-target>Invoices</a>
+        <a href="#payments" class="tab-nav__link{% if active_tab == 'payments' %} is-active{% endif %}" data-tab-target>Payments</a>
+        <a href="#projects" class="tab-nav__link{% if active_tab == 'projects' %} is-active{% endif %}" data-tab-target>Projects</a>
+        <a href="#edit" class="tab-nav__link{% if active_tab == 'edit' %} is-active{% endif %}" data-tab-target>Edit</a>
+      </nav>
+    </header>
+    <div class="card-body">
+      <section class="tab-panel{% if active_tab == 'activity' %} is-active{% endif %}" id="activity">
+        {% if account_rows %}
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">Date</th>
+                  <th scope="col" class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in account_rows %}
+                  <tr class="account-table__row account-table__row--{{ row.type }}">
+                    <td class="account-table__item">
+                      {% if row.type == 'payment' and row.details %}
+                        Payment for
+                        {% for detail in row.details %}
+                          {% if not forloop.first %}, {% endif %}
+                          <a href="{{ detail.url }}" class="link-primary">#{{ detail.label }}</a>
+                        {% endfor %}
+                      {% elif row.url %}
+                        <a href="{{ row.url }}" class="link-primary">{{ row.title }}</a>
+                      {% else %}
+                        {{ row.title }}
+                      {% endif %}
+                    </td>
+                    <td>{% if row.date %}{{ row.date|date:"j M Y" }}{% else %}—{% endif %}</td>
+                    <td class="text-end">
+                      {{ row.amount|floatformat:2 }} €
+                      {% if row.outstanding_amount %}
+                        <div class="account-table__amount-note{% if row.outstanding_is_overdue %} account-table__amount-note--danger{% else %} account-table__amount-note--current{% endif %}">
+                          ({{ row.outstanding_amount|floatformat:2 }} €)
+                        </div>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted text-center py-4">No invoices or payments recorded yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="tab-panel{% if active_tab == 'projects' %} is-active{% endif %}" id="projects">
+        {% if projects %}
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Title</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="text-end">Invoiced</th>
+                <th scope="col" class="text-end">Paid</th>
+                <th scope="col" class="text-end">Pending</th>
+                <th scope="col">Last invoice</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for project in projects %}
+              <tr>
+                <td><a href="{% url 'projects:detail' project.id %}" class="link-primary">{{ project.project_code }}</a></td>
+                <td>{{ project.title }}</td>
+                <td>
+                  {% if project.status == 'active' %}
+                    <span class="status-badge status-badge--success">Active</span>
+                  {% else %}
+                    <span class="status-badge status-badge--muted">Inactive</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">{{ project.invoiced_total|floatformat:2 }} €</td>
+                <td class="text-end">{{ project.paid_total|floatformat:2 }} €</td>
+                <td class="text-end">
+                  {{ project.pending_total|floatformat:2 }} €
+                  {% if project.overdue_total %}
+                    <span class="kpi__meta">Overdue <span class="text-danger">{{ project.overdue_total|floatformat:2 }} €</span></span>
+                  {% endif %}
+                </td>
+                <td>{% if project.last_invoice_date %}{{ project.last_invoice_date|date:"j M Y" }}{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="text-muted text-center py-4">
+            No projects for this customer yet.
+            <a href="{% url 'projects:add' %}?customer={{ customer.id }}" class="btn btn-primary ms-2">Add project</a>
+          </p>
+        {% endif %}
+      </section>
+
+      <section class="tab-panel{% if active_tab == 'invoices' %} is-active{% endif %}" id="invoices">
+        {% if invoice_list %}
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Invoice</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Project</th>
+                  <th scope="col" class="text-end">Total</th>
+                  <th scope="col" class="text-end">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in invoice_list %}
+                  <tr>
+                    <td><a href="{% url 'invoices:edit' inv.id %}" class="link-primary">#{{ inv.sequence_number }}</a></td>
+                    <td>{% if inv.issued_date %}{{ inv.issued_date|date:"j M Y" }}{% else %}—{% endif %}</td>
+                    <td>{{ inv.display_status_label }}</td>
+                  <td>
+                    {% if inv.project %}
+                      <a href="{% url 'projects:detail' inv.project.id %}" class="link-primary">{{ inv.project.title }}</a>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                    <td class="text-end">{{ inv.total_due|floatformat:2 }} €</td>
+                    <td class="text-end">
+                      {% if inv.amount_due %}
+                        {% if inv.is_overdue %}<span class="text-danger">{% endif %}
+                        {{ inv.amount_due|floatformat:2 }} €
+                        {% if inv.is_overdue %}</span>{% endif %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted text-center py-4">No invoices for this customer.</p>
+        {% endif %}
+      </section>
+
+      <section class="tab-panel{% if active_tab == 'payments' %} is-active{% endif %}" id="payments">
+        {% if payment_list %}
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Applied to</th>
+                  <th scope="col" class="text-end">Amount</th>
+                  <th scope="col" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for payment in payment_list %}
+                  <tr>
+                    <td><a href="#" class="link-primary" data-payment-edit data-payment-id="{{ payment.id|unlocalize }}" data-payment-post="{% url 'customers:add_payment' customer.id %}">#{{ payment.id }}</a></td>
+                    <td>{{ payment.received_at|date:"j M Y" }}</td>
+                    <td>
+                      {% with apps=payment.applications.all %}
+                        {% if apps %}
+                          {% for application in apps %}
+                            {% if not forloop.first %}, {% endif %}
+                            <a href="{% url 'invoices:edit' application.invoice.id %}" class="link-primary">#{{ application.invoice.sequence_number }}</a>
+                          {% endfor %}
+                        {% else %}
+                          —
+                        {% endif %}
+                      {% endwith %}
+                    </td>
+                    <td class="text-end">{{ payment.amount|floatformat:2 }} €</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" data-payment-edit data-payment-id="{{ payment.id|unlocalize }}" data-payment-post="{% url 'customers:add_payment' customer.id %}">Edit</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger" data-payment-delete data-delete-url="{% url 'invoices:payment_delete' payment.id %}">Delete</button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted text-center py-4">No payments recorded for this customer.</p>
+        {% endif %}
+      </section>
+
+      <section class="tab-panel{% if active_tab == 'edit' %} is-active{% endif %}" id="edit">
+        <form method="post" class="stack-gap-md">
+          {% csrf_token %}
+          <input type="hidden" name="tab" value="edit" />
+          <div class="surface surface--padded stack-gap-md">
+            <h2 class="section-title">Company</h2>
+            <div class="row">
+              {% include 'invoices/partials/form_field.html' with field=company_form.name cls='col-md-6' %}
+              {% include 'invoices/partials/form_field.html' with field=company_form.customer_information_file_number cls='col-md-3' label='VAT number' %}
+              {% include 'invoices/partials/form_field.html' with field=status_form.is_active cls='col-md-3' label='Active client' %}
+            </div>
+          </div>
+
+          <div class="surface surface--padded stack-gap-md">
+            <h2 class="section-title">Address</h2>
+            {% include 'invoices/partials/form_field.html' with field=address_form.full_address %}
+          </div>
+
+          <div class="surface surface--padded stack-gap-md">
+            <h2 class="section-title">Primary contact</h2>
+            <div class="row">
+              {% include 'invoices/partials/form_field.html' with field=company_form.contact_name cls='col-md-6' label='Name' %}
+              {% include 'invoices/partials/form_field.html' with field=company_form.contact_email cls='col-md-6' label='Email' %}
+              {% include 'invoices/partials/form_field.html' with field=company_form.contact_cc_email cls='col-md-6' label='CC email' %}
+              {% include 'invoices/partials/form_field.html' with field=company_form.contact_phone_number cls='col-md-6' label='Phone' %}
+              {% include 'invoices/partials/form_field.html' with field=company_form.contact_country cls='col-md-6' label='Country' %}
+            </div>
+          </div>
+
+          <div class="surface surface--padded stack-gap-md">
+            <h2 class="section-title">Billing defaults</h2>
+            <div class="row">
+              {% include 'invoices/partials/form_field.html' with field=billing_form.currency cls='col-md-6' label='Currency' %}
+              {% include 'invoices/partials/form_field.html' with field=billing_form.payment_term cls='col-md-6' label='Payment period' %}
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save customer</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </article>
+
+  {% include 'invoices/partials/payment_drawer.html' %}
+
+</section>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-tab-group]').forEach((nav) => {
+      const links = nav.querySelectorAll('[data-tab-target]');
+      links.forEach((link) => {
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          const targetId = link.getAttribute('href').replace('#', '');
+          links.forEach((l) => l.classList.remove('is-active'));
+          link.classList.add('is-active');
+          const panels = nav.closest('.card').querySelectorAll('.tab-panel');
+          panels.forEach((panel) => {
+            panel.classList.toggle('is-active', panel.id === targetId);
+          });
+          history.replaceState({}, '', `${location.pathname}?tab=${targetId}`);
+        });
+      });
+    });
+  });
+</script>
+<script src="{% static 'invoices/js/payment_drawer.js' %}"></script>
+{% endblock %}

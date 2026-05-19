@@ -1,0 +1,109 @@
+{% with formset=formset add_label=add_button_label|default:'Add line' add_class=add_button_class|default:'btn btn-outline-secondary btn-sm' %}
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+    <div class="alert alert-info">
+      {% for error in formset.non_form_errors %}
+        <p class="mb-0">{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <div class="order-lines-table-wrapper">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle order-lines-table">
+        <colgroup>
+          <col class="order-lines-table__type-col" />
+          <col class="order-lines-table__description-col" />
+          <col class="order-lines-table__quantity-col" />
+          <col class="order-lines-table__unit-price-col" />
+          <col class="order-lines-table__remove-col" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" class="order-lines-table__type-col">Type</th>
+            <th scope="col">Description</th>
+            <th scope="col" class="text-end order-lines-table__quantity-col">Quantity</th>
+            <th scope="col" class="text-end">
+              Unit price{% if currency_label %} ({{ currency_label }}){% endif %}
+            </th>
+            <th scope="col" class="order-lines-table__remove-col">
+              <span class="visually-hidden">Remove line</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for form in formset %}
+            <tr class="formsetDynamic">
+              <td class="order-lines-table__type-cell">
+                <label for="{{ form.line_type.id_for_label }}" class="visually-hidden">{{ form.line_type.label }}</label>
+                <div class="order-line-field order-line-type-field">
+                  {{ form.line_type }}
+                </div>
+              </td>
+              <td class="order-lines-table__description-cell">
+                <label for="{{ form.description.id_for_label }}" class="visually-hidden">{{ form.description.label }}</label>
+                <div class="order-line-field">
+                  {{ form.description }}
+                  {% for error in form.description.errors %}
+                    <p class="form-field__error mb-0">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              </td>
+              <td class="text-end order-lines-table__quantity-cell">
+                <label for="{{ form.quantity.id_for_label }}" class="visually-hidden">{{ form.quantity.label }}</label>
+                <div class="order-line-field order-line-quantity-field">
+                  {{ form.quantity }}
+                  {% for error in form.quantity.errors %}
+                    <p class="form-field__error mb-0">{{ error }}</p>
+                  {% endfor %}
+                  <div class="order-line-warning" data-order-line-warning></div>
+                </div>
+              </td>
+              <td class="text-end">
+                <label for="{{ form.unit_price.id_for_label }}" class="visually-hidden">{{ form.unit_price.label }}</label>
+                <div class="order-line-field">
+                  {{ form.unit_price }}
+                  {% for error in form.unit_price.errors %}
+                    <p class="form-field__error mb-0">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              </td>
+              <td class="order-lines-table__remove-cell">
+                <div class="order-line-hidden-fields">
+                  {{ form.id }}{{ form.DELETE }}
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm js-orderline-remove" title="Delete line">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 7h16" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                    <path d="M9 7v-3h6v3" />
+                  </svg>
+                  <span class="visually-hidden">Delete line</span>
+                </button>
+                {% if form.non_field_errors %}
+                  <div class="order-lines-table__row-errors">
+                    {% for error in form.non_field_errors %}
+                      <p class="form-field__error mb-0">{{ error }}</p>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="order-lines-table__footer">
+    <button type="button" class="{{ add_class }} js-orderline-add">
+      <span class="d-inline-flex align-items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+        {{ add_label }}
+      </span>
+    </button>
+  </div>
+{% endwith %}

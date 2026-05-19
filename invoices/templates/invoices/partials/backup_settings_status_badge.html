@@ -1,0 +1,5 @@
+{% if backup_configuration.is_enabled %}
+  <span class="status-badge status-badge--success" data-backup-settings-status-badge>Enabled</span>
+{% else %}
+  <span class="status-badge status-badge--muted" data-backup-settings-status-badge>Disabled</span>
+{% endif %}

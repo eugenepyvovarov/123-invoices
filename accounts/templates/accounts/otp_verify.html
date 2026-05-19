@@ -1,0 +1,126 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enter security code · Invoices</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'invoices/images/favicon.ico' %}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" integrity="sha384-CG4m6qBPdZiZsaAJ+lZeXqIuAv89xDSHLVQQP4SRrped1IovnHgwlHGawEq+yLKw" crossorigin="anonymous" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/components.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/base.css' %}" />
+    <style>
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: radial-gradient(circle at top, #f2f5ff, #e6ecfb);
+      }
+      .auth-shell {
+        width: min(520px, 100%);
+      }
+      .auth-card {
+        border-radius: 32px;
+        background: white;
+        padding: 3rem;
+        box-shadow: 0 25px 60px rgb(15 23 42 / 0.1);
+      }
+      .auth-card h1 {
+        margin-bottom: 0.5rem;
+      }
+      .auth-card .divider {
+        margin: 2rem 0;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        color: var(--text-muted);
+      }
+      .auth-card .divider::before,
+      .auth-card .divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border-subtle);
+      }
+      .form-vertical label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        font-weight: 600;
+        color: var(--text-strong);
+      }
+      .form-vertical label input {
+        border-radius: 12px;
+        border: 1px solid #d5dcf0;
+        background: #f8f9ff;
+        padding: 0.85rem 1rem;
+        font-size: 1rem;
+      }
+      .form-vertical label input:focus {
+        border-color: #2563eb;
+        outline: none;
+        box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+      }
+      .form-button {
+        width: 100%;
+        margin-top: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="auth-shell">
+      <article class="auth-card" data-testid="otp-verify-card">
+        <header class="mb-4">
+          <p class="text-sm text-muted mb-1">Two-factor verification</p>
+          <h1>Enter your security code</h1>
+          <p class="text-muted mb-0">Open your authenticator app or use a recovery code to continue.</p>
+        </header>
+
+        {% if messages %}
+          <div class="alert alert-danger" data-testid="otp-messages">
+            {% for message in messages %}
+              {{ message }}{% if not forloop.last %}<br />{% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <form method="post" class="form-vertical" data-testid="otp-totp-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify_totp" />
+          <label for="{{ totp_form.token.id_for_label }}" class="form-label">Authenticator code</label>
+          {{ totp_form.token }}
+          {% if totp_form.token.errors %}
+            <small class="text-danger d-block mt-1">
+              {% for error in totp_form.token.errors %}
+                {{ error }}{% if not forloop.last %}<br />{% endif %}
+              {% endfor %}
+            </small>
+          {% endif %}
+          <button type="submit" class="btn btn-primary form-button" data-testid="otp-totp-submit">Verify code</button>
+        </form>
+
+        <div class="divider">or</div>
+
+        <form method="post" class="form-vertical" data-testid="otp-recovery-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify_recovery" />
+          <label for="{{ recovery_form.code.id_for_label }}" class="form-label">Recovery code</label>
+          {{ recovery_form.code }}
+          {% if recovery_form.code.errors %}
+            <small class="text-danger d-block mt-1">
+              {% for error in recovery_form.code.errors %}
+                {{ error }}{% if not forloop.last %}<br />{% endif %}
+              {% endfor %}
+            </small>
+          {% endif %}
+          <button type="submit" class="btn btn-outline-primary form-button" data-testid="otp-recovery-submit">Use recovery code</button>
+        </form>
+
+        <p class="text-muted small mt-4 mb-0">Need help? Contact an administrator to reset two-factor authentication for your account.</p>
+      </article>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,93 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <header class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Invoice details</h1>
+      <p class="text-muted small mb-0">Update header information and manage order lines for this invoice.</p>
+    </div>
+    <a href="{% url 'invoices:list' %}" class="btn btn-outline-secondary">Back to invoices</a>
+  </header>
+
+  <form method="post"
+        data-order-lines-formset="orderline"
+        data-invoice-dates
+        data-invoice-totals
+        data-discount-rate="{{ discount_rate|default:'0' }}"
+        data-tax-rate="{{ tax_rate|default:'0' }}"
+        data-currency-symbol="{{ currency_symbol|default:'€' }}"
+        data-currency-code="{{ currency_code|default:'' }}"
+        class="stack-gap-md">
+    {% csrf_token %}
+    <input type="hidden" name="reference_number_hint" value="{{ reference_number_hint }}">
+    {% if prefilled_customer_id %}
+      <input type="hidden" name="customer" value="{{ prefilled_customer_id }}">
+    {% endif %}
+    {{ invoice_form.non_field_errors }}
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Header</h2>
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.reference_number cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.payment_term cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.issued_date cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.due_date cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.project cls='col-md-6' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.bank_account cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=invoice_form.status cls='col-md-3' %}
+      </div>
+    </section>
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Notes</h2>
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.notes help_text='Shown on the invoice and PDF.' %}
+    </section>
+
+    {% include 'invoices/partials/recent_items.html' with recent_items_panel_id='invoice-recent-items-panel' recent_items_script_id='invoice-recent-items-data' %}
+
+    <section class="drawer-section">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="section-title mb-0">Order lines</h2>
+        <small class="text-muted">Start with the default rows and add or remove as needed.</small>
+      </div>
+      {% include 'invoices/partials/order_lines_table.html' with formset=order_formset add_button_class='btn btn-outline-secondary' currency_label=currency_display %}
+    </section>
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Invoice totals</h2>
+      <dl class="invoice-totals-grid" data-invoice-totals-summary>
+      <div class="invoice-totals-grid__row">
+        <dt>Subtotal</dt>
+        <dd data-total-sub>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row">
+        <dt>Discount</dt>
+        <dd data-total-discount>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row">
+        <dt>Tax</dt>
+        <dd data-total-tax>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row invoice-totals-grid__row--emphasis">
+        <dt>Total</dt>
+        <dd data-total-total>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="d-flex justify-content-end gap-2">
+      <button type="submit" class="btn btn-primary">Save invoice</button>
+    </div>
+  </form>
+</section>
+
+{{ payment_terms_meta|json_script:"payment-terms-meta" }}
+{{ project_payment_defaults|json_script:"project-payment-config" }}
+{{ customer_payment_defaults|json_script:"customer-payment-config" }}
+<script src="{% static 'invoices/js/order_lines.js' %}"></script>
+<script src="{% static 'invoices/js/invoice_dates.js' %}"></script>
+<script src="{% static 'invoices/js/invoice_totals.js' %}"></script>
+<script src="{% static 'invoices/js/recent_items.js' %}"></script>
+
+{% endblock %}

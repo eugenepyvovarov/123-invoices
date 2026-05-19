@@ -1,0 +1,100 @@
+{% if dashboard_chart.months %}
+  <section class="surface surface--padded dashboard-chart" data-dashboard-chart>
+    <header class="dashboard-chart__header">
+      <h2>Revenue vs Expense</h2>
+      <div class="dashboard-chart__legend filter-toggle-group" role="group" aria-label="Toggle revenue and expense series">
+        <button
+          type="button"
+          class="filter-toggle is-active dashboard-chart__legend-toggle dashboard-chart__legend-toggle--revenue"
+          data-dashboard-chart-toggle="revenue"
+          aria-pressed="true"
+          aria-disabled="false"
+          data-dashboard-chart-toggle-locked="false"
+        >
+          Revenue
+        </button>
+        <button
+          type="button"
+          class="filter-toggle is-active dashboard-chart__legend-toggle dashboard-chart__legend-toggle--expense"
+          data-dashboard-chart-toggle="expense"
+          aria-pressed="true"
+          aria-disabled="false"
+          data-dashboard-chart-toggle-locked="false"
+        >
+          Expenses
+        </button>
+      </div>
+    </header>
+    <div class="dashboard-chart__wrapper">
+      <div class="dashboard-chart__plot">
+        <div class="dashboard-chart__y-axis" aria-hidden="true">
+          {% for tick in dashboard_chart.y_axis_ticks %}
+            <div class="dashboard-chart__y-axis-tick">
+              <span class="dashboard-chart__y-axis-label">{{ tick.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="dashboard-chart__plot-body">
+          <div class="dashboard-chart__guide-lines" aria-hidden="true">
+            {% for tick in dashboard_chart.y_axis_ticks %}
+              <span class="dashboard-chart__guide-line" style="--tick-ratio: {{ tick.ratio }};"></span>
+            {% endfor %}
+          </div>
+          <table class="dashboard-chart__table">
+            <caption>Revenue and expense totals for the previous twenty-four months</caption>
+            <thead>
+              <tr>
+                <th scope="col">Month</th>
+                <th scope="col">Monthly totals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for point in dashboard_chart.months %}
+                <tr>
+                  <th scope="row">
+                    <span class="dashboard-chart__month-label">{{ point.month_label }}</span>
+                    <span class="visually-hidden">: Invoiced {{ point.invoiced_display }}, Expenses {{ point.expense_display }}</span>
+                  </th>
+                  {% if dashboard_chart.axis_max %}
+                  {% widthratio point.invoiced_total dashboard_chart.axis_max 1000 as invoiced_size %}
+                  {% widthratio point.expense_total dashboard_chart.axis_max 1000 as expense_size %}
+                  {% else %}
+                  {% widthratio 0 1 1000 as invoiced_size %}
+                  {% widthratio 0 1 1000 as expense_size %}
+                  {% endif %}
+                    <td
+                      class="dashboard-chart__bar"
+                      style="--revenue-size: calc({{ invoiced_size }} / 1000); --expense-size: calc({{ expense_size }} / 1000);"
+                      aria-label="{{ point.month_label }} invoiced {{ point.invoiced_display }}, expenses {{ point.expense_display }}"
+                    >
+                     <span class="data visually-hidden">{{ point.month_label }}: Invoiced {{ point.invoiced_display }}, Expenses {{ point.expense_display }}</span>
+                      <span class="dashboard-chart__bar-group" aria-hidden="true">
+                        <span class="dashboard-chart__series dashboard-chart__series--revenue" data-dashboard-chart-series="revenue">
+                          <span class="dashboard-chart__bar-revenue" aria-hidden="true"></span>
+                          <span class="dashboard-chart__bar-caption dashboard-chart__bar-caption--revenue" aria-hidden="true">{{ point.revenue_display }}</span>
+                        </span>
+                        <span class="dashboard-chart__series dashboard-chart__series--expense" data-dashboard-chart-series="expense">
+                          <span class="dashboard-chart__bar-expense" aria-hidden="true"></span>
+                          <span class="dashboard-chart__bar-caption dashboard-chart__bar-caption--expense" aria-hidden="true">{{ point.expense_display }}</span>
+                        </span>
+                     </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <ul class="dashboard-chart__x-axis" aria-hidden="true">
+          {% for point in dashboard_chart.months %}
+          <li class="dashboard-chart__x-axis-label">
+            {% if point.month_year_marker %}
+              <span class="dashboard-chart__x-axis-year">{{ point.month_year_marker }}</span>
+            {% endif %}
+            <span class="dashboard-chart__x-axis-month">{{ point.month_abbrev }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+{% endif %}

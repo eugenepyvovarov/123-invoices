@@ -1,0 +1,110 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+{% block main %}
+<section class="page expenses-page">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Expenses</h1>
+      <p class="page-subtitle">Track spending, attach vendor invoices, and keep projects in sync.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" data-expense-drawer data-expense-id="new">
+        New expense
+      </button>
+      <a href="{% url 'expenses:csv_import' %}" class="btn btn-outline-secondary" data-testid="expense-import-entry">
+        <span class="btn__icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+            <path d="M7 11l5 5l5 -5" />
+            <path d="M12 4v12" />
+          </svg>
+        </span>
+        Import expense statement
+      </a>
+    </div>
+  </header>
+
+  <div class="stack-gap-sm" aria-live="polite" data-expense-feedback></div>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <div class="filters-grid">
+        <div class="form-field page-filter-panel__period">
+          <label class="form-field__label" for="expenses-period">Period</label>
+          <div class="form-field__control">
+            <select id="expenses-period" name="date_range" class="field-control" onchange="this.form.submit()">
+              {% for option in global_date_filter.options %}
+                <option value="{{ option.value }}" {% if option.value == global_date_filter.key %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-field__label" for="expenses-search">Search</label>
+          <div class="form-field__control">
+            <input
+              id="expenses-search"
+              type="search"
+              name="q"
+              value="{{ search_query }}"
+              class="field-control"
+              placeholder="Person, company, memo, or project"
+            />
+          </div>
+        </div>
+        <div class="form-field">
+          <span class="form-field__label">Invoice available</span>
+          <div class="form-field__control">
+            <div class="filter-toggle-group" role="group" aria-label="Filter expenses by attachment">
+              <button type="submit" class="filter-toggle{% if availability_filter == 'all' %} is-active{% endif %}" name="has_attachment" value="all" aria-pressed="{% if availability_filter == 'all' %}true{% else %}false{% endif %}">
+                All
+              </button>
+              <button type="submit" class="filter-toggle{% if availability_filter == 'with' %} is-active{% endif %}" name="has_attachment" value="with" aria-pressed="{% if availability_filter == 'with' %}true{% else %}false{% endif %}">
+                With file
+              </button>
+              <button type="submit" class="filter-toggle{% if availability_filter == 'without' %} is-active{% endif %}" name="has_attachment" value="without" aria-pressed="{% if availability_filter == 'without' %}true{% else %}false{% endif %}">
+                Without file
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="form-field">
+          <span class="form-field__label">Apply</span>
+          <div class="form-field__control">
+            <div class="table-actions">
+              <button type="submit" class="btn btn-primary">Search</button>
+              {% if search_query %}
+                <a href="{% url 'expenses:list' %}?date_range={{ global_date_filter.key }}&has_attachment={{ availability_filter }}" class="btn btn-quiet">Clear</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <div id="expense-list-results" data-expense-list-results>
+    {% include 'expenses/partials/expense_list_results.html' %}
+  </div>
+</section>
+
+<div id="expenseDrawer" class="invoice-drawer" aria-hidden="true">
+  <div class="invoice-drawer__backdrop" data-expense-drawer-close></div>
+  <section class="invoice-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="expenseDrawerTitle">
+    <header class="invoice-drawer__header">
+      <h2 id="expenseDrawerTitle">Expense</h2>
+      <button type="button" class="icon-button" aria-label="Close drawer" data-expense-drawer-close>
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </header>
+    <div id="expenseDrawerContent" class="invoice-drawer__body"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script src="{% static 'invoices/js/expenses_drawer.js' %}"></script>
+{% endblock %}

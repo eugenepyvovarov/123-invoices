@@ -1,0 +1,329 @@
+{% extends 'invoices/base.html' %}
+{% load static l10n %}
+{% block main %}
+<div class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <div class="d-flex align-items-center gap-3 mb-1">
+        <h1 class="h4 mb-0">Invoice {{ invoice.sequence_number }}</h1>
+        <span class="{{ status_badge_class }}">{{ invoice.display_status_label }}</span>
+      </div>
+      <p class="text-muted mb-0">Project: {{ invoice.project|default:'—' }} · Customer: {{ invoice.customer|default:'—' }}</p>
+      {% if invoice_notes %}
+        <p class="text-muted mb-0 mt-1">Notes: {{ invoice_notes|truncatechars:120 }}</p>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'invoices:list' %}" class="btn btn-quiet">Back to invoices</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <header class="card__header card__header--split">
+      <h2>Invoice</h2>
+      <div class="d-flex align-items-center gap-2">
+        <div class="d-flex gap-2">
+          {% if show_add_payment %}
+          <button type="button" class="btn btn-primary" data-payment-drawer-open title="Add payment">
+            <span class="d-inline-flex align-items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              Add payment
+            </span>
+          </button>
+          {% endif %}
+          <a href="{% url 'invoices:generate_pdf' invoice.id %}" target="_blank" rel="noopener" class="btn btn-outline-secondary" title="Generate and open PDF" data-action="generate-pdf">
+            <span class="d-inline-flex align-items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-text" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+                <path d="M9 9l1 0" />
+                <path d="M9 13l6 0" />
+                <path d="M9 17l6 0" />
+              </svg>
+              PDF
+            </span>
+          </a>
+        </div>
+        <nav class="tab-nav" data-tab-group>
+          <a href="#preview" class="tab-nav__link{% if active_tab == 'preview' %} is-active{% endif %}" data-tab-target>Preview</a>
+          <a href="#edit" class="tab-nav__link{% if active_tab == 'edit' %} is-active{% endif %}" data-tab-target>Edit</a>
+        </nav>
+      </div>
+    </header>
+    <div class="card-body">
+      <section class="tab-panel{% if active_tab == 'preview' %} is-active{% endif %}" id="preview">
+        {% if invoice_payment_applications %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h3 class="section-title mb-0">Payments</h3>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Date</th>
+                    <th scope="col" class="text-end">Applied</th>
+                    <th scope="col" class="text-end">Payment</th>
+                    <th scope="col">Memo</th>
+                    <th scope="col" class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for application in invoice_payment_applications %}
+                    {% with payment=application.payment %}
+                      <tr>
+                        <td>
+                          {% if invoice.customer %}
+                            <a href="#" class="link-primary" data-payment-edit data-payment-id="{{ payment.id|unlocalize }}" data-payment-post="{% url 'customers:add_payment' invoice.customer.id %}">#{{ payment.id }}</a>
+                          {% else %}
+                            #{{ payment.id }}
+                          {% endif %}
+                        </td>
+                        <td>{{ payment.received_at|date:"j M Y" }}</td>
+                        <td class="text-end">{{ application.amount_applied|floatformat:2 }} {{ currency_display|default:currency_symbol|default:'€' }}</td>
+                        <td class="text-end">{{ payment.amount|floatformat:2 }} {{ currency_display|default:currency_symbol|default:'€' }}</td>
+                        <td>{{ payment.memo|default:"—"|truncatechars:60 }}</td>
+                        <td class="text-end">
+                          <div class="d-inline-flex flex-wrap justify-content-end gap-2">
+                            {% if invoice.customer %}
+                              <button type="button" class="btn btn-sm btn-outline-secondary" data-payment-edit data-payment-id="{{ payment.id|unlocalize }}" data-payment-post="{% url 'customers:add_payment' invoice.customer.id %}">Open</button>
+                            {% endif %}
+                            <form method="post" action="{% url 'invoices:remove_payment_application' invoice.id application.id %}" class="d-inline" onsubmit="return confirm('Remove this payment from this invoice? The payment record will be kept.');">
+                              {% csrf_token %}
+                              <button type="submit" class="btn btn-sm btn-outline-danger">Remove from invoice</button>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endwith %}
+                  {% endfor %}
+                  <tr class="text-muted">
+                    <td class="fw-semibold">Outstanding</td>
+                    <td>—</td>
+                    <td class="text-end">—</td>
+                    <td class="text-end fw-semibold">{{ invoice_remaining|floatformat:2 }} {{ currency_display|default:currency_symbol|default:'€' }}</td>
+                    <td>—</td>
+                    <td class="text-end">
+                      {% if show_add_payment %}
+                        <button type="button" class="btn btn-sm btn-primary" data-payment-drawer-open>Add payment</button>
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+        <div style="width: 100%; height: 1200px;">
+          <iframe id="invoice-preview-frame" src="{{ preview_url }}" data-preview-src="{{ preview_url }}" title="Invoice preview" style="width: 100%; height: 100%; border: 1px solid #e9ecef; border-radius: 6px;"></iframe>
+        </div>
+      </section>
+
+      <section class="tab-panel{% if active_tab == 'edit' %} is-active{% endif %}" id="edit">
+        <form method="post"
+              data-order-lines-formset="orderline"
+              data-invoice-dates
+              data-invoice-totals
+              data-quick-save-url="{% url 'invoices:quick_save' invoice.id %}"
+              data-discount-rate="{{ discount_rate|default:'0' }}"
+              data-tax-rate="{{ tax_rate|default:'0' }}"
+              data-currency-symbol="{{ currency_symbol|default:'€' }}"
+              class="stack-gap-md">
+          {% csrf_token %}
+          {{ invoice_form.non_field_errors }}
+
+          <section class="drawer-section">
+            <h2 class="section-title mb-3">Header</h2>
+            <div class="row">
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.reference_number cls='col-md-3' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.payment_term cls='col-md-3' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.issued_date cls='col-md-3' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.due_date cls='col-md-3' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.project cls='col-md-6' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.bank_account cls='col-md-3' %}
+              {% include 'invoices/partials/form_field.html' with field=invoice_form.status cls='col-md-3' %}
+            </div>
+          </section>
+
+          <section class="drawer-section">
+            <h2 class="section-title mb-3">Notes</h2>
+            {% include 'invoices/partials/form_field.html' with field=invoice_form.notes help_text='Shown on the invoice and PDF.' %}
+          </section>
+
+          {% if show_recent_items %}
+            {% include 'invoices/partials/recent_items.html' with recent_items_panel_id='invoice-profile-recent-items-panel' recent_items_script_id='invoice-profile-recent-items-data' %}
+          {% endif %}
+
+          <section class="drawer-section">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="section-title mb-0">Order lines</h2>
+        <small class="text-muted">Start with the default rows and add or remove as needed.</small>
+      </div>
+      {% include 'invoices/partials/order_lines_table.html' with formset=order_formset add_button_class='btn btn-outline-secondary' currency_label=currency_display %}
+    </section>
+
+          <section class="drawer-section">
+            <h2 class="section-title mb-3">Invoice totals</h2>
+      <dl class="invoice-totals-grid" data-invoice-totals-summary>
+        <div class="invoice-totals-grid__row">
+          <dt>Subtotal</dt>
+          <dd data-total-sub>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+        </div>
+        <div class="invoice-totals-grid__row">
+          <dt>Discount</dt>
+          <dd data-total-discount>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+        </div>
+        <div class="invoice-totals-grid__row">
+          <dt>Tax</dt>
+          <dd data-total-tax>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+        </div>
+        <div class="invoice-totals-grid__row invoice-totals-grid__row--emphasis">
+          <dt>Total</dt>
+          <dd data-total-total>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+        </div>
+      </dl>
+    </section>
+
+          <footer class="d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-primary">Save invoice</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  {# Ensure the payment drawer markup is rendered within the main block #}
+  {% include 'invoices/partials/payment_drawer.html' %}
+
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+{{ payment_terms_meta|json_script:"payment-terms-meta" }}
+{{ project_payment_defaults|json_script:"project-payment-config" }}
+{{ customer_payment_defaults|json_script:"customer-payment-config" }}
+<script src="{% static 'invoices/js/order_lines.js' %}"></script>
+<script src="{% static 'invoices/js/invoice_dates.js' %}"></script>
+<script src="{% static 'invoices/js/invoice_totals.js' %}"></script>
+<script src="{% static 'invoices/js/recent_items.js' %}"></script>
+<script src="{% static 'invoices/js/payment_drawer.js' %}"></script>
+<script>
+  function getCsrfToken() {
+    const cookie = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const group = document.querySelector('[data-tab-group]');
+    if (!group) return;
+    const tabs = group.querySelectorAll('[data-tab-target]');
+    const panels = document.querySelectorAll('.tab-panel');
+    const activate = (id) => {
+      tabs.forEach((tab) => tab.classList.toggle('is-active', tab.getAttribute('href') === `#${id}`));
+      panels.forEach((panel) => panel.classList.toggle('is-active', panel.id === id));
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', id);
+      history.replaceState({}, '', url.toString());
+    };
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', (e) => {
+        const targetId = tab.getAttribute('href').slice(1);
+        if (targetId === 'preview') {
+          e.preventDefault();
+          attemptQuickSave().then((ok) => {
+            if (!ok) {
+              return;
+            }
+            refreshPreview();
+            activate('preview');
+          });
+        } else {
+          e.preventDefault();
+          activate(targetId);
+        }
+      });
+    });
+
+    const invoiceForm = document.querySelector('[data-invoice-dates][data-quick-save-url]');
+    let quickSavePromise = null;
+    if (window.invoiceDates && typeof window.invoiceDates.init === 'function') {
+      window.invoiceDates.init(invoiceForm);
+    }
+    if (window.invoiceTotals && typeof window.invoiceTotals.init === 'function') {
+      window.invoiceTotals.init(invoiceForm);
+    }
+
+    function attemptQuickSave() {
+      if (quickSavePromise) {
+        return quickSavePromise;
+      }
+      if (!invoiceForm) {
+        return Promise.resolve(true);
+      }
+      const quickSaveUrl = invoiceForm.dataset.quickSaveUrl;
+      if (!quickSaveUrl) {
+        return Promise.resolve(true);
+      }
+
+      const formData = new FormData(invoiceForm);
+      quickSavePromise = fetch(quickSaveUrl, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': getCsrfToken() },
+      })
+        .then((response) => {
+          if (response.ok) {
+            return true;
+          }
+          return response.json().then((data) => {
+            const message = data?.errors ? 'Please review the highlighted fields before continuing.' : 'Unable to save invoice.';
+            alert(message);
+            return false;
+          }).catch(() => {
+            alert('Unable to save invoice.');
+            return false;
+          });
+        })
+        .catch(() => {
+          alert('Unable to save invoice.');
+          return false;
+        });
+      return quickSavePromise.finally(() => {
+        quickSavePromise = null;
+      });
+    }
+
+    function refreshPreview() {
+      const frame = document.getElementById('invoice-preview-frame');
+      if (frame) {
+        const baseSrc = frame.dataset.previewSrc || frame.src;
+        frame.src = `${baseSrc}${baseSrc.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      }
+    }
+
+    const generateBtn = document.querySelector('[data-action="generate-pdf"]');
+    if (generateBtn) {
+      generateBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        attemptQuickSave().then((ok) => {
+          if (ok) {
+            window.open(generateBtn.href, '_blank', 'noopener');
+          }
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}
+
+{# Note: includes outside of blocks are ignored in Django extends #}

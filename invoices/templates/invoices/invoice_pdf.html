@@ -1,0 +1,202 @@
+<!--invoice_pdf.html-->
+{% load static %}
+{% block content %}
+{% if pdf_inline_css %}
+  <style>
+    {{ pdf_inline_css|safe }}
+  </style>
+{% else %}
+  <link rel="stylesheet" type="text/css" href="{% static 'invoices/css/render_invoice_pdf_styles.css' %}">
+{% endif %}
+<header>
+
+  <div class="invoice-info header-item">
+    <h2 class="title left-margin">INVOICE</h2>
+    <div class="invoice-info-detail small-margins left-margin">
+      <h3>Number:</h3>
+      <p>{{invoice.sequence_number}}</p>
+      <div class="break"></div> <!-- break -->
+      <h3>Date:</h3>
+      <p>{{invoice.issued_date|date:"d/m/Y"}}</p>
+      {% if invoice.due_date %}
+      <div class="break"></div> <!-- break -->
+      <h3>Due Date:</h3>
+      <p>{{ invoice.due_date|date:"d/m/Y" }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="logo header-item">
+    {% if invoice.issuer.company.logo %}
+      <img src="{{ invoice.issuer.company.logo.url }}">
+    {% endif %}
+  </div>
+  <div class="company-data header-item">
+    <div class="company-meta">
+      <span class="company-meta__name">{{ invoice.issuer.company.name|upper }}</span>
+      <span class="company-meta__vat">VAT {{ invoice.issuer.company.customer_information_file_number }}</span>
+    </div>
+    {% with issuer_address=invoice.issuer.company.address %}
+      <div class="company-address">
+        {% if issuer_address and issuer_address.full_address %}
+          {{ issuer_address.full_address|upper|linebreaksbr }}
+        {% else %}
+          {% if issuer_address %}
+            {% if issuer_address.street %}
+              {{ issuer_address.street|upper }}<br />
+            {% endif %}
+            {% if issuer_address.postal_code or issuer_address.city %}
+              {{ issuer_address.postal_code|upper }} {{ issuer_address.city|upper }}{% if issuer_address.state %}, {{ issuer_address.state|upper }}{% endif %}<br />
+            {% endif %}
+            {% if issuer_address.country %}
+              {{ issuer_address.country|upper }}
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endwith %}
+  </div>
+ 
+</header>
+<main>
+  <div class="content-box customer-data">
+    <div class="invoice-info-detail item small-margins left-margin">
+      <h3>Customer:</h3>
+      <p> 
+          {{invoice.customer.company.name|upper}} 
+          {% with customer_address=invoice.customer.company.address %}
+          {% if customer_address and customer_address.full_address %}
+              <br /><br />{{ customer_address.full_address|upper|linebreaksbr }}
+          {% endif %}
+        {% endwith %}
+      </p>
+    </div>
+    
+    {% if invoice.customer.company.customer_information_file_number %}
+    <div class="invoice-info-detail item small-margins left-margin">
+      <h3>VAT:</h3>
+      <p>{{invoice.customer.company.customer_information_file_number}}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if project_name %}
+  <div class="project-summary">
+    <h2>Project: {{ project_name|upper }}</h2>
+  </div>
+  {% endif %}
+
+  <div class="container-table-products">
+    <table id="products" align="center">
+      <thead>
+        <tr class="no-border">
+          <th colspan="4"></th>
+        </tr>
+        <tr class="no-border"></tr>
+        <tr>
+            <th class="description-col">Description</th>
+            <th class="qty-col">Hrs / Qty</th>
+            <th class="rate-col">Rate</th>
+            <th class="amount-col">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in order_lines %}
+        <tr>
+          <td class="description-col">{{ order.description }}</td>
+          <td class="qty-col">{{ order.quantity|floatformat:"2" }}</td>
+          <td class="rate-col">{{ order.unit_price|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+          <td class="amount-col last-column-bold">{{ order.amount|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        {% endfor %}
+        {% for i in empty_rows %}
+        <tr>
+          <td class="description-col"></td>
+          <td class="qty-col"></td>
+          <td class="rate-col"></td>
+          <td class="amount-col"></td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td class="no-border" colspan="4"></td>
+        </tr>
+        <tr class="no-border"></tr>
+        <tr>
+          <td class="no-border border-top-0"></td>
+          <td class="summary-label left-bold-border align-right top-bold-border border-bottom-0 pr-1" colspan="2">Total</td>
+          <td class="amount-col last-column left-bold-border top-bold-border">{{ invoice.sub_total|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        <tr>
+          <td class="no-border border-top-0"></td>
+          <td class="summary-label left-bold-border border-right-0 align-right border-top-0 border-bottom-0 text-red" colspan="2">Discount ({{invoice.discount_value|floatformat:"0"}}%)</td>
+          <td class="amount-col last-column left-bold-border text-red">-{{ invoice.discount_amount|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        <tr>
+          <td class="no-border border-top-0"></td>
+          <td class="summary-label left-bold-border align-right pr-1 border-top-0 border-bottom-0" colspan="2">Taxable Base</td>
+          <td class="amount-col last-column left-bold-border">{{ invoice.tax_base|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        <tr>
+          <td class="no-border border-top-0"></td>
+          <td class="summary-label left-bold-border border-right-0 border-top-0 border-bottom-0 align-right" colspan="2">VAT {{invoice.tax_value|floatformat:"0"}}%</td>
+          <td class="amount-col last-column left-bold-border">{{ invoice.tax_amount|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        <tr>
+          <td class="no-border border-top-0"></td>
+          <td class="summary-label left-bold-border bottom-bold-border border-top-0 align-right pr-1 text-bold" colspan="2">Invoice Total</td>
+          <td class="amount-col last-column-bold left-bold-border bottom-bold-border">{{ invoice.total_due|floatformat:"2" }} {{ currency_display|default:currency_symbol }}</td>
+        </tr>
+        <tr>
+          <td class="no-border" colspan="4"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if invoice_notes %}
+    <div class="content-box notes">
+      <div class="invoice-info-detail item small-margins left-margin">
+        <h3>Notes:</h3>
+        <p style="padding: 0;">{{ invoice_notes|linebreaksbr }}</p>
+      </div>
+    </div>
+  {% endif %}
+  {% with issuer_company=invoice.issuer.company selected_account=bank_account|default:invoice.bank_account %}
+    {% if selected_account or issuer_company.payment_method or issuer_company.bank_account_number or issuer_company.payment_terms %}
+    <div class="content-box payment-data">
+      {% if selected_account or issuer_company.payment_method or issuer_company.bank_account_number %}
+      <div class="payment-info-detail item small-margins">
+        <h3>Payment Info:</h3>
+        <div class="payment-info-detail__content">
+          {% if selected_account %}
+            {% if selected_account.payment_method %}
+              <p>{{ selected_account.payment_method|upper|linebreaksbr }}</p>
+            {% endif %}
+            {% if selected_account.account_details %}
+              <p>{{ selected_account.account_details|linebreaksbr }}</p>
+            {% endif %}
+          {% else %}
+            {% if issuer_company.payment_method %}
+              <p>{{ issuer_company.payment_method|upper|linebreaksbr }}</p>
+            {% endif %}
+            {% if issuer_company.bank_account_number %}
+              <p>{{ issuer_company.bank_account_number|linebreaksbr }}</p>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if issuer_company.payment_terms %}
+      <div class="payment-info-detail item small-margins">
+        <h3>Payment Notes:</h3>
+        <div class="payment-info-detail__content">
+          <p>{{ issuer_company.payment_terms|linebreaksbr }}</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% endwith %}
+  </main>
+
+{% endblock %}

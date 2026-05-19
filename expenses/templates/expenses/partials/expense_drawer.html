@@ -1,0 +1,37 @@
+<form id="expense-drawer-form" class="stack-gap-md" method="post" enctype="multipart/form-data" action="{{ action_url }}">
+  {% csrf_token %}
+  <input type="hidden" name="current_list_url" value="" data-expense-current-list-url />
+  {{ form.non_field_errors }}
+  <div class="stack-gap-md">
+    {% include 'invoices/partials/form_field.html' with field=form.paid_date label='Paid date' %}
+    {% include 'invoices/partials/form_field.html' with field=form.amount label='Amount (EUR)' %}
+    {% include 'invoices/partials/form_field.html' with field=form.customer label='Customer (optional)' %}
+    {% include 'invoices/partials/form_field.html' with field=form.project label='Project (optional)' %}
+    <div class="form-field">
+      <label class="form-field__label" for="{{ form.attachment.id_for_label }}">Invoice attachment</label>
+      <div class="form-field__control">
+        {{ form.attachment }}
+      </div>
+      {% if form.instance and form.instance.attachment %}
+        <small class="form-field__help">
+          Current file:
+          <a href="{{ form.instance.attachment.url }}" target="_blank" rel="noopener">
+            {{ form.instance.attachment.name|cut:'expenses/' }}
+          </a>
+        </small>
+      {% endif %}
+      {% for error in form.attachment.errors %}
+        <p class="form-field__error">{{ error }}</p>
+      {% endfor %}
+    </div>
+    {% include 'invoices/partials/form_field.html' with field=form.remove_attachment label='Remove attachment' %}
+    {% include 'invoices/partials/form_field.html' with field=form.description label='Description (optional)' %}
+    {% include 'invoices/partials/form_field.html' with field=form.exclude_from_reports label='Exclude from reports' %}
+  </div>
+  <footer class="drawer-actions">
+    <button type="button" class="btn btn-outline-secondary" data-expense-drawer-close>Cancel</button>
+    <button type="submit" class="btn btn-primary">Save expense</button>
+  </footer>
+</form>
+
+{{ project_options|json_script:"expense-project-options" }}

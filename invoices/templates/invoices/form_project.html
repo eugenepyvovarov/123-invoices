@@ -1,0 +1,32 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <h1 class="mb-3">{% if project %}Edit project{% else %}New project{% endif %}</h1>
+  <form method="post" class="stack-gap-md" data-project-form>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <section class="drawer-section">
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=form.title cls='col-md-6' %}
+        {% include 'invoices/partials/form_field.html' with field=form.project_code cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=form.status cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=form.customer cls='col-md-6' %}
+        {% include 'invoices/partials/form_field.html' with field=form.payment_term cls='col-md-3' %}
+        {% include 'invoices/partials/form_field.html' with field=form.comment cls='col-md-12' %}
+      </div>
+    </section>
+
+    <footer class="d-flex justify-content-end gap-2">
+      <button type="submit" class="btn btn-primary">Save project</button>
+    </footer>
+  </form>
+</section>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+{{ customer_payment_defaults|json_script:"customer-payment-config" }}
+<script src="{% static 'invoices/js/project_form.js' %}"></script>
+{% endblock %}

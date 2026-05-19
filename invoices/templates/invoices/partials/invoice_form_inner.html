@@ -1,0 +1,91 @@
+<form id="invoice-drawer-form"
+      method="post"
+      data-testid="invoice-drawer-form"
+      data-order-lines-formset="orderline"
+      data-invoice-dates
+      data-invoice-totals
+      data-discount-rate="{{ discount_rate|default:'0' }}"
+      data-tax-rate="{{ tax_rate|default:'0' }}"
+      data-currency-symbol="{{ currency_symbol|default:'€' }}"
+      data-currency-code="{{ currency_code|default:'' }}"
+      class="stack-gap-md">
+  {% csrf_token %}
+  <div class="drawer-header">
+    <div>
+      <div class="drawer-header__title">{{ invoice.sequence_number }}</div>
+      <div class="drawer-header__subtitle">
+        {% if invoice.issued_date %}
+          Issued {{ invoice.issued_date|date:"j M Y" }}
+        {% else %}
+          Draft invoice
+        {% endif %}
+        {% if invoice.project %}
+          &nbsp;&middot;&nbsp;Project {{ invoice.project.project_code }}
+        {% endif %}
+        {% if invoice.total_due is not None %}
+          &nbsp;&middot;&nbsp;Total {{ invoice.total_due|floatformat:2 }} {{ currency_display|default:currency_symbol|default:'€' }}
+        {% endif %}
+      </div>
+    </div>
+    <span class="{{ status_badge_class }}" data-testid="invoice-drawer-status-badge" data-status="{{ invoice.display_status_label|lower }}">{{ invoice.display_status_label }}</span>
+  </div>
+
+  <section class="drawer-section">
+    {{ invoice_form.non_field_errors }}
+    <div class="row">
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.reference_number cls='col-md-3' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.payment_term cls='col-md-3' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.issued_date cls='col-md-3' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.due_date cls='col-md-3' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.project cls='col-md-6' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.bank_account cls='col-md-3' %}
+      {% include 'invoices/partials/form_field.html' with field=invoice_form.status cls='col-md-3' %}
+    </div>
+  </section>
+
+  {% include 'invoices/partials/recent_items.html' with recent_items_panel_id='invoice-drawer-recent-items-panel' recent_items_script_id='invoice-drawer-recent-items-data' %}
+
+  <section class="drawer-section">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="section-title mb-0">Order lines</h6>
+      <small class="text-muted">Autosaves after each change</small>
+    </div>
+    {% include 'invoices/partials/order_lines_table.html' with formset=order_formset add_button_class='btn btn-outline-secondary btn-sm' currency_label=currency_display %}
+  </section>
+
+  <section class="drawer-section">
+    <h6 class="section-title mb-0">Notes</h6>
+    {% include 'invoices/partials/form_field.html' with field=invoice_form.notes help_text='Shown on the invoice and PDF.' %}
+  </section>
+
+  <section class="drawer-section">
+    <h6 class="section-title mb-0">Invoice totals</h6>
+    <dl class="invoice-totals-grid" data-invoice-totals-summary>
+      <div class="invoice-totals-grid__row">
+        <dt>Subtotal</dt>
+        <dd data-total-sub>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row">
+        <dt>Discount</dt>
+        <dd data-total-discount>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row">
+        <dt>Tax</dt>
+        <dd data-total-tax>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+      <div class="invoice-totals-grid__row invoice-totals-grid__row--emphasis">
+        <dt>Total</dt>
+        <dd data-total-total>0.00 {{ currency_display|default:currency_symbol|default:'€' }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  {{ payment_terms_meta|json_script:"payment-terms-meta" }}
+  {{ project_payment_defaults|json_script:"project-payment-config" }}
+  {{ customer_payment_defaults|json_script:"customer-payment-config" }}
+
+  <footer class="drawer-footer d-flex justify-content-end gap-2">
+    <button type="button" class="btn btn-outline-secondary" data-invoice-drawer-close>Close</button>
+    <button type="submit" class="btn btn-primary" data-testid="invoice-drawer-save">Save</button>
+  </footer>
+</form>

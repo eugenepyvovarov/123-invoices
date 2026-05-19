@@ -1,0 +1,48 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <header class="mb-4">
+    <h1 class="mb-1">Customer profile</h1>
+    <p class="text-muted small mb-0">Keep customer, address, and contact details up to date. These details will appear on invoices.</p>
+  </header>
+
+  <form method="post" class="stack-gap-md">
+    {% csrf_token %}
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Company</h2>
+      {{ company_form.non_field_errors }}
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=company_form.name cls='col-md-6' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.customer_information_file_number cls='col-md-3' label='VAT number' %}
+        {% include 'invoices/partials/form_field.html' with field=status_form.is_active cls='col-md-3' label='Active client' %}
+      </div>
+    </section>
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Address</h2>
+      {{ address_form.non_field_errors }}
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=address_form.full_address cls='col-md-12' %}
+      </div>
+    </section>
+
+    <section class="drawer-section">
+      <h2 class="section-title mb-3">Primary contact</h2>
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_name cls='col-md-4' label='Name' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_email cls='col-md-4' label='Email' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_cc_email cls='col-md-4' label='CC email' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_phone_number cls='col-md-4' label='Phone' %}
+        {% include 'invoices/partials/form_field.html' with field=company_form.contact_country cls='col-md-4' label='Country' %}
+      </div>
+    </section>
+
+    <footer class="d-flex justify-content-end gap-2">
+      <button type="submit" class="btn btn-primary">Save customer</button>
+    </footer>
+  </form>
+</section>
+{% endblock %}

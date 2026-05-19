@@ -1,0 +1,190 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+{% block main %}
+<div class="bulk-wizard py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="h4 mb-1">Generate last month’s invoices</h1>
+      <p class="text-muted mb-0 small">
+        Period: {{ last_month_start|date:"j M Y" }} – {{ last_month_end|date:"j M Y" }}. Adjust line items before creating drafts.
+      </p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-quiet">Back to dashboard</a>
+  </div>
+
+  <form method="post" id="bulk-last-month-form" class="d-flex flex-column gap-4">
+    {% csrf_token %}
+    {% for row in candidates %}
+    <section class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <div class="form-check mb-1">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="selected"
+                value="{{ row.project.id }}"
+                id="project-select-{{ row.project.id }}"
+                checked
+              />
+              <label class="form-check-label fw-semibold" for="project-select-{{ row.project.id }}">
+                {{ row.project.project_code }} — {{ row.project.title }}
+              </label>
+            </div>
+            <div class="text-muted small">
+              Client: {{ row.project.customer.company|default:'—' }} ·
+              Last invoice:
+              <a href="{% url 'invoices:edit' row.invoice.id %}" target="_blank">{{ row.invoice.sequence_number }}</a>
+              ({{ row.invoice.total_due|floatformat:2 }} €)
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary js-add-line"
+            data-project="{{ row.project.id }}"
+          >
+            Add line
+          </button>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table align-middle bulk-lines-table" data-project="{{ row.project.id }}">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col" class="text-end">Quantity</th>
+                <th scope="col" class="text-end">Unit price</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in row.lines %}
+              <tr>
+                <td>
+                  <input
+                    type="text"
+                    name="project-{{ row.project.id }}-description"
+                    value="{{ line.description }}"
+                    class="form-control"
+                    placeholder="Description"
+                  />
+                </td>
+                <td class="text-end">
+                  <input
+                    type="number"
+                    step="0.001"
+                    name="project-{{ row.project.id }}-quantity"
+                    value="{{ line.quantity }}"
+                    class="form-control text-end"
+                  />
+                </td>
+                <td class="text-end">
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="project-{{ row.project.id }}-unit_price"
+                    value="{{ line.unit_price }}"
+                    class="form-control text-end"
+                  />
+                </td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-link text-danger btn-sm js-remove-line">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    {% empty %}
+    <div class="card">
+      <div class="card-body text-center text-muted py-5">
+        No eligible projects found for last month. Create invoices manually instead.
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if candidates %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="text-muted small">
+        Drafts inherit client and numbering defaults. PDFs are generated immediately when selected.
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" name="action" value="create" class="btn btn-primary">
+          Create drafts
+        </button>
+        <button type="submit" name="action" value="create_and_generate" class="btn btn-outline-primary">
+          Create drafts & PDFs
+        </button>
+      </div>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+{% if candidates %}
+<script>
+  (function () {
+    function createRow(projectId) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <input type="text" name="project-${projectId}-description" class="form-control" placeholder="Description" />
+        </td>
+        <td class="text-end">
+          <input type="number" step="0.001" name="project-${projectId}-quantity" class="form-control text-end" />
+        </td>
+        <td class="text-end">
+          <input type="number" step="0.01" name="project-${projectId}-unit_price" class="form-control text-end" />
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-link text-danger btn-sm js-remove-line">Remove</button>
+        </td>`;
+      return tr;
+    }
+
+    function ensureRow(tbody, projectId) {
+      if (!tbody) return;
+      if (!tbody.children.length) {
+        tbody.appendChild(createRow(projectId));
+      }
+    }
+
+    document.addEventListener('click', (event) => {
+      const addBtn = event.target.closest('.js-add-line');
+      if (addBtn) {
+        event.preventDefault();
+        const projectId = addBtn.getAttribute('data-project');
+        const table = document.querySelector(`table[data-project="${projectId}"] tbody`);
+        if (table) {
+          table.appendChild(createRow(projectId));
+        }
+        return;
+      }
+
+      const removeBtn = event.target.closest('.js-remove-line');
+      if (removeBtn) {
+        event.preventDefault();
+        const row = removeBtn.closest('tr');
+        const tbody = row && row.parentElement;
+        if (!tbody) {
+          return;
+        }
+        const projectId = tbody.closest('table')?.getAttribute('data-project');
+        row.remove();
+        ensureRow(tbody, projectId);
+      }
+    });
+
+    document.querySelectorAll('.bulk-lines-table tbody').forEach((tbody) => {
+      const projectId = tbody.closest('table')?.getAttribute('data-project');
+      ensureRow(tbody, projectId);
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

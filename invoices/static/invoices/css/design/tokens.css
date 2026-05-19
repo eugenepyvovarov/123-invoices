@@ -1,0 +1,56 @@
+:root {
+  --color-bg: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-soft: #eef2ff;
+  --color-surface-muted: #f1f5f9;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-accent: #2563eb;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  --color-accent-softer: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5f5;
+  --color-surface-inverse: #ffffff;
+  --color-success: #16a34a;
+  --color-success-strong: #15803d;
+  --color-success-soft: color-mix(in srgb, var(--color-success) 18%, transparent);
+  --color-danger: #dc2626;
+  --color-danger-strong: #b91c1c;
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 22%, transparent);
+  --color-secondary: #475569;
+  --color-field-border: color-mix(in srgb, var(--color-text) 16%, transparent);
+  --color-overlay-soft: color-mix(in srgb, var(--color-text) 8%, transparent);
+  --color-overlay-mid: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --color-overlay-strong: color-mix(in srgb, var(--color-text) 35%, transparent);
+  --shadow-sm: 0 4px 12px color-mix(in srgb, var(--color-text) 6%, transparent);
+  --shadow-md: 0 12px 24px color-mix(in srgb, var(--color-text) 10%, transparent);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --transition-fast: 160ms ease;
+}
+
+.bg-surface { background: var(--color-surface); }
+.text-muted { color: var(--color-text-muted); }
+.bordered { border: 1px solid var(--color-border); }
+.rounded-md { border-radius: var(--radius-md); }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.gap-2 { gap: var(--space-2); }
+.gap-4 { gap: var(--space-4); }
+.p-4 { padding: var(--space-4); }
+.p-6 { padding: var(--space-6); }
+.mt-4 { margin-top: var(--space-4); }
+.mb-3 { margin-bottom: var(--space-3); }
+.mb-4 { margin-bottom: var(--space-4); }
+.text-right { text-align: right; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+@media (max-width: 992px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

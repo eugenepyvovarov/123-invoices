@@ -1,0 +1,147 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in · Invoices</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'invoices/images/favicon.ico' %}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" integrity="sha384-CG4m6qBPdZiZsaAJ+lZeXqIuAv89xDSHLVQQP4SRrped1IovnHgwlHGawEq+yLKw" crossorigin="anonymous" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/design/components.css' %}" />
+    <link rel="stylesheet" href="{% static 'invoices/css/base.css' %}" />
+    <style>
+      :root {
+        --login-card-radius: 32px;
+        --login-shadow: 0 25px 60px rgb(15 23 42 / 0.1);
+        --login-input-bg: #f8f9ff;
+        --login-input-border: #d5dcf0;
+        --login-button: #2563eb;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: radial-gradient(circle at top, #f2f5ff, #e6ecfb);
+      }
+
+      .auth-shell {
+        width: min(520px, 100%);
+      }
+
+      .auth-card {
+        border-radius: var(--login-card-radius);
+        background: white;
+        padding: 3rem;
+        box-shadow: var(--login-shadow);
+      }
+
+      .auth-card h1 {
+        margin-bottom: 2rem;
+        font-weight: 600;
+      }
+
+      .auth-card label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #1f2933;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .auth-card label > input {
+        border-radius: 12px;
+        border: 1px solid var(--login-input-border);
+        background: var(--login-input-bg);
+        padding: 0.85rem 1rem;
+        font-size: 1rem;
+      }
+
+      .auth-card label > input:focus {
+        border-color: var(--login-button);
+        outline: none;
+        box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+      }
+
+      .auth-card button[type="submit"] {
+        width: 100%;
+        margin-top: 0.5rem;
+        padding: 1rem;
+        border-radius: 12px;
+        border: none;
+        font-size: 1rem;
+        font-weight: 600;
+        background: var(--login-button);
+        color: white;
+        transition: filter 150ms ease;
+      }
+
+      .auth-card button[type="submit"]:hover {
+        filter: brightness(1.05);
+      }
+
+      .auth-footer {
+        margin-top: 1.25rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="auth-shell">
+      <article class="auth-card">
+        <header>
+          <p class="text-muted">Invoices</p>
+          <h1>Sign in</h1>
+        </header>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger" data-testid="login-form-errors">
+            {% for error in form.non_field_errors %}
+              {{ error }}{% if not forloop.last %}<br />{% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <form method="post" class="stack-gap-md" novalidate data-testid="login-form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}" />
+
+          <label for="{{ form.username.id_for_label }}">
+            Email
+            {{ form.username }}
+          </label>
+          {% if form.username.errors %}
+            <small class="text-danger">
+              {% for error in form.username.errors %}
+                {{ error }}{% if not forloop.last %}<br />{% endif %}
+              {% endfor %}
+            </small>
+          {% endif %}
+
+          <label for="{{ form.password.id_for_label }}">
+            Password
+            {{ form.password }}
+          </label>
+          {% if form.password.errors %}
+            <small class="text-danger">
+              {% for error in form.password.errors %}
+                {{ error }}{% if not forloop.last %}<br />{% endif %}
+              {% endfor %}
+            </small>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary" data-testid="login-submit">Continue</button>
+        </form>
+
+        <p class="auth-footer">
+          Need access? Ask an administrator to create an account for you.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>

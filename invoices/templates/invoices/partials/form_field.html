@@ -1,0 +1,27 @@
+{% if field %}
+  {% if field.is_hidden %}
+    {{ field }}
+  {% else %}
+    <div class="form-field {{ cls|default:'' }}">
+      {% if field.field.widget.input_type == 'checkbox' %}
+        <label class="form-field__checkbox">
+          {{ field }}
+          <span>{% firstof label field.label %}</span>
+        </label>
+      {% else %}
+        <label class="form-field__label" for="{{ field.id_for_label }}">
+          {% firstof label field.label %}
+        </label>
+        <div class="form-field__control">
+          {{ field }}
+        </div>
+      {% endif %}
+      {% if help_text or field.help_text %}
+        <small class="form-field__help">{% firstof help_text field.help_text %}</small>
+      {% endif %}
+      {% for error in field.errors %}
+        <p class="form-field__error">{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

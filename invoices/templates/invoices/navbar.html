@@ -1,0 +1,160 @@
+{% load static %}
+
+{% block navbar %}
+<div class="sidebar">
+  <div class="sidebar__mobile-header">
+    <span class="sidebar__mobile-title">Menu</span>
+    <button type="button" class="icon-button sidebar__mobile-close" data-nav-close aria-label="Close navigation">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="22" height="22" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+  <header class="sidebar__header">
+    {% if issuer_companies %}
+      <div class="company-switcher" data-testid="company-switcher">
+        <div class="company-switcher__control">
+          <details class="dropdown" data-dropdown data-testid="company-switcher-dropdown">
+            <summary class="company-switcher__summary" role="button" data-testid="company-switcher-toggle">
+              <span class="company-switcher__name" data-testid="company-switcher-active-name">
+                {% if is_cross_company_dashboard %}
+                  Dashboard
+                {% elif active_issuer %}
+                  {{ active_issuer.company.name }}
+                {% else %}
+                  Select a company
+                {% endif %}
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-down company-switcher__chevron" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6l6 -6" />
+              </svg>
+            </summary>
+            <ul data-testid="company-switcher-menu">
+              <li>
+                <a href="{% url 'cross_company_dashboard' %}" class="dropdown-item company-switcher__option"{% if request.path == '/dashboard/cross-company/' %} aria-current="page"{% endif %}>
+                  <span class="company-switcher__option-name">Dashboard</span>
+                </a>
+              </li>
+              {% for issuer in issuer_companies %}
+                <li>
+                  <form method="post" action="{% url 'company:switch' %}" class="company-switcher__form" data-testid="company-switcher-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                    <input type="hidden" name="company_id" value="{{ issuer.company_id }}" />
+                    <button type="submit" class="dropdown-item company-switcher__option" data-testid="company-switcher-option" data-company-id="{{ issuer.company_id }}"{% if not is_cross_company_dashboard and active_issuer and issuer.pk == active_issuer.pk %} aria-current="true"{% endif %}>
+                      <span class="company-switcher__option-name">{{ issuer.company.name }}</span>
+                      {% if active_issuer and issuer.pk == active_issuer.pk and not is_cross_company_dashboard %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check company-switcher__check" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M5 12l5 5l10 -10" />
+                        </svg>
+                      {% endif %}
+                    </button>
+                  </form>
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+          <a href="{% url 'company:settings' %}" class="company-switcher__manage" aria-label="Manage companies" data-testid="company-switcher-manage-link">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.118c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.118 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.118 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.118c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.118c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.118 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.118 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37a1.724 1.724 0 0 0 2.572 -1.118z" />
+              <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <p class="sidebar__empty">Add a company to get started.</p>
+    {% endif %}
+  </header>
+
+  <nav class="sidebar__nav" aria-label="Primary navigation">
+    {% if not is_cross_company_dashboard %}
+      <ul class="sidebar__links">
+        <li><a href="{% url 'dashboard' %}" class="sidebar__link{% if request.path == '/' or request.path|slice:':10' == '/dashboard' %} is-active{% endif %}">Dashboard</a></li>
+        <li><a href="{% url 'customers:list' %}" class="sidebar__link{% if request.path|slice:':11' == '/customers/' %} is-active{% endif %}">Customers</a></li>
+        <li><a href="{% url 'projects:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/projects/' %} is-active{% endif %}">Projects</a></li>
+        <li><a href="{% url 'invoices:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/invoices/' %} is-active{% endif %}">Invoices</a></li>
+        <li><a href="{% url 'expenses:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/expenses/' %} is-active{% endif %}">Expenses</a></li>
+      </ul>
+    {% endif %}
+    {% if not is_cross_company_dashboard %}
+      <div class="sidebar__meta sidebar__customers sidebar__customers--desktop">
+        <span class="sidebar__meta-title">Customers</span>
+        {% if sidebar_active_customers %}
+          <ul class="sidebar__meta-list">
+            {% for customer in sidebar_active_customers %}
+              <li>
+                <a href="{% url 'customers:detail' customer.id %}" class="sidebar__meta-link sidebar__meta-link--customer">
+                  {{ customer.company.name }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <span class="sidebar__meta-empty">No active customers yet.</span>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if not is_cross_company_dashboard %}
+      <div class="sidebar__meta sidebar__customers sidebar__customers--mobile">
+        <span class="sidebar__meta-title">Customers</span>
+        {% if sidebar_active_customers %}
+          <details class="dropdown sidebar-customers-dropdown">
+            <summary class="sidebar-customers-dropdown__summary" role="button">
+              Browse customers
+            </summary>
+            <ul class="sidebar-customers-dropdown__menu">
+              {% for customer in sidebar_active_customers %}
+                <li>
+                  <a href="{% url 'customers:detail' customer.id %}" class="sidebar__meta-link sidebar__meta-link--customer">
+                    {{ customer.company.name }}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% else %}
+          <span class="sidebar__meta-empty">No active customers yet.</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </nav>
+  <div class="sidebar__meta">
+    <span class="sidebar__meta-title">Account</span>
+    <p class="sidebar__meta-empty mb-2">{{ request.user.email }}</p>
+    {% if request.user.is_superuser %}
+      <a href="{% url 'backup_settings' %}" class="btn btn-outline-secondary w-100 mb-2 sidebar__account-action">
+        <span class="sidebar__account-action-content">
+          <span class="sidebar__account-action-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-database-export" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3" />
+              <path d="M4 6v6c0 1.657 3.582 3 8 3c.35 0 .694 -.008 1.03 -.024" />
+              <path d="M20 12v-6" />
+              <path d="M4 12v6c0 1.657 3.582 3 8 3" />
+              <path d="M11 10.5v-4.5" />
+              <path d="M15 18h6" />
+              <path d="M18 15l3 3l-3 3" />
+            </svg>
+          </span>
+          <span class="sidebar__account-action-label">Backups</span>
+        </span>
+      </a>
+    {% endif %}
+    <form method="post" action="{% url 'accounts:logout' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary w-100 sidebar__account-action">
+        <span class="sidebar__account-action-content">
+          <span class="sidebar__account-action-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-logout" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" />
+              <path d="M9 12h12l-3 -3" />
+              <path d="M18 15l3 -3" />
+            </svg>
+          </span>
+          <span class="sidebar__account-action-label">Logout</span>
+        </span>
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

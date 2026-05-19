@@ -1,0 +1,111 @@
+{% extends 'invoices/base.html' %}
+{% load static tz %}
+
+{% block main %}
+<section class="py-4 stack-gap-md">
+  <header class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <h1 class="mb-1">Backup settings</h1>
+      <p class="text-muted small mb-0">Backup configuration and recent run history are available to superusers only.</p>
+    </div>
+    <div data-backup-settings-status-badge-container>
+      {% include 'invoices/partials/backup_settings_status_badge.html' %}
+    </div>
+  </header>
+
+  {% with active_backup_tab=backup_tab|default:'recent-backups' %}
+    <section class="stack-gap-md backup-settings-tabs" data-backup-settings-tabs>
+      <nav class="tab-nav backup-settings-tab-nav" data-tab-group>
+        <a href="#recent-backups-panel" class="tab-nav__link{% if active_backup_tab == 'recent-backups' %} is-active{% endif %}" data-tab-target>Recent backups</a>
+        <a href="#backup-settings-panel" class="tab-nav__link{% if active_backup_tab == 'settings' %} is-active{% endif %}" data-tab-target>Backup settings</a>
+      </nav>
+
+      <div class="tab-container tab-panels stack-gap-md backup-settings-tab-container">
+        <section class="tab-panel backup-settings-tab-panel{% if active_backup_tab == 'recent-backups' %} is-active{% endif %}" id="recent-backups-panel" data-backup-settings-panel>
+          <section class="drawer-section drawer-section--flat stack-gap-md">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+              <div>
+                <h2 class="section-title mb-1">Recent backups</h2>
+                <p class="text-muted small mb-0">The latest 10 backup attempts are shown here.</p>
+              </div>
+              <form method="post" action="{% url 'backup_run_now' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Run backup now</button>
+              </form>
+            </div>
+
+            {% if recent_backup_runs %}
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                      <tr>
+                        <th scope="col">Started</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Finished</th>
+                        <th scope="col">Size</th>
+                        <th scope="col" class="text-end">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {% for run in recent_backup_runs %}
+                       <tr>
+                          <td data-label="Started">{{ run.started_at_display }}</td>
+                          <td data-label="Source">{{ run.get_trigger_source_display }}</td>
+                          <td data-label="Status">
+                            <span class="backup-status-indicator backup-status-indicator--{{ run.status_indicator.variant }}" aria-label="{{ run.status_indicator.label }}">
+                              {% if run.status_indicator.icon == 'circle-check' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                  <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                  <path d="M9 12l2 2l4 -4" />
+                                </svg>
+                              {% elif run.status_indicator.icon == 'circle-x' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                  <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                  <path d="M10 10l4 4m0 -4l-4 4" />
+                                </svg>
+                              {% else %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-progress" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                  <path d="M12 6v3" />
+                                  <path d="M12 15v3" />
+                                  <path d="M15 12h3" />
+                                  <path d="M6 12h3" />
+                                </svg>
+                              {% endif %}
+                              <span class="visually-hidden">{{ run.status_indicator.label }}</span>
+                            </span>
+                          </td>
+                          <td data-label="Finished">{% if run.finished_at %}{{ run.finished_at_display }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                          <td data-label="Size">{% if run.download_url and run.artifact_size_bytes %}<a href="{{ run.download_url }}" target="_blank" rel="noopener">{{ run.artifact_size_bytes|filesizeformat }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                          <td data-label="Actions" class="text-end table-actions-cell">
+                            <div class="table-actions">
+                              <a href="{% url 'backup_run_detail' run.id %}" class="btn btn-sm btn-outline-secondary">View details</a>
+                           </div>
+                         </td>
+                       </tr>
+                     {% endfor %}
+                   </tbody>
+                 </table>
+              </div>
+            {% else %}
+              <p class="mb-0 text-muted small">No backup runs have been recorded yet.</p>
+            {% endif %}
+          </section>
+        </section>
+
+        <section class="tab-panel backup-settings-tab-panel{% if active_backup_tab == 'settings' %} is-active{% endif %}" id="backup-settings-panel" data-backup-settings-panel>
+          {% include 'invoices/partials/backup_settings_settings_panel.html' %}
+        </section>
+      </div>
+    </section>
+  {% endwith %}
+</section>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script src="{% static 'invoices/js/backup_settings.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,27 @@
+<section
+  class="drawer-section"
+  data-recent-items-component
+  data-selected-project="{{ selected_project_id|default_if_none:'' }}"
+  data-recent-items-url-template="{% url 'projects:recent_items' 0 %}"
+  data-recent-items-data-script="{{ recent_items_script_id }}"
+  {% if recent_items_exclude_invoice_id %}data-exclude-invoice="{{ recent_items_exclude_invoice_id }}"{% endif %}
+  data-recent-items-expanded="true"
+>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h2 class="section-title mb-1">Recently used items</h2>
+      <small class="text-muted">Click “Add” to copy the row into the order lines below.</small>
+    </div>
+    <button
+      type="button"
+      class="btn btn-outline-secondary btn-sm"
+      data-recent-items-toggle
+      aria-controls="{{ recent_items_panel_id }}"
+      aria-expanded="true"
+    >
+      Hide recent tasks
+    </button>
+  </div>
+  <div id="{{ recent_items_panel_id }}" data-recent-items-wrapper></div>
+  {{ recent_items_data|json_script:recent_items_script_id }}
+</section>

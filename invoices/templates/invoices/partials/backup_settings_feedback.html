@@ -1,0 +1,3 @@
+{% if feedback_message %}
+  <div class="alert alert-{{ feedback_level|default:'info' }}" role="alert">{{ feedback_message }}</div>
+{% endif %}

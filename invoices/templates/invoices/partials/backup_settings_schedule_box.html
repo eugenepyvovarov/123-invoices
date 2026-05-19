@@ -1,0 +1,16 @@
+<section class="drawer-section drawer-section--flat stack-gap-md" data-backup-settings-schedule-section>
+  <div>
+    <h2 class="section-title mb-1">Schedule and retention</h2>
+    <p class="text-muted small mb-0">Control when automated backups run and how many uploaded snapshots are retained.</p>
+  </div>
+
+  <div class="row">
+    {% include 'invoices/partials/form_field.html' with field=backup_form.is_enabled cls='col-md-3' label='Enable automated backups' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.daily_run_time cls='col-md-3' label='Daily run time' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.daily_retention_count cls='col-md-2' label='Daily kept' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.weekly_retention_count cls='col-md-2' label='Weekly kept' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.monthly_retention_count cls='col-md-2' label='Monthly kept' %}
+  </div>
+  <p class="text-muted small mb-1">The daily run time is interpreted in {{ backup_scheduling_timezone }}.</p>
+  <p class="text-muted small mb-0">Retention counts control how many uploaded daily, weekly, and monthly snapshots remain stored remotely.</p>
+</section>

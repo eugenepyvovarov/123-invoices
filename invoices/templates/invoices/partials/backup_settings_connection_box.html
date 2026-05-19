@@ -1,0 +1,27 @@
+<section class="drawer-section drawer-section--flat stack-gap-md" data-backup-settings-destination-section>
+  <div>
+    <h2 class="section-title mb-1">S3 connection</h2>
+    <p class="text-muted small mb-0">Update the destination and credentials used for remote backup uploads.</p>
+  </div>
+
+  {{ backup_form.non_field_errors }}
+
+  <div class="row">
+    {% include 'invoices/partials/form_field.html' with field=backup_form.endpoint_url cls='col-md-6' label='Endpoint URL' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.bucket_name cls='col-md-3' label='Bucket name' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.region cls='col-md-3' %}
+  </div>
+  <div class="row">
+    {% include 'invoices/partials/form_field.html' with field=backup_form.object_prefix cls='col-md-4' label='Object prefix' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.access_key_id cls='col-md-4' label='Access key ID' %}
+    {% include 'invoices/partials/form_field.html' with field=backup_form.secret_access_key cls='col-md-4' label='Secret access key' %}
+  </div>
+
+  <div class="stack-gap-sm" aria-live="polite" data-backup-settings-test-feedback>
+    {% include 'invoices/partials/backup_settings_feedback.html' with feedback_message=test_feedback_message feedback_level=test_feedback_level %}
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 flex-wrap">
+    <button type="submit" name="action" value="test_s3_connection" class="btn btn-outline-secondary">Test S3 connection</button>
+  </div>
+</section>

@@ -1,0 +1,153 @@
+{% extends 'invoices/base.html' %}
+{% load static %}
+{% block main %}
+<section class="page dashboard-page">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Dashboard</h1>
+    </div>
+  </header>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <div class="filters-grid">
+        <div class="form-field page-filter-panel__period">
+          <label class="form-field__label" for="dashboard-period">Period</label>
+          <div class="form-field__control">
+            <select id="dashboard-period" name="date_range" class="field-control" onchange="this.form.submit()">
+              {% for option in global_date_filter.options %}
+                <option value="{{ option.value }}" {% if option.value == global_date_filter.key %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  {% include 'invoices/partials/dashboard_chart.html' %}
+
+  <section class="stack-gap-md dashboard">
+  <section class="dashboard__kpis">
+    <article class="kpi-card">
+      <h2>Total pending</h2>
+      <p>{{ pending_total|floatformat:2 }} €</p>
+    </article>
+    <article class="kpi-card">
+      <h2>Overdue</h2>
+      <p class="text-danger">{{ overdue_total|floatformat:2 }} €</p>
+    </article>
+    <article class="kpi-card">
+      <h2>Invoiced {{ period_name }}</h2>
+      <p>{{ invoiced_total|floatformat:2 }} €</p>
+    </article>
+    <article class="kpi-card">
+      <h2>Paid {{ period_name }}</h2>
+      <p>{{ paid_total|floatformat:2 }} €</p>
+    </article>
+  </section>
+
+  <div class="dashboard__grid">
+    <section class="dashboard__split">
+      <article class="card">
+        <header class="card__header">
+          <h2>Top Pending Invoices</h2>
+        </header>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table" data-testid="dashboard-top-pending-invoices">
+            <thead><tr><th>#</th><th>Client</th><th class="text-end">Total</th></tr></thead>
+            <tbody>
+              {% for inv in top_pending %}
+                <tr>
+                  <td><a href="{% url 'invoices:edit' inv.id %}" class="link">{{ inv.sequence_number }}</a></td>
+                  <td>{{ inv.customer }}</td>
+                  <td class="text-end">{{ inv.total_due|floatformat:2 }} €</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-center text-muted">No data</td></tr>
+              {% endfor %}
+            </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>Overdue Invoices</h2>
+        </header>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table" data-testid="dashboard-overdue-invoices">
+            <thead><tr><th>#</th><th>Date</th><th>Client</th><th class="text-end">Overdue amount</th></tr></thead>
+            <tbody>
+              {% for inv in top_overdue %}
+                <tr>
+                  <td><a href="{% url 'invoices:edit' inv.id %}" class="link">{{ inv.sequence_number }}</a></td>
+                  <td>{{ inv.issued_date|date:"j/m/Y" }}</td>
+                  <td>{{ inv.customer }}</td>
+                  <td class="text-end"><strong class="text-danger">{{ inv.amount_due|default_if_none:0|floatformat:2 }} €</strong></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted">No data</td></tr>
+              {% endfor %}
+            </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </section>
+
+      <article class="card dashboard__full">
+        <header class="card__header card__header--split">
+          <h2>Recent invoices</h2>
+          <div class="dashboard__actions">
+            <a class="btn btn-primary btn-sm" href="{% url 'invoices:add' %}">New invoice</a>
+          </div>
+        </header>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table" data-testid="dashboard-recent-invoices">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Client</th>
+              <th>Project</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in recent_invoices %}
+              <tr>
+                <td><a href="{% url 'invoices:edit' inv.id %}" class="link">{{ inv.sequence_number }}</a></td>
+                <td>{{ inv.issued_date|date:"j/m/Y" }}</td>
+                <td>{{ inv.display_status_label }}</td>
+                <td>{% if inv.customer %}<a href="{% url 'customers:detail' inv.customer.id %}" class="link">{{ inv.customer }}</a>{% else %}—{% endif %}</td>
+                <td>{% if inv.project %}<a href="{% url 'projects:detail' inv.project.id %}" class="link">{{ inv.project.title }}</a>{% else %}—{% endif %}</td>
+                <td class="text-end">{{ inv.total_due|floatformat:2 }} €</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="text-center text-muted">No invoices yet</td></tr>
+            {% endfor %}
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+  </div>
+  </section>
+</section>
+
+{% include 'invoices/partials/invoice_drawer.html' %}
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script src="{% static 'invoices/js/dashboard_chart.js' %}"></script>
+<script src="{% static 'invoices/js/order_lines.js' %}"></script>
+<script src="{% static 'invoices/js/recent_items.js' %}"></script>
+<script src="{% static 'invoices/js/invoice_drawer.js' %}"></script>
+{% endblock %}

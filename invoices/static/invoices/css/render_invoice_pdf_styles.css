@@ -1,0 +1,293 @@
+html {
+    box-sizing: border-box;
+    font-family: 'Open Sans', 'sans-serif';
+    background-color: #fff;
+    color: #444;
+}
+
+@page {
+    size: A4;
+    margin: 1cm;
+    font-size: 10px;
+}
+
+body{
+    display: flex;
+    flex-wrap: wrap;
+    margin: auto;
+    padding: 0;
+    width: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 13px;
+}
+
+header {
+    order: 1;
+    display: flex;
+    padding-top: 1.5em;
+    margin-bottom: 1em;
+    height: 130px;
+    width: 100%;
+
+}
+main {
+    order: 1;
+    display: flex;
+    margin-bottom: 2rem;
+
+    width: 100%;
+    flex-wrap: wrap;
+}
+h3 {
+    font-size: 13px;
+    width: 80px;
+    font-weight: normal;
+}
+.title {
+    font-size: 24px !important;
+    margin-bottom: 0.5em;
+}
+.break {
+    flex-basis: 100%;
+    height: 0;
+}
+.header-item + .header-item{
+    margin-left: 2%;
+}
+.invoice-info {
+    order:1;
+    flex-basis: 55%;
+    max-width: 55%;
+}
+.invoice-info-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+}
+.invoice-info-detail .detail-label {
+    font-weight: 600;
+    margin-right: 0.5em;
+    text-transform: uppercase;
+}
+.small-margins>*{
+    margin-bottom: 0.1em;
+    margin-top: 0.1em;
+}
+.left-margin, .left-margin>*{
+    margin-left: 0.2em;
+}
+.logo {
+    order:2;
+    flex-grow: 0;
+    flex-basis: 20%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 1.5em;
+}
+.logo>img {
+    justify-content: center;
+    height: 120px;
+    width: 130px;
+}
+.company-data {
+    order: 3;
+    flex-grow: 0;
+    flex-basis: 35%;
+    margin-left: auto;
+    text-align: right;
+    padding-right: 0.8em;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-top: 1.6em;
+}
+.company-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2em;
+    font-weight: 400;
+    margin-bottom: 0.5em;
+}
+.company-meta__name {
+    font-weight: 600;
+}
+.company-meta__vat {
+    font-weight: 400;
+}
+.company-meta__name,
+.company-meta__vat {
+    text-align: right;
+}
+.company-address {
+    text-align: right;
+    line-height: 1.4em;
+}
+
+.client-data{
+    order: 4;
+}
+.item{
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+}
+.content-box {
+    border: 3pt solid black;
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+.customer-data{
+    line-height: 1.5em;
+    padding-bottom: 0.2em !important;
+    padding-top: 0.2em !important;
+}
+.notes {
+    padding: 0.6em 0.8em !important;
+}
+.notes .invoice-info-detail {
+    align-items: flex-start;
+}
+.notes h3 {
+    width: 90px;
+    margin: 0;
+    text-align: left;
+    font-weight: normal;
+}
+.notes p {
+    margin: 0;
+    flex: 1;
+}
+.project-summary {
+    width: 100%;
+    text-align: center;
+    margin: 2em 0 0;
+}
+.project-summary h2 {
+    display: inline-block;
+    width: auto;
+    margin: 0 0.5em 0 0;
+}
+.project-summary p {
+    display: inline-block;
+    margin: 0;
+    font-weight: 600;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    border: 3pt solid black;
+}
+.container-table-products {
+    margin-top: 3em;
+    margin-bottom: 2em;
+    order: 5;
+    min-height: 280px;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+
+}
+th,td {
+    border: 1px solid black;
+    text-align: center;
+    width: 0;
+}
+
+#products .description-col {
+    width: 45%;
+    text-align: left !important;
+    padding-left: 0.6em;
+}
+#products .qty-col,
+#products .rate-col {
+    width: 18%;
+    text-align: right !important;
+    padding-right: 0.6em;
+}
+#products .rate-col {
+    width: 18%;
+}
+#products .amount-col {
+    width: 19%;
+    text-align: right !important;
+    padding-right: 0.6em;
+}
+.summary-label {
+    text-align: right !important;
+    padding-right: 0.6em;
+}
+
+.last-column{
+    text-align: right;
+}
+
+.last-column-bold{
+    text-align: right;
+    font-weight: bold;
+}
+tr {
+    height: 23.5px;
+}
+
+.left-bold-border{
+    border-left: 3pt solid black !important;
+}
+.top-bold-border{
+    border-top: 3pt solid black !important;
+}
+
+
+.payment-data {
+    margin-top: 4em;
+    order: 6;
+    padding-top: 0.3em !important;
+    padding-bottom: 1.8em !important;
+}
+.payment-info-detail {
+    margin-left: 0;
+    padding: 0.4em 1em;
+}
+.payment-info-detail>h3 {
+    width: 140px;
+    text-align: left;
+}
+.payment-info-detail.item {
+    justify-content: flex-start;
+}
+.payment-info-detail__content {
+    flex: 1;
+    text-align: left;
+}
+.payment-info-detail__content p {
+    margin: 0.1em 0;
+}
+.text-red{
+    color: red;
+}
+.text-bold{
+    font-weight: bold !important;
+}
+.align-right {
+    text-align: right;
+}
+.pr-1{
+    padding-right: 1.5em;
+}
+.bottom-bold-border{
+    border-bottom: 3pt solid black !important;
+}
+.border-right-0{
+    border-right: 0;
+}
+.border-top-0{
+    border-top: 0 !important;
+}
+.border-bottom-0{
+    border-bottom: 0! important;
+}
+.no-border, .no-border>th{
+    border: 0;
+}

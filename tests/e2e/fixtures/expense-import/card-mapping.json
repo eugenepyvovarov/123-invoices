@@ -1,0 +1,9 @@
+{
+  "paid_date": "Txn Date",
+  "amount": "Card Debit",
+  "description": "Merchant",
+  "transaction_id": "Reference Number",
+  "currency": "ISO Currency",
+  "date_formats": ["%Y-%m-%d"],
+  "amount_mode": "absolute"
+}

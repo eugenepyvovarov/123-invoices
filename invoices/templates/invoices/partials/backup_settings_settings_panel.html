@@ -1,0 +1,15 @@
+<form method="post" class="stack-gap-md" novalidate data-backup-settings-form>
+  {% csrf_token %}
+  <div class="stack-gap-md" data-backup-settings-settings-panel>
+    {% include 'invoices/partials/backup_settings_connection_box.html' %}
+    {% include 'invoices/partials/backup_settings_schedule_box.html' %}
+
+    <div class="stack-gap-sm" aria-live="polite" data-backup-settings-save-feedback>
+      {% include 'invoices/partials/backup_settings_feedback.html' with feedback_message=save_feedback_message feedback_level=save_feedback_level %}
+    </div>
+
+    <footer class="d-flex justify-content-end gap-2 flex-wrap" data-backup-settings-actions>
+      <button type="submit" name="action" value="save" class="btn btn-primary">Save changes</button>
+    </footer>
+  </div>
+</form>

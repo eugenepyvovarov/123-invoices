@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+declare -a CANDIDATES=()
+declare -a EXTRA_ARGS=()
+
+has_explicit_model=0
+for arg in "$@"; do
+  case "${arg}" in
+    -m|--model)
+      has_explicit_model=1
+      break
+      ;;
+    --model=*)
+      has_explicit_model=1
+      break
+      ;;
+  esac
+done
+
+if [ -n "${OPENCODE_DEFAULT_MODEL:-}" ] && [ "${has_explicit_model}" -eq 0 ]; then
+  EXTRA_ARGS=(--model "${OPENCODE_DEFAULT_MODEL}")
+fi
+
+if [ -n "${OPENCODE_BIN:-}" ]; then
+  CANDIDATES+=("${OPENCODE_BIN}")
+fi
+
+CANDIDATES+=(
+  "${REPO_ROOT}/controller/opencode"
+  "${REPO_ROOT}/controller/bin/opencode"
+  "${REPO_ROOT}/controller/scripts/opencode"
+  "${REPO_ROOT}/controller/.venv/bin/opencode"
+)
+
+for candidate in "${CANDIDATES[@]}"; do
+  if [ -x "${candidate}" ]; then
+    if [ "${OPENCODE_RESOLVE_ONLY:-0}" = "1" ]; then
+      printf '%s\n' "${candidate}"
+      exit 0
+    fi
+
+    if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
+      exec "${candidate}" "${EXTRA_ARGS[@]}" "$@"
+    fi
+
+    exec "${candidate}" "$@"
+  fi
+done
+
+echo "Unable to resolve opencode CLI from controller checkout. Checked: ${CANDIDATES[*]}" >&2
+exit 127

@@ -1,0 +1,134 @@
+# Deployment
+
+## Runtime Shape
+
+The production runtime is a Docker image run through Docker Compose with two
+services:
+
+- `web`: runs Gunicorn and applies startup migrations.
+- `scheduler`: runs `python manage.py run_backup_scheduler`.
+
+Both services use the same image and share the same mounted runtime state:
+
+- `./db:/app/db`
+- `./media:/app/media`
+- `./.env:/app/.env:ro`
+
+For the SQLite deployment path, both containers should resolve the database to
+`/app/db/db.sqlite3`.
+
+## Local Docker Commands
+
+Build a local image:
+
+```bash
+docker build -t invoices:local .
+```
+
+Run a one-off container:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env -e RUN_MIGRATIONS=1 \
+  -v "$(pwd)/db:/app/db" \
+  -v "$(pwd)/media:/app/media" \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  invoices:local
+```
+
+Run the Compose stack:
+
+```bash
+docker compose up -d
+```
+
+Override the image used by Compose:
+
+```bash
+INVOICES_IMAGE=git.ultramac.work/lifeisgoodlabs/invoices:some-tag docker compose up -d
+```
+
+## Production Rollout
+
+The canonical live deploy command is:
+
+```bash
+./scripts/deploy.sh
+```
+
+It performs the full rollout:
+
+- resolves deploy-managed runtime values;
+- builds and pushes the image through `scripts/build_and_push.sh`;
+- exports one `INVOICES_IMAGE` value for both services;
+- pulls the new image for `web` and `scheduler`;
+- recreates `web` before `scheduler`;
+- runs `scripts/verify_deploy.sh`.
+
+Useful inputs:
+
+- `REGISTRY_HOST`, default `git.ultramac.work`.
+- `REGISTRY_IMAGE`, default `git.ultramac.work/lifeisgoodlabs/invoices`.
+- `TAG`, default `latest`.
+- `COMPOSE_PROJECT_NAME`, default `03-invoices`.
+- `PHASE_APP`, default `lifeisgoodlabs-invoices`.
+- `PHASE_ENV`, default `Development`.
+
+`SECRET_KEY` and `RENDER_EXTERNAL_HOSTNAME` are required before rollout.
+Explicit shell exports and repo-root `.deploy.env` values win first; Phase can
+fill missing managed values when the Phase CLI is available and authenticated.
+
+The deploy script writes the managed host values into `.env` while preserving
+unrelated entries. Do not manually hotfix `.env` after deployment for values
+that should come from the deploy path.
+
+## Verification
+
+Run the tracked verification script:
+
+```bash
+./scripts/verify_deploy.sh
+```
+
+Equivalent manual checks:
+
+```bash
+COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler
+curl -H "Host: invoices.ultramac.work" http://127.0.0.1:8000/
+COMPOSE_PROJECT_NAME=03-invoices docker compose logs --no-color --tail 50 scheduler
+```
+
+Use the host-header probe when verifying production behavior. It catches host
+routing and `ALLOWED_HOSTS` mistakes that localhost-only checks can miss. The
+response should be a non-400 application response, typically a redirect to
+login.
+
+Scheduler logs should not contain Python tracebacks or
+`Backup scheduler run failed:`.
+
+## Runtime Smoke
+
+Use runtime smoke when changing container startup behavior:
+
+```bash
+./scripts/runtime_smoke.sh
+```
+
+The script builds the runtime image, starts temporary web and scheduler
+containers with shared `db/` and `media/` mounts, waits for the web service, and
+confirms both services use `/app/db/db.sqlite3`.
+
+## Database Checks
+
+Confirm the effective database path inside both services:
+
+```bash
+COMPOSE_PROJECT_NAME=03-invoices docker compose exec web python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings'); import django; django.setup(); from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
+COMPOSE_PROJECT_NAME=03-invoices docker compose exec scheduler python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings'); import django; django.setup(); from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
+```
+
+Confirm migrations and backup tables exist:
+
+```bash
+COMPOSE_PROJECT_NAME=03-invoices docker compose exec web python manage.py showmigrations --plan
+COMPOSE_PROJECT_NAME=03-invoices docker compose exec web python -c "import sqlite3; conn = sqlite3.connect('/app/db/db.sqlite3'); print(conn.execute(\"select name from sqlite_master where type='table' and name in ('django_migrations', 'invoices_backupconfiguration', 'invoices_backuprun') order by name\").fetchall())"
+```

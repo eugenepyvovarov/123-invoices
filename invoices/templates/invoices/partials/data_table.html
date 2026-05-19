@@ -1,0 +1,59 @@
+<div class="table-scroll">
+  <table class="data-table">
+    {% if order_columns %}
+      <thead>
+        <tr>
+          {% for column in order_columns %}
+            {% with column_href=column.href|default:'' %}
+              {% if column.sortable is False %}
+                {% with href=column_href %}
+                  {% include 'invoices/partials/data_table_header_cell.html' %}
+                {% endwith %}
+              {% else %}
+                {% if not column_href %}
+                  {% with base_href='?order='|add:column.next_order %}
+                    {% if query_without_order %}
+                      {% with href=base_href|add:'&'|add:query_without_order %}
+                        {% include 'invoices/partials/data_table_header_cell.html' %}
+                      {% endwith %}
+                    {% else %}
+                      {% with href=base_href %}
+                        {% include 'invoices/partials/data_table_header_cell.html' %}
+                      {% endwith %}
+                    {% endif %}
+                  {% endwith %}
+                {% else %}
+                  {% with href=column_href %}
+                    {% include 'invoices/partials/data_table_header_cell.html' %}
+                  {% endwith %}
+                {% endif %}
+              {% endif %}
+            {% endwith %}
+          {% endfor %}
+       </tr>
+     </thead>
+    {% endif %}
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          {% for cell in row.cells %}
+            <td{% if cell.align %} class="{{ cell.align }}"{% endif %}{% if cell.colspan %} colspan="{{ cell.colspan }}"{% endif %}{% if cell.label %} data-label="{{ cell.label }}"{% endif %}>{{ cell.content|safe }}</td>
+          {% endfor %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="{{ order_columns|length|default:1 }}" class="text-center py-4 text-muted">{{ empty_message }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+    {% if footer_row %}
+      <tfoot>
+        <tr class="table-total-row">
+          {% for cell in footer_row.cells %}
+            <td{% if cell.align %} class="{{ cell.align }}"{% endif %}{% if cell.colspan %} colspan="{{ cell.colspan }}"{% endif %}>{{ cell.content|safe }}</td>
+          {% endfor %}
+        </tr>
+      </tfoot>
+    {% endif %}
+  </table>
+</div>

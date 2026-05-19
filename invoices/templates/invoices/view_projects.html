@@ -1,0 +1,46 @@
+{% extends 'invoices/base.html' %}
+{% load table_tags %}
+{% block main %}
+<section class="page projects-report">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Projects</h1>
+    </div>
+    <a href="{% url 'projects:add' %}" class="btn btn-primary">New project</a>
+  </header>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <input type="hidden" name="order" value="{{ order_filter }}" />
+      <div class="filters-grid">
+        <div class="form-field page-filter-panel__period">
+          <label class="form-field__label" for="projects-period">Period</label>
+          <div class="form-field__control">
+            <select id="projects-period" name="date_range" class="field-control" onchange="this.form.submit()">
+              {% for option in global_date_filter.options %}
+                <option value="{{ option.value }}" {% if option.value == global_date_filter.key %}selected{% endif %}>
+                  {{ option.label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <span class="form-field__label">Project status</span>
+          <div class="form-field__control">
+            <div class="filter-toggle-group" role="group" aria-label="Filter projects by status">
+              <button type="submit" name="project_status" value="active" class="filter-toggle{% if project_status_filter == 'active' %} is-active{% endif %}" aria-pressed="{% if project_status_filter == 'active' %}true{% else %}false{% endif %}"{% if project_status_filter == 'active' %} aria-current="true"{% endif %}>Active</button>
+              <button type="submit" name="project_status" value="inactive" class="filter-toggle{% if project_status_filter == 'inactive' %} is-active{% endif %}" aria-pressed="{% if project_status_filter == 'inactive' %}true{% else %}false{% endif %}"{% if project_status_filter == 'inactive' %} aria-current="true"{% endif %}>Inactive</button>
+              <button type="submit" name="project_status" value="all" class="filter-toggle{% if project_status_filter == 'all' %} is-active{% endif %}" aria-pressed="{% if project_status_filter == 'all' %}true{% else %}false{% endif %}"{% if project_status_filter == 'all' %} aria-current="true"{% endif %}>All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <article class="surface surface--padded">
+    {% render_data_table order_columns project_rows query_without_order empty_message='No projects match the selected filters.' %}
+  </article>
+</section>
+{% endblock %}

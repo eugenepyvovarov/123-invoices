@@ -1,0 +1,450 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Invoice {{ invoice.reference_number }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 24mm 22mm 30mm 22mm;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      color: #4c4c4c;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-weight: 600;
+      color: #0091c7;
+      letter-spacing: 0.04em;
+    }
+
+    .invoice {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      gap: 26px;
+    }
+
+    .invoice__header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .issuer {
+      max-width: 360px;
+    }
+
+    .issuer__name {
+      font-size: 22px;
+      color: #0091c7;
+    }
+
+    .issuer__address {
+      margin-top: 4px;
+      white-space: pre-line;
+      color: #7a7a7a;
+    }
+
+    .issuer__contact {
+      margin-top: 8px;
+      white-space: pre-line;
+      color: #7a7a7a;
+      font-size: 11px;
+    }
+
+    .separator {
+      border-top: 1px solid #0f0f0f;
+      margin: 14px 0 8px;
+    }
+
+    .invoice-meta {
+      text-align: right;
+      min-width: 210px;
+    }
+
+    .invoice-meta__label {
+      font-size: 28px;
+      font-weight: 600;
+      color: #0091c7;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .meta-table {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .meta-table th {
+      text-align: right;
+      padding-left: 12px;
+      font-weight: 500;
+      color: #7f7f7f;
+      white-space: nowrap;
+    }
+
+    .meta-table td {
+      padding-left: 12px;
+      text-align: right;
+      font-weight: 600;
+      color: #4c4c4c;
+    }
+
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      align-items: center;
+      padding: 22px 0;
+      border-top: 1px solid #d9d9d9;
+      border-bottom: 1px solid #d9d9d9;
+    }
+
+    .bill-to {
+      max-width: 280px;
+    }
+
+    .bill-to__label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: #7f7f7f;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .bill-to__name {
+      color: #0091c7;
+      font-weight: 600;
+    }
+
+    .bill-to__address,
+    .bill-to__contact {
+      margin-top: 6px;
+      white-space: pre-line;
+      color: #7a7a7a;
+    }
+
+    .invoice-summary {
+      text-align: center;
+    }
+
+    .invoice-summary__title {
+      font-size: 26px;
+      color: #0091c7;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .invoice-summary__meta {
+      margin-top: 8px;
+      color: #7a7a7a;
+      line-height: 1.4;
+    }
+
+    .invoice-summary__total {
+      font-size: 30px;
+      margin-top: 12px;
+      font-weight: 600;
+      color: #0091c7;
+    }
+
+    .invoice-summary__due {
+      color: #0091c7;
+      font-weight: 500;
+      margin-top: 2px;
+      font-size: 11px;
+    }
+
+    .payment-details {
+      text-align: right;
+      color: #7a7a7a;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .project-title {
+      text-align: center;
+      font-size: 18px;
+      color: #0091c7;
+      letter-spacing: 0.06em;
+      margin-top: 12px;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .summary-table th {
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 12px 0 10px;
+      color: #0091c7;
+      border-bottom: 1px solid #c8c8c8;
+    }
+
+    .summary-table td {
+      padding: 9px 0;
+      color: #4c4c4c;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .summary-table td:nth-child(2),
+    .summary-table td:nth-child(3),
+    .summary-table td:nth-child(4) {
+      text-align: right;
+    }
+
+    .summary-table tbody tr:last-child td {
+      border-bottom: 1px solid #c8c8c8;
+    }
+
+    .totals {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .totals table {
+      min-width: 260px;
+    }
+
+    .totals th {
+      text-align: right;
+      font-weight: 400;
+      color: #7f7f7f;
+      padding: 4px 0;
+    }
+
+    .totals td {
+      text-align: right;
+      font-weight: 600;
+      color: #4c4c4c;
+      padding: 4px 0;
+    }
+
+    .totals tr:last-child th,
+    .totals tr:last-child td {
+      border-top: 1px solid #0f0f0f;
+      padding-top: 8px;
+      color: #0091c7;
+      font-size: 14px;
+    }
+
+    .due-note {
+      margin-top: 18px;
+      text-align: right;
+      color: #0091c7;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    .notes {
+      margin-top: auto;
+      color: #7a7a7a;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: #7f7f7f;
+      text-transform: uppercase;
+      margin-top: 36px;
+    }
+
+  </style>
+</head>
+<body>
+  <article class="invoice">
+    <header class="invoice__header">
+      <div class="issuer">
+        <h1 class="issuer__name">{{ invoice.issuer.company.name }}</h1>
+        {% with issuer_address=invoice.issuer.company.address %}
+          {% if issuer_address and issuer_address.full_address %}
+            <div class="issuer__address">{{ issuer_address.full_address|linebreaksbr }}</div>
+          {% endif %}
+        {% endwith %}
+        <div class="issuer__contact">
+          {% if invoice.issuer.company.customer_information_file_number %}
+            VAT reg No: {{ invoice.issuer.company.customer_information_file_number }}{% if invoice.issuer.company.contact_email or invoice.issuer.company.contact_phone_number %}<br>{% endif %}
+          {% endif %}
+          {% if invoice.issuer.company.contact_email %}
+            {{ invoice.issuer.company.contact_email }}{% if invoice.issuer.company.contact_phone_number %}<br>{% endif %}
+          {% endif %}
+          {% if invoice.issuer.company.contact_phone_number %}
+            {{ invoice.issuer.company.contact_phone_number }}
+          {% endif %}
+        </div>
+      </div>
+      <div class="invoice-meta">
+        <div class="invoice-meta__label">Invoice</div>
+        <table class="meta-table">
+          <tr>
+            <th>No.</th>
+            <td>{{ invoice.reference_number|default:invoice.sequence_number }}</td>
+          </tr>
+          <tr>
+            <th>Date</th>
+            <td>{{ invoice.issued_date|date:"d M Y" }}</td>
+          </tr>
+          <tr>
+            <th>Due</th>
+            <td>{{ invoice.due_date|date:"d M Y" }}</td>
+          </tr>
+          <tr>
+            <th>Currency</th>
+            <td>{{ invoice.currency.code }}</td>
+          </tr>
+        </table>
+      </div>
+    </header>
+
+    <div class="separator"></div>
+
+    <section class="summary-bar">
+      <div class="bill-to">
+        <div class="bill-to__label">Billed to</div>
+        <div class="bill-to__name">{{ invoice.customer.company.name }}</div>
+        {% with customer_address=invoice.customer.company.address %}
+          {% if customer_address and customer_address.full_address %}
+            <div class="bill-to__address">{{ customer_address.full_address|linebreaksbr }}</div>
+          {% endif %}
+        {% endwith %}
+        {% if invoice.customer.company.customer_information_file_number %}
+          <div class="bill-to__contact">VAT: {{ invoice.customer.company.customer_information_file_number }}</div>
+        {% endif %}
+      </div>
+      <div class="invoice-summary">
+        <div class="invoice-summary__title">Invoice</div>
+        <div class="invoice-summary__meta">
+          {{ invoice.issued_date|date:"d M Y" }}<br>
+          Invoice # {{ invoice.reference_number|default:invoice.sequence_number }}
+        </div>
+        <div class="invoice-summary__total">
+          {{ invoice.total_due|floatformat:"2" }} {{ invoice.currency.symbol|default:invoice.currency.code }}
+        </div>
+        {% if invoice.due_date %}
+          <div class="invoice-summary__due">Due by {{ invoice.due_date|date:"d M Y" }}</div>
+        {% endif %}
+      </div>
+      <div class="payment-details">
+        {% with company=invoice.issuer.company selected_account=bank_account|default:invoice.bank_account %}
+          {% if selected_account %}
+            {% if selected_account.account_details %}<strong>IBAN:</strong> {{ selected_account.account_details }}{% endif %}
+            {% if selected_account.payment_method %}{% if selected_account.account_details %}\n{% endif %}<strong>Payment method:</strong> {{ selected_account.payment_method }}{% endif %}
+          {% else %}
+            {% if company.bank_account_number %}
+              <strong>IBAN:</strong> {{ company.bank_account_number }}
+            {% endif %}
+            {% if company.payment_method %}
+              {% if company.bank_account_number %}\n{% endif %}
+              <strong>Payment method:</strong> {{ company.payment_method }}
+            {% endif %}
+          {% endif %}
+          {% if company.payment_terms %}
+            {% if selected_account or company.bank_account_number or company.payment_method %}\n{% endif %}
+            {{ company.payment_terms|linebreaksbr }}
+          {% endif %}
+        {% endwith %}
+      </div>
+    </section>
+
+    {% if invoice.project %}
+      <div class="project-title">{{ invoice.project.project_code }} – {{ invoice.project.title }}</div>
+    {% endif %}
+
+    {% if invoice.project %}
+      <div class="project-title">{{ invoice.project.project_code }} – {{ invoice.project.title }}</div>
+    {% endif %}
+
+    <section>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th style="width: 50%;">Description</th>
+            <th style="width: 16%; text-align:right;">Hrs/Qty</th>
+            <th style="width: 16%; text-align:right;">Rate</th>
+            <th style="width: 18%; text-align:right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in order_lines %}
+            <tr>
+              <td>{{ line.description }}</td>
+              <td>{{ line.quantity|floatformat:"2" }}</td>
+              <td>{{ line.unit_price|floatformat:"2" }} {{ invoice.currency.symbol|default:invoice.currency.code }}</td>
+              <td>{{ line.line_total|floatformat:"2" }} {{ invoice.currency.symbol|default:invoice.currency.code }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">No items recorded for this invoice.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="totals">
+      {% with currency_symbol=invoice.currency.symbol|default:invoice.currency.code %}
+      <table>
+        <tr>
+          <th>Subtotal</th>
+          <td>{{ invoice.sub_total|floatformat:"2" }} {{ currency_symbol }}</td>
+        </tr>
+        {% if invoice.discount_amount %}
+        <tr>
+          <th>Discount ({{ invoice.discount_value }}%)</th>
+          <td>-{{ invoice.discount_amount|floatformat:"2" }} {{ currency_symbol }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <th>Taxable base</th>
+          <td>{{ invoice.tax_base|floatformat:"2" }} {{ currency_symbol }}</td>
+        </tr>
+        {% if invoice.tax_amount %}
+        <tr>
+          <th>Tax ({{ invoice.tax_value }}%)</th>
+          <td>{{ invoice.tax_amount|floatformat:"2" }} {{ currency_symbol }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <th>Total due</th>
+          <td>{{ invoice.total_due|floatformat:"2" }} {{ currency_symbol }}</td>
+        </tr>
+      </table>
+      {% endwith %}
+    </section>
+
+    {% if invoice.due_date %}
+      <div class="due-note">Invoice total due by {{ invoice.due_date|date:"d M Y" }}</div>
+    {% endif %}
+
+    {% if invoice.comment %}
+    <section class="notes">
+      <div class="notes__title">Notes</div>
+      <div>{{ invoice.comment|linebreaksbr }}</div>
+    </section>
+    {% endif %}
+
+    <footer>
+      {{ invoice.issuer.company.name }} · Generated on {% now "d M Y" %}
+    </footer>
+  </article>
+</body>
+</html>
