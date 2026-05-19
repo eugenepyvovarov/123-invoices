@@ -28,6 +28,7 @@ docker build -t invoices:local .
 Run a one-off container:
 
 ```bash
+mkdir -p db media
 docker run --rm -p 8000:8000 --env-file .env -e RUN_MIGRATIONS=1 \
   -v "$(pwd)/db:/app/db" \
   -v "$(pwd)/media:/app/media" \

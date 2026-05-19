@@ -19,6 +19,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp env.example .env
+mkdir -p db media
 python manage.py migrate
 python manage.py runserver
 ```
@@ -90,6 +91,7 @@ Do not commit local runtime or generated artifacts:
 
 - `.env` and `.deploy.env`.
 - `db.sqlite3`, `db/e2e.sqlite3`, and `db/e2e-runtime.sqlite3`.
+- SQLite files under `db/`; keep only `db/.gitkeep`.
 - `media/`.
 - `staticfiles/`, except `staticfiles/.gitkeep`.
 - `tmp/`, except `tmp/.gitkeep`.

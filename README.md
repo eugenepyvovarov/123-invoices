@@ -28,6 +28,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp env.example .env
+mkdir -p db media
 python manage.py migrate
 python manage.py runserver
 ```
@@ -47,6 +48,7 @@ docker build -t invoices:local .
 Run the app with persistent local SQLite and media mounts:
 
 ```bash
+mkdir -p db media
 docker run --rm -p 8000:8000 --env-file .env -e RUN_MIGRATIONS=1 \
   -v "$(pwd)/db:/app/db" \
   -v "$(pwd)/media:/app/media" \

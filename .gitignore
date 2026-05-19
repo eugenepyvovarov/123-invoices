@@ -12,6 +12,9 @@ db_screencast.sqlite3-*
 *.sqlite3-shm
 *.sqlite3-wal
 db.sqlite3
+db/*.sqlite3
+db/*.sqlite3-*
+!db/.gitkeep
 
 # Backup files #
 *.bak
