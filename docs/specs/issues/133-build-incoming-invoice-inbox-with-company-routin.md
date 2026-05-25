@@ -95,13 +95,13 @@ The app also already stores imported expense currency metadata in `raw_data` whi
 
 ## Task List
 
-- [ ] Add incoming invoice data model
-  - [ ] Add `IncomingEmailSource`, `IssuerEmailRoutingRule`, `IncomingInvoiceCandidate`, and `IncomingInvoiceArtifact` models with status/provider/kind choices.
-  - [ ] Limit the source provider for this issue to IMAP while keeping future provider expansion non-disruptive.
-  - [ ] Add reviewed/unpaid candidate state and fields for confirmed issuer, selected artifact, metadata, and conversion limitation messaging.
-  - [ ] Add incoming artifact upload paths under `media/incoming-invoices/...`.
-  - [ ] Add uniqueness/index constraints for source message ids, status/date filtering, issuer filtering, and artifact hashes.
-  - [ ] Add model/admin tests for constraints, status transitions, relationships, file paths, and display helpers.
+- [x] Add incoming invoice data model
+  - [x] Add `IncomingEmailSource`, `IssuerEmailRoutingRule`, `IncomingInvoiceCandidate`, and `IncomingInvoiceArtifact` models with status/provider/kind choices.
+  - [x] Limit the source provider for this issue to IMAP while keeping future provider expansion non-disruptive.
+  - [x] Add reviewed/unpaid candidate state and fields for confirmed issuer, selected artifact, metadata, and conversion limitation messaging.
+  - [x] Add incoming artifact upload paths under `media/incoming-invoices/...`.
+  - [x] Add uniqueness/index constraints for source message ids, status/date filtering, issuer filtering, and artifact hashes.
+  - [x] Add model/admin tests for constraints, status transitions, relationships, file paths, and display helpers.
 
 - [ ] Build IMAP polling, artifact, routing, and duplicate services
   - [ ] Add IMAP message fetching for configured folder/search scope without mutating mailbox state.
