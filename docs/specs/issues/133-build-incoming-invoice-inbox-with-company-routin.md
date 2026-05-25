@@ -111,13 +111,13 @@ The app also already stores imported expense currency metadata in `raw_data` whi
   - [x] Add issuer scoring from aliases, delivered-to addresses, company names, VAT/tax ids, keywords, and available artifact/body text.
   - [x] Add duplicate detection for message ids, artifact hashes, invoice fingerprints, and incoming-created expense provenance.
 
-- [ ] Add incoming inbox review and conversion UI
-  - [ ] Add URL routes, views, templates, and forms for inbox list, candidate detail/review, source settings, routing settings, artifact download/preview, and conversion confirmation.
-  - [ ] Add filters for status, company, source, confidence, date, and missing review.
-  - [ ] Add actions for company override, artifact selection, not-invoice, needs-fetch, reviewed/unpaid, duplicate/link-existing, and duplicate override.
-  - [ ] Add conversion validation requiring confirmed issuer, selected artifact, paid state, paid date for expenses, amount, and description/vendor confirmation.
-  - [ ] Create paid `Expense` records from confirmed candidates, attach the selected artifact, write provenance/source currency metadata to `raw_data`, link records, and invalidate dashboard caches.
-  - [ ] Add view/form tests for permissions, filters, review actions, conversion success/failure, reviewed/unpaid state, and duplicate handling.
+- [x] Add incoming inbox review and conversion UI
+  - [x] Add URL routes, views, templates, and forms for inbox list, candidate detail/review, source settings, routing settings, artifact download/preview, and conversion confirmation.
+  - [x] Add filters for status, company, source, confidence, date, and missing review.
+  - [x] Add actions for company override, artifact selection, not-invoice, needs-fetch, reviewed/unpaid, duplicate/link-existing, and duplicate override.
+  - [x] Add conversion validation requiring confirmed issuer, selected artifact, paid state, paid date for expenses, amount, and description/vendor confirmation.
+  - [x] Create paid `Expense` records from confirmed candidates, attach the selected artifact, write provenance/source currency metadata to `raw_data`, link records, and invalidate dashboard caches.
+  - [x] Add view/form tests for permissions, filters, review actions, conversion success/failure, reviewed/unpaid state, and duplicate handling.
 
 - [ ] Integrate navigation, styling, docs, and evidence support
   - [ ] Add navigation entry points that fit the existing sidebar and active-company patterns.
