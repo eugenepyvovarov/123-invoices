@@ -56,8 +56,11 @@ test.describe('incoming invoice inbox', () => {
     await expect(page.getByText('no accounting record', { exact: false })).toBeVisible();
     await capture(page, testInfo, 'incoming-reviewed-unpaid');
 
-    await page.goto('/expenses/incoming/?status=ready');
-    await page.getByRole('link', { name: 'Review' }).first().click();
+    await page.goto('/expenses/incoming/');
+    const conversionCandidateRows = page.getByTestId('incoming-candidate-row').filter({ hasText: 'Invoice E2E-ALPHA-ATT-001' });
+    await expect(conversionCandidateRows.first()).toBeVisible();
+    const conversionCandidateWasConverted = await conversionCandidateRows.first().getByText('Converted').isVisible();
+    await conversionCandidateRows.first().getByRole('link', { name: 'Review' }).click();
     await page.getByTestId('incoming-convert-link').click();
     await expect(page.getByTestId('incoming-conversion-form')).toBeVisible();
     await page.getByLabel('Vendor').fill('Synthetic Supplies Ltd');
@@ -66,11 +69,17 @@ test.describe('incoming invoice inbox', () => {
     await page.getByLabel('Currency').fill('EUR');
     await page.getByLabel('Paid date').fill('2026-05-25');
     await capture(page, testInfo, 'incoming-conversion-form');
-    await page.getByRole('button', { name: 'Confirm' }).click();
+    if (!conversionCandidateWasConverted) {
+      await page.getByRole('button', { name: 'Confirm' }).click();
+      await page.goto('/expenses/?q=Converted%20incoming%20invoice%20evidence');
+    } else {
+      await page.goto('/expenses/?q=Converted%20incoming%20invoice%20evidence');
+    }
     await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();
     await expect(page.getByText('Converted incoming invoice evidence')).toBeVisible();
-    await page.locator('tr', { hasText: 'Converted incoming invoice evidence' }).getByRole('link', { name: /^#/ }).click();
-    await expect(page.getByText('Current file:', { exact: false })).toBeVisible();
+    const convertedExpenseRow = page.locator('tr', { hasText: 'Converted incoming invoice evidence' }).first();
+    await convertedExpenseRow.locator('[data-expense-drawer]').first().click();
+    await expect(page.locator('#expenseDrawerContent')).toContainText('Current file:');
     await capture(page, testInfo, 'incoming-converted-expense');
 
     await page.goto('/expenses/incoming/?status=needs_review');
