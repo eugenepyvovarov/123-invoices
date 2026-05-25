@@ -30,3 +30,19 @@ the root README and `docs/`. Automation behavior is summarized in
 - Preview launch: `/bin/bash ./scripts/preview.sh`
 - Preview destroy: `/bin/bash ./scripts/destroy-preview.sh`
 - Production artifact: `/bin/bash ./scripts/artifact.sh production`
+
+`scripts/deploy.sh` is the canonical deployment entrypoint for the live
+`03-invoices` Compose rollout. It refreshes the canonical `03-invoices` Compose
+stack, including `03-invoices-web-1` and `03-invoices-scheduler-1`, without
+separate ad hoc container recreation steps. The rollout uses one
+`INVOICES_IMAGE` reference for both services, rolls `web` before `scheduler`
+under `03-invoices`, and the verification scripts verify the named stack,
+expected container names, web health check, and scheduler startup logs.
+
+- `scripts/deploy.sh` is the canonical deployment entrypoint for the live `03-invoices` Compose rollout.
+- refreshes the canonical `03-invoices` Compose stack
+- `03-invoices-web-1` and `03-invoices-scheduler-1`
+- without separate ad hoc container recreation steps
+- uses one `INVOICES_IMAGE` reference for both services
+- rolls `web` before `scheduler` under `03-invoices`
+- verify the named stack, expected container names, web health check, and scheduler startup logs

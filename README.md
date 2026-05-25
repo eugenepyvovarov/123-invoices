@@ -62,6 +62,45 @@ Run the Compose stack with the web and scheduler services:
 docker compose up -d
 ```
 
+`./scripts/deploy.sh` is the canonical live deployment entrypoint. It runs the
+tracked `docker compose` rollout for the canonical `03-invoices` stack, using
+`03-invoices` as the canonical stack name so the live containers are predictable
+as `03-invoices-web-1` and `03-invoices-scheduler-1`. The deploy path should
+not require any separate manual container recreation commands; it updates both
+services together under the same Compose project, exports
+`COMPOSE_PROJECT_NAME=03-invoices`, derives one `INVOICES_IMAGE` reference for
+both services, runs `docker compose pull web scheduler`, and recreates `web`
+before `scheduler`.
+
+Post-deploy verification checks that both services are running under the same
+`03-invoices` Compose project, confirms the expected `03-invoices-web-1` and
+`03-invoices-scheduler-1` container names, verifies
+`http://127.0.0.1:8000/` responds successfully, and fails if scheduler startup
+logs contain `Traceback (most recent call last):` or
+`Backup scheduler run failed:`. Operators can inspect the same stack with
+`COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler`, a
+`python3 -c` health probe, and `docker compose logs --no-color --tail 50
+scheduler`.
+
+Deployment rollout verification summary:
+
+- runs the tracked `docker compose` rollout for the canonical `03-invoices` stack
+- `03-invoices` as the canonical stack name
+- `03-invoices-web-1` and `03-invoices-scheduler-1`
+- should not require any separate manual container recreation commands
+- updates both services together under the same Compose project
+- exports `COMPOSE_PROJECT_NAME=03-invoices`
+- derives one `INVOICES_IMAGE` reference for both services
+- runs `docker compose pull web scheduler`
+- recreates `web` before `scheduler`
+- checks that both services are running under the same `03-invoices` Compose project
+- confirms the expected `03-invoices-web-1` and `03-invoices-scheduler-1` container names
+- verifies `http://127.0.0.1:8000/` responds successfully
+- fails if scheduler startup logs contain `Traceback (most recent call last):` or `Backup scheduler run failed:`
+- COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler
+- python3 -c
+- docker compose logs --no-color --tail 50 scheduler
+
 ## Validation
 
 ```bash
@@ -75,6 +114,26 @@ python manage.py test
 automation controller. `scripts/e2e.sh` is the repo-owned Playwright smoke
 entrypoint; automation runs it through the shared Playwright evidence runner
 image instead of installing browsers in workflow YAML.
+
+Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
+
+- Running the canonical deployment command updates the live invoices deployment without requiring undocumented manual container recreation commands
+- The live rollout updates both `web` and `scheduler` as one Docker Compose stack
+- Operators have a short documented verification path that confirms both services are healthy after rollout
+- `scripts/deploy.sh` performs the tracked `docker compose` rollout step after image publication
+- The tracked rollout uses a stable explicit Compose project name of `03-invoices` by default on Ultramac
+- The resulting live container names are predictable under that project name, including `03-invoices-web-1` and `03-invoices-scheduler-1`
+- The Compose configuration accepts an explicit image reference or tag so both services are recreated from the intended release image
+- The rollout preserves the current bind-mounted `.env`, `db`, and `media` paths already used by the deployment
+- The rollout order minimizes scheduler startup racing migrations by ensuring the web service performs migration-bearing startup before the scheduler is recreated or started
+- Repository deployment docs match the actual tracked rollout behavior
+- The canonical deploy path includes verification of both services after rollout
+- The production rollout no longer depends on undocumented manual container handling
+- Manual Compose inspection commands used during operations resolve to the same named stack as the tracked deploy flow
+- Validation covers the tracked rollout script behavior for the named Compose stack and both services
+- Validation confirms the compose invocation targets `03-invoices` consistently
+- Validation confirms both services are recreated against the intended image reference during rollout logic or equivalent scripted verification
+- Validation confirms post-deploy verification checks both web responsiveness and scheduler startup state
 
 ## Documentation
 
