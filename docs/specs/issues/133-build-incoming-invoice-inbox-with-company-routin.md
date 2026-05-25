@@ -119,13 +119,13 @@ The app also already stores imported expense currency metadata in `raw_data` whi
   - [x] Create paid `Expense` records from confirmed candidates, attach the selected artifact, write provenance/source currency metadata to `raw_data`, link records, and invalidate dashboard caches.
   - [x] Add view/form tests for permissions, filters, review actions, conversion success/failure, reviewed/unpaid state, and duplicate handling.
 
-- [ ] Integrate navigation, styling, docs, and evidence support
-  - [ ] Add navigation entry points that fit the existing sidebar and active-company patterns.
-  - [ ] Reuse existing tables, filters, badges, forms, feedback components, and Tabler icon style.
-  - [ ] Add focused CSS only where existing design components are insufficient.
-  - [ ] Update `README.md` and/or `docs/` with IMAP setup, credential references, polling, fixtures, review, paid conversion, unpaid limitation, currency metadata, privacy, and rollback guidance.
-  - [ ] Add sanitized synthetic fixtures and E2E seed/setup support for incoming sources, routing rules, and candidates.
-  - [ ] Add issue-specific Playwright coverage plus the demo and visual-validation script scenarios declared below.
+- [x] Integrate navigation, styling, docs, and evidence support
+  - [x] Add navigation entry points that fit the existing sidebar and active-company patterns.
+  - [x] Reuse existing tables, filters, badges, forms, feedback components, and Tabler icon style.
+  - [x] Add focused CSS only where existing design components are insufficient.
+  - [x] Update `README.md` and/or `docs/` with IMAP setup, credential references, polling, fixtures, review, paid conversion, unpaid limitation, currency metadata, privacy, and rollback guidance.
+  - [x] Add sanitized synthetic fixtures and E2E seed/setup support for incoming sources, routing rules, and candidates.
+  - [x] Add issue-specific Playwright coverage plus the demo and visual-validation script scenarios declared below.
 
 ## Deployment / Rollout
 
