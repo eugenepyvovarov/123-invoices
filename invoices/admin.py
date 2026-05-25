@@ -5,7 +5,11 @@ from .models import (
     Company,
     Currency,
     Customer,
+    IncomingEmailSource,
+    IncomingInvoiceArtifact,
+    IncomingInvoiceCandidate,
     Invoice,
+    IssuerEmailRoutingRule,
     IssuerBankAccount,
     Issuer,
     OrderLine,
@@ -188,6 +192,78 @@ class CurrencyAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "symbol", "is_base")
     search_fields = ("code", "name")
     list_filter = ("is_base",)
+
+
+class IncomingInvoiceArtifactInline(admin.TabularInline):
+    model = IncomingInvoiceArtifact
+    extra = 0
+    fields = ("kind", "original_filename", "content_type", "size", "sha256", "is_invoice_like", "invoice_confidence")
+    readonly_fields = ("size", "sha256")
+
+
+@admin.register(IncomingEmailSource)
+class IncomingEmailSourceAdmin(admin.ModelAdmin):
+    list_display = ("display_name", "email_address", "provider", "issuer", "is_enabled", "last_seen_message_at")
+    list_filter = ("provider", "is_enabled", "issuer")
+    search_fields = ("display_name", "email_address", "folder", "polling_query")
+    autocomplete_fields = ("issuer", "user")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(IssuerEmailRoutingRule)
+class IssuerEmailRoutingRuleAdmin(admin.ModelAdmin):
+    list_display = ("issuer", "auto_assign_enabled", "confidence_threshold", "alias_count", "keyword_count")
+    list_filter = ("auto_assign_enabled",)
+    search_fields = ("issuer__company__name",)
+    autocomplete_fields = ("issuer",)
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Aliases")
+    def alias_count(self, obj):
+        return len(obj.recipient_aliases or []) + len(obj.delivered_to_addresses or [])
+
+    @admin.display(description="Keywords")
+    def keyword_count(self, obj):
+        return len(obj.keywords or [])
+
+
+@admin.register(IncomingInvoiceCandidate)
+class IncomingInvoiceCandidateAdmin(admin.ModelAdmin):
+    list_display = (
+        "display_subject",
+        "status",
+        "source",
+        "suggested_issuer",
+        "confirmed_issuer",
+        "received_at",
+        "artifact_count",
+    )
+    list_filter = ("status", "source", "suggested_issuer", "confirmed_issuer", "received_at")
+    search_fields = ("subject", "provider_message_id", "from_name", "from_email")
+    autocomplete_fields = (
+        "source",
+        "suggested_issuer",
+        "confirmed_issuer",
+        "selected_artifact",
+        "generated_body_pdf_artifact",
+        "converted_expense",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "received_at"
+    inlines = [IncomingInvoiceArtifactInline]
+
+    @admin.display(description="Artifacts")
+    def artifact_count(self, obj):
+        return obj.artifacts.count()
+
+
+@admin.register(IncomingInvoiceArtifact)
+class IncomingInvoiceArtifactAdmin(admin.ModelAdmin):
+    list_display = ("display_name", "candidate", "kind", "content_type", "size", "is_invoice_like", "invoice_confidence")
+    list_filter = ("kind", "is_invoice_like", "content_type")
+    search_fields = ("original_filename", "sha256", "candidate__subject", "candidate__provider_message_id")
+    autocomplete_fields = ("candidate",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(Statement)
