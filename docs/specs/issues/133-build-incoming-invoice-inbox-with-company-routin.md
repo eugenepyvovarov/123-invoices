@@ -1,8 +1,8 @@
 ## Overview
 
-Build an incoming invoice inbox for supplier invoices and receipts. The inbox stages mailbox-fetched email candidates for review, suggests the correct issuer/company, stores candidate artifacts, and creates accounting records only after a user confirms the company and selected file.
+Build an incoming invoice inbox for supplier invoices and receipts. The inbox stages IMAP-fetched email candidates for review, suggests the correct issuer/company, stores candidate artifacts, and creates accounting records only after a user confirms the company and selected file.
 
-This draft recommends an MVP that is review-first, IMAP/fixture-testable, and paid-expense focused. Scope-changing choices about Gmail OAuth, unpaid supplier bills, and first-class expense currency are listed in `Open Questions`.
+This draft recommends an IMAP-only, review-first MVP focused on converting paid incoming invoices into existing `Expense` records. Unpaid supplier-bill handling and first-class expense currency remain scope decisions in `Open Questions`.
 
 ## Problem
 
@@ -11,7 +11,8 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 ## Proposed Outcome
 
 - Add incoming email source, issuer routing rule, candidate, and artifact models without overloading outgoing invoices.
-- Poll/import one configured mailbox source on demand and store candidates idempotently.
+- Connect one configured IMAP mailbox source and poll it manually/non-destructively.
+- Store candidates idempotently before any accounting record is created.
 - Save invoice-looking attachments and generate an email-body PDF artifact when no suitable attachment exists.
 - Suggest an issuer using recipient/delivered-to aliases, legal names, VAT/tax identifiers, keywords, and extracted candidate text.
 - Keep uncertain candidates in review states; never auto-convert fetched email.
@@ -22,14 +23,14 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 ## Constraints / Non-Goals
 
-- Do not change the existing outgoing `Invoice` semantics.
+- Do not change existing outgoing `Invoice` semantics.
+- Do not add Gmail OAuth/API support in this issue; mailbox connection is IMAP only.
 - Do not implement vendor-portal browser automation.
-- Do not scrape broad personal mailboxes; polling must use configured folder/query scope.
+- Do not scrape broad personal mailboxes; polling must use configured folder/search scope.
 - Do not delete, archive, label, or mark source emails as handled in this first version.
 - Do not add scheduled polling until the manual workflow is stable.
-- Do not store real email credentials, OAuth tokens, passwords, cookies, source messages, or customer data in git, logs, markdown, screenshots, or fixtures.
-- Do not make OCR mandatory unless already-available dependencies make it trivial and deterministic.
-- Do not add Gmail OAuth/API support unless the provider open question is answered that it is required for this issue.
+- Do not store real IMAP credentials, passwords, cookies, source messages, or customer data in git, logs, markdown, screenshots, or fixtures.
+- Do not make OCR mandatory unless existing dependencies make it trivial and deterministic.
 - Do not add a full supplier-bill/AP ledger unless the unpaid-bill open question is answered that it is required for this issue.
 - Keep existing expense statement import behavior company-scoped and unchanged.
 
@@ -37,8 +38,8 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 ### User Outcome
 
-1. A permitted user can open an incoming invoice inbox from the app navigation and view staged candidates by status, company, source, confidence, date, and missing-review filters.
-2. A user can configure or seed one invoice email source without entering secrets into committed files or reviewer evidence.
+1. A permitted user can open an incoming invoice inbox from app navigation and view staged candidates by status, company, source, confidence, date, and missing-review filters.
+2. A user can configure or seed one IMAP invoice email source without entering secrets into committed files or reviewer evidence.
 3. A manual poll/import action creates candidates without creating expenses or bills.
 4. A candidate detail page shows sender, subject, received date, suggested company, status, artifacts, extraction hints, detection reasons, warnings, and review actions.
 5. The user can confirm or override the company before conversion.
@@ -49,16 +50,16 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 ### Technical Behavior
 
-1. New incoming models are issuer-aware and enforce the existing user/issuer access boundary; unresolved shared-mailbox candidates are visible only to the source owner or superusers until assigned.
-2. `IncomingEmailSource` stores provider/source metadata, enabled state, folder/query scope, cursor state, and credential references only; raw secrets are not stored in logs or screenshots.
-3. `IssuerEmailRoutingRule` stores per-issuer aliases, delivered-to addresses, legal names, VAT/tax identifiers, keywords, and threshold/auto-suggestion settings.
+1. New incoming models are issuer-aware and enforce existing user/issuer access boundaries.
+2. `IncomingEmailSource` supports IMAP source metadata, enabled state, folder/search scope, cursor state, and credential references only; raw secrets are not exposed in logs or screenshots.
+3. `IssuerEmailRoutingRule` stores per-issuer aliases, delivered-to addresses, legal names, VAT/tax identifiers, keywords, and confidence threshold settings.
 4. `IncomingInvoiceCandidate` is unique per source and provider message id and stores sanitized headers/body/provider metadata, detection metadata, duplicate metadata, status, suggested/resolved issuer, and linked converted expense.
 5. `IncomingInvoiceArtifact` stores each attachment/body artifact under `media/`, records content type, size, SHA-256 hash, extracted text when available, parsed metadata, and invoice-likeness confidence.
-6. Polling is non-destructive, idempotent, limited to configured scope, and safe to rerun.
+6. Polling is non-destructive, idempotent, limited to configured IMAP scope, and safe to rerun.
 7. Email-body PDFs are generated with existing PDF tooling when no suitable attachment exists, and both body PDFs and useful attachments are retained when both exist.
 8. Portal-link-only candidates with no usable file/body invoice are marked `needs_fetch`.
 9. Routing chooses a suggested issuer only when exactly one issuer meets confidence requirements; otherwise the candidate stays `needs_review`.
-10. Duplicate detection covers source/message id, artifact SHA-256, candidate invoice fingerprints, and incoming-created expense provenance; conversion of duplicates requires an explicit override or link-existing action.
+10. Duplicate detection covers source/message id, artifact SHA-256, candidate invoice fingerprints, and incoming-created expense provenance; conversion of duplicates requires explicit override or link-existing action.
 11. Conversion requires confirmed issuer, selected artifact, paid status, paid date, amount, and description/vendor confirmation before creating an `Expense`.
 12. Created expenses include incoming-invoice provenance in `raw_data`, and dashboard/cache state is invalidated after conversion.
 
@@ -67,8 +68,8 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 1. The change includes database migrations for new incoming source/routing/candidate/artifact tables.
 2. Runtime artifacts are stored under `media/` and are not committed.
 3. Mailbox polling is manual only through a repo-owned management command in this issue.
-4. Documentation describes mailbox source setup, credential-reference expectations, fixture import, poll command usage, review workflow, and security/privacy rules.
-5. Rollback is a normal code rollback; already-created incoming tables/media may remain inert unless an operator chooses to clean them up separately.
+4. Documentation describes IMAP source setup, credential-reference expectations, fixture import, poll command usage, review workflow, and security/privacy rules.
+5. Rollback is a normal code rollback; already-created incoming tables/media may remain inert unless an operator chooses separate cleanup.
 
 ### Validation
 
@@ -80,8 +81,8 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 ## Implementation Plan
 
-1. Add incoming intake data models and migrations in the existing financial model area, keeping outgoing `Invoice` untouched.
-2. Add source/routing services for message parsing, artifact extraction, body PDF rendering, text normalization, issuer scoring, duplicate fingerprinting, and sanitized provenance.
+1. Add incoming intake data models and migrations in `invoices`, keeping outgoing `Invoice` untouched.
+2. Add IMAP source/routing services for message parsing, artifact extraction, body PDF rendering, text normalization, issuer scoring, duplicate fingerprinting, and sanitized provenance.
 3. Add a manual polling/import command that supports an IMAP source and a synthetic fixture path for tests/evidence.
 4. Add inbox list/detail/review/conversion views and forms under the expenses area, because paid conversion targets `Expense`.
 5. Add per-source and per-issuer routing settings UI that stores credential references and routing rules without raw secrets.
@@ -92,18 +93,19 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 - [ ] Add incoming invoice data model
   - [ ] Add `IncomingEmailSource`, `IssuerEmailRoutingRule`, `IncomingInvoiceCandidate`, and `IncomingInvoiceArtifact` models with status/provider/kind choices.
+  - [ ] Limit the source provider for this issue to IMAP while keeping future provider expansion non-disruptive.
   - [ ] Add upload path helpers for incoming artifacts under `media/incoming-invoices/...`.
-  - [ ] Add uniqueness/index constraints for source message ids, candidate artifacts, status/date filtering, issuer filtering, and artifact hashes.
-  - [ ] Add admin registrations with safe list displays that do not expose secrets or full raw email bodies.
-  - [ ] Add model tests for constraints, status transitions, access-relevant relationships, file paths, and string/display helpers.
+  - [ ] Add uniqueness/index constraints for source message ids, status/date filtering, issuer filtering, and artifact hashes.
+  - [ ] Add safe admin registrations that do not expose secrets or full raw email bodies.
+  - [ ] Add model tests for constraints, status transitions, access-relevant relationships, file paths, and display helpers.
 
-- [ ] Build polling, artifact, routing, and duplicate services
+- [ ] Build IMAP polling, artifact, routing, and duplicate services
+  - [ ] Add IMAP message fetching for configured folder/search scope without mutating mailbox state.
   - [ ] Add email parsing that captures sanitized headers, recipients, delivered-to values, text/html bodies, message/thread ids, and allowed attachments.
   - [ ] Add email-body PDF rendering using existing WeasyPrint/django-weasyprint dependencies.
   - [ ] Add source polling/import idempotency by source id plus provider message id, with fixture-backed import support for tests.
   - [ ] Add issuer scoring from aliases, delivered-to addresses, company names, VAT/tax ids, keywords, and artifact/body text.
   - [ ] Add duplicate detection for message ids, artifact SHA-256, invoice metadata fingerprints, and incoming-created expense provenance.
-  - [ ] Add service tests for attached, body-only, mixed artifact, ambiguous routing, duplicate, and needs-fetch cases.
 
 - [ ] Add incoming inbox review and conversion UI
   - [ ] Add URL routes, views, and templates for incoming inbox list, candidate detail/review, source settings, routing settings, artifact download/preview, and conversion confirmation.
@@ -114,10 +116,10 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
   - [ ] Add view/form tests for permissions, filters, review actions, conversion success/failure, and duplicate handling.
 
 - [ ] Integrate navigation, styling, and docs
-  - [ ] Add navigation entry points that fit the existing sidebar and active-company patterns.
-  - [ ] Reuse existing surfaces, filter groups, tables, badges, forms, drawer/page patterns, and Tabler icon style.
+  - [ ] Add navigation entry points that fit existing sidebar and active-company patterns.
+  - [ ] Reuse existing tables, filters, badges, forms, page patterns, and Tabler icon style.
   - [ ] Add focused CSS only where existing design components are insufficient.
-  - [ ] Update `README.md` and/or `docs/` with setup, credential-reference, polling, fixture, review, conversion, privacy, and rollback guidance.
+  - [ ] Update `README.md` and/or `docs/` with IMAP setup, credential-reference, polling, fixture, review, conversion, privacy, and rollback guidance.
   - [ ] Add regression tests that existing invoice and expense import screens still render and behave as before.
 
 - [ ] Add preview-safe synthetic evidence support
@@ -130,7 +132,7 @@ Supplier invoices currently have no safe intake workflow. The existing `Invoice`
 
 Run the normal Django deployment with migrations. No scheduled worker or mailbox cron should be enabled by this issue.
 
-Before enabling a production source, an operator must configure runtime credential references and a narrow folder/query/label scope. The first production poll should be run manually with a small limit and verified in the inbox before repeated polling.
+Before enabling a production IMAP source, an operator must configure runtime credential references and a narrow folder/search scope. The first production poll should be run manually with a small limit and verified in the inbox before repeated polling.
 
 Generated files live in `media/`. Rollback leaves created incoming rows and media files unused by older code; if cleanup is needed, handle it as an operator data-maintenance task after rollback.
 
@@ -139,11 +141,11 @@ Generated files live in `media/`. Rollback leaves created incoming rows and medi
 ### Add
 
 - `invoices/migrations/00xx_incoming_invoice_inbox.py` — schema for incoming source, routing rule, candidate, and artifact models.
-- `invoices/services/incoming_email.py` — source polling/import and email parsing.
+- `invoices/services/incoming_email.py` — IMAP polling/import and email parsing.
 - `invoices/services/incoming_invoice_artifacts.py` — artifact storage, hashing, body-PDF generation, and safe text extraction hooks.
 - `invoices/services/incoming_invoice_routing.py` — issuer scoring and reasons.
 - `invoices/services/incoming_invoice_conversion.py` — review transitions, duplicate handling, and conversion to `Expense`.
-- `invoices/management/commands/poll_incoming_invoices.py` — manual poll/import command with fixture support.
+- `invoices/management/commands/poll_incoming_invoices.py` — manual IMAP poll/import command with fixture support.
 - `expenses/templates/expenses/incoming_*.html` — inbox, detail/review, settings, and conversion screens.
 - `tests/fixtures/incoming_email/` — sanitized synthetic email and artifact fixtures.
 - `invoices/tests/test_incoming_invoice_*.py` and `expenses/tests/test_incoming_invoice_views.py` — focused model/service/view coverage.
@@ -170,7 +172,7 @@ Generated files live in `media/`. Rollback leaves created incoming rows and medi
 - Existing `Expense` paid-date requirement unless the unpaid-bill open question changes scope.
 - Existing expense statement import flow and mapping behavior.
 - Managed workflow files and environment sample files.
-- Scheduled polling, provider-side labels, vendor-portal automation, and OCR as follow-up scope.
+- Gmail/OAuth, scheduled polling, provider-side labels, vendor-portal automation, and OCR as follow-up scope.
 
 ## Demo Media
 
@@ -186,7 +188,7 @@ video + screenshots
 
 #### Steps
 
-1. Sign in through the repo-owned smoke-user flow and seed a synthetic incoming invoice source with issuer routing rules.
+1. Sign in through the repo-owned smoke-user flow and seed a synthetic IMAP incoming invoice source with issuer routing rules.
 2. Import synthetic emails covering an attached invoice file, an email-body-only invoice, and an uncertain company match.
 3. Open the incoming inbox and show the staged candidates with their review statuses and company suggestions.
 4. Open a candidate detail page, review available artifacts, confirm the suggested company, select an artifact, and open conversion.
@@ -237,5 +239,4 @@ incoming-invoice-inbox
 ## Open Questions
 
 - Should this issue include a first-class unpaid supplier bill model, or should unpaid reviewed candidates remain unconverted with an explicit UI limitation until a follow-up issue?
-- Should the first connected mailbox implementation be IMAP with runtime credential references, or is Gmail OAuth/API support required in this issue?
 - Should converted incoming invoice currency remain stored in Expense.raw_data like the existing expense importer, or should this issue add a first-class currency field to Expense?
