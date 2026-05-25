@@ -695,6 +695,14 @@ def _available_issuers(request):
 
 def _incoming_candidate_queryset(request):
     issuers = _available_issuers(request)
+    if request.user.is_superuser:
+        return (
+            IncomingInvoiceCandidate.objects.select_related(
+                'source', 'suggested_issuer__company', 'confirmed_issuer__company', 'selected_artifact', 'converted_expense'
+            )
+            .prefetch_related('artifacts')
+            .distinct()
+        )
     issuer_ids = list(issuers.values_list('id', flat=True))
     return (
         IncomingInvoiceCandidate.objects.select_related(
@@ -702,8 +710,8 @@ def _incoming_candidate_queryset(request):
         )
         .prefetch_related('artifacts')
         .filter(
-            Q(source__issuer__isnull=True)
-            | Q(source__issuer_id__in=issuer_ids)
+            Q(source__issuer_id__in=issuer_ids)
+            | Q(source__issuer__isnull=True, source__user=request.user, suggested_issuer__isnull=True, confirmed_issuer__isnull=True)
             | Q(suggested_issuer_id__in=issuer_ids)
             | Q(confirmed_issuer_id__in=issuer_ids)
         )
@@ -755,7 +763,12 @@ def incoming_inbox(request):
     paginator = Paginator(qs, 50)
     page = paginator.get_page(request.GET.get('page'))
     issuers = _available_issuers(request)
-    sources = IncomingEmailSource.objects.filter(Q(issuer__isnull=True) | Q(issuer__in=issuers)).order_by('display_name')
+    if request.user.is_superuser:
+        sources = IncomingEmailSource.objects.all().order_by('display_name')
+    else:
+        sources = IncomingEmailSource.objects.filter(
+            Q(issuer__in=issuers) | Q(issuer__isnull=True, user=request.user)
+        ).order_by('display_name')
     return render(request, 'expenses/incoming_inbox.html', {
         'candidates': page,
         'filters': filters,
@@ -768,7 +781,12 @@ def incoming_inbox(request):
 @require_http_methods(['GET', 'POST'])
 def incoming_source_settings(request):
     issuers = _available_issuers(request)
-    sources = IncomingEmailSource.objects.filter(Q(issuer__isnull=True) | Q(issuer__in=issuers)).select_related('issuer__company')
+    if request.user.is_superuser:
+        sources = IncomingEmailSource.objects.all().select_related('issuer__company')
+    else:
+        sources = IncomingEmailSource.objects.filter(
+            Q(issuer__in=issuers) | Q(issuer__isnull=True, user=request.user)
+        ).select_related('issuer__company')
     if request.method == 'POST':
         form = IncomingEmailSourceForm(request.POST, user=request.user, issuers=issuers)
         if form.is_valid():

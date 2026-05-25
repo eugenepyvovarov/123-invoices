@@ -209,6 +209,9 @@ class IncomingEmailSourceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['issuer'].queryset = issuers or Issuer.objects.none()
         self.fields['issuer'].required = False
+        self.fields['folder'].help_text = 'IMAP folder to read, usually INBOX.'
+        self.fields['polling_query'].help_text = 'Optional IMAP search such as UNSEEN or FROM "billing@example.com".'
+        self.fields['credential_reference'].help_text = 'Runtime secret reference only; do not enter the password here.'
         self._apply_pico_styles()
 
     def _apply_pico_styles(self):
@@ -230,18 +233,12 @@ class IncomingEmailSourceForm(forms.ModelForm):
 class IssuerEmailRoutingRuleForm(forms.ModelForm):
     recipient_aliases = JsonListField(label='Recipient aliases')
     delivered_to_addresses = JsonListField(label='Delivered-to addresses')
-    legal_names = JsonListField(label='Legal company names')
-    tax_identifiers = JsonListField(label='VAT/tax identifiers')
-    keywords = JsonListField(label='Keywords')
 
     class Meta:
         model = IssuerEmailRoutingRule
         fields = [
             'recipient_aliases',
             'delivered_to_addresses',
-            'legal_names',
-            'tax_identifiers',
-            'keywords',
             'confidence_threshold',
             'auto_assign_enabled',
         ]
@@ -262,6 +259,10 @@ class IssuerEmailRoutingRuleForm(forms.ModelForm):
         rule = super().save(commit=False)
         if self.issuer is not None:
             rule.issuer = self.issuer
+            company = self.issuer.company
+            rule.legal_names = [company.name] if company and company.name else []
+            rule.tax_identifiers = [company.customer_information_file_number] if company and company.customer_information_file_number else []
+            rule.keywords = []
         if commit:
             rule.save()
         return rule

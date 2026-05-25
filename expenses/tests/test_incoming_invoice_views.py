@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 
-from invoices.models import Expense, IncomingEmailSource, IncomingInvoiceArtifact, IncomingInvoiceCandidate
+from invoices.models import Company, Expense, IncomingEmailSource, IncomingInvoiceArtifact, IncomingInvoiceCandidate, Issuer
 
 from .base import ExpenseViewsTestCase
 
@@ -50,6 +50,38 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
         self.assertContains(response, 'Vendor invoice')
         self.assertContains(response, 'AP inbox')
 
+    def test_shared_source_candidates_for_other_issuer_are_not_visible(self):
+        other_company = Company.objects.create(name='Other Issuer Co', customer_information_file_number='VATOTHER')
+        other_issuer = Issuer.objects.create(company=other_company)
+        other_user = self.create_user_with_issuers(
+            [other_issuer],
+            username='other-incoming-user',
+            email='other-incoming@example.com',
+        )
+        other_source = IncomingEmailSource.objects.create(
+            user=other_user,
+            issuer=None,
+            display_name='Other shared AP inbox',
+            email_address='other-ap@example.com',
+            folder='INBOX',
+        )
+        other_candidate = IncomingInvoiceCandidate.objects.create(
+            source=other_source,
+            suggested_issuer=other_issuer,
+            status=IncomingInvoiceCandidate.STATUS_READY,
+            provider_message_id='other-shared-message',
+            from_email='vendor@example.com',
+            subject='Other issuer invoice',
+            received_at=timezone.now(),
+        )
+
+        inbox_response = self.client.get(reverse('expenses:incoming_inbox'))
+        detail_response = self.client.get(reverse('expenses:incoming_detail', args=[other_candidate.pk]))
+
+        self.assertEqual(inbox_response.status_code, 200)
+        self.assertNotContains(inbox_response, 'Other issuer invoice')
+        self.assertEqual(detail_response.status_code, 404)
+
     def test_candidate_detail_saves_company_and_artifact(self):
         response = self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
             'action': 'confirm',
@@ -66,6 +98,29 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
         self.assertEqual(self.candidate.confirmed_issuer, self.issuer)
         self.assertEqual(self.candidate.selected_artifact, self.artifact)
         self.assertEqual(self.candidate.status, IncomingInvoiceCandidate.STATUS_READY)
+
+    def test_candidate_detail_can_override_to_different_permitted_company(self):
+        override_company = Company.objects.create(name='Override Issuer Co', customer_information_file_number='VATOVERRIDE')
+        override_issuer = Issuer.objects.create(company=override_company)
+        override_issuer.users.add(self.user)
+
+        response = self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
+            'action': 'confirm',
+            'confirmed_issuer': override_issuer.pk,
+            'selected_artifact': self.artifact.pk,
+            'vendor': 'Vendor Ltd',
+            'description': 'Confirmed vendor invoice for override issuer',
+            'amount': '42.50',
+            'currency': 'EUR',
+        })
+
+        self.assertRedirects(response, reverse('expenses:incoming_detail', args=[self.candidate.pk]))
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.suggested_issuer, self.issuer)
+        self.assertEqual(self.candidate.confirmed_issuer, override_issuer)
+
+        detail_response = self.client.get(reverse('expenses:incoming_detail', args=[self.candidate.pk]))
+        self.assertContains(detail_response, 'Override Issuer Co')
 
     def test_inbox_history_keeps_terminal_review_statuses_visible(self):
         terminal_statuses = [
@@ -133,6 +188,24 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
         self.assertEqual(self.candidate.status, IncomingInvoiceCandidate.STATUS_REVIEWED_UNPAID)
         self.assertIn('no accounting record', self.candidate.conversion_limitation_message)
         self.assertEqual(Expense.objects.filter(raw_data__incoming_invoice__candidate_id=self.candidate.pk).count(), 0)
+
+    def test_reviewed_unpaid_detail_renders_limitation_message(self):
+        self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
+            'action': 'reviewed_unpaid',
+            'confirmed_issuer': self.issuer.pk,
+            'selected_artifact': self.artifact.pk,
+            'vendor': 'Vendor Ltd',
+            'description': 'Unpaid vendor invoice',
+            'amount': '42.50',
+            'currency': 'EUR',
+        })
+
+        response = self.client.get(reverse('expenses:incoming_detail', args=[self.candidate.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-testid="incoming-reviewed-unpaid"')
+        self.assertContains(response, 'Reviewed/unpaid')
+        self.assertContains(response, 'no accounting record')
 
     def test_conversion_requires_paid_date(self):
         response = self.client.post(reverse('expenses:incoming_convert', args=[self.candidate.pk]), {
