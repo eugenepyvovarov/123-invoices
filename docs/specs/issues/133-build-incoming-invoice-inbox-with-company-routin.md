@@ -103,13 +103,13 @@ The app also already stores imported expense currency metadata in `raw_data` whi
   - [x] Add uniqueness/index constraints for source message ids, status/date filtering, issuer filtering, and artifact hashes.
   - [x] Add model/admin tests for constraints, status transitions, relationships, file paths, and display helpers.
 
-- [ ] Build IMAP polling, artifact, routing, and duplicate services
-  - [ ] Add IMAP message fetching for configured folder/search scope without mutating mailbox state.
-  - [ ] Add email parsing for sanitized headers, recipients, delivered-to values, text/html bodies, message/thread ids, and allowed attachments.
-  - [ ] Add email-body PDF rendering using existing WeasyPrint dependencies.
-  - [ ] Add fixture-backed import support for tests and evidence.
-  - [ ] Add issuer scoring from aliases, delivered-to addresses, company names, VAT/tax ids, keywords, and available artifact/body text.
-  - [ ] Add duplicate detection for message ids, artifact hashes, invoice fingerprints, and incoming-created expense provenance.
+- [x] Build IMAP polling, artifact, routing, and duplicate services
+  - [x] Add IMAP message fetching for configured folder/search scope without mutating mailbox state.
+  - [x] Add email parsing for sanitized headers, recipients, delivered-to values, text/html bodies, message/thread ids, and allowed attachments.
+  - [x] Add email-body PDF rendering using existing WeasyPrint dependencies.
+  - [x] Add fixture-backed import support for tests and evidence.
+  - [x] Add issuer scoring from aliases, delivered-to addresses, company names, VAT/tax ids, keywords, and available artifact/body text.
+  - [x] Add duplicate detection for message ids, artifact hashes, invoice fingerprints, and incoming-created expense provenance.
 
 - [ ] Add incoming inbox review and conversion UI
   - [ ] Add URL routes, views, templates, and forms for inbox list, candidate detail/review, source settings, routing settings, artifact download/preview, and conversion confirmation.
