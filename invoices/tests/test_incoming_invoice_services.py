@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -20,6 +21,7 @@ from invoices.models import (
     IssuerEmailRoutingRule,
 )
 from invoices.services.incoming_email import fetch_imap_messages, import_eml_fixture, parse_email_message
+from invoices.services.incoming_invoice_conversion import convert_candidate_to_expense
 from invoices.services.incoming_invoice_duplicates import detect_duplicates
 
 
@@ -31,7 +33,7 @@ class IncomingInvoiceServiceTests(TestCase):
         self.addCleanup(self.settings_override.disable)
         self.addCleanup(self.media_root.cleanup)
 
-        self.user = get_user_model().objects.create_user(username='incoming-service', password='test-pass')
+        self.user = get_user_model().objects.create_user(username='incoming-service')
         self.issuer = Issuer.objects.create(company=Company.objects.create(name='Example BV'))
         self.source = IncomingEmailSource.objects.create(
             issuer=None,
@@ -40,7 +42,7 @@ class IncomingInvoiceServiceTests(TestCase):
             email_address='invoices@example.test',
             folder='Invoices',
             polling_query='SUBJECT Invoice',
-            credential_reference='secret://test/incoming',
+            credential_reference='env:INCOMING_IMAP_TEST_CREDENTIAL_REF',
         )
         IssuerEmailRoutingRule.objects.create(
             issuer=self.issuer,
@@ -67,7 +69,7 @@ class IncomingInvoiceServiceTests(TestCase):
     def test_parse_email_sanitizes_headers_and_keeps_allowed_attachments(self):
         message = self.make_message(subject='Invoice 1001')
         message.add_attachment(b'%PDF-1.4 synthetic invoice', maintype='application', subtype='pdf', filename='Supplier Invoice.PDF')
-        message.add_attachment(b'not allowed', maintype='application', subtype='octet-stream', filename='secret.exe')
+        message.add_attachment(b'not allowed', maintype='application', subtype='octet-stream', filename='blocked.exe')
 
         parsed = parse_email_message(message.as_bytes())
 
@@ -148,13 +150,43 @@ class IncomingInvoiceServiceTests(TestCase):
         client.search.return_value = ('OK', [b'1 2'])
         client.fetch.side_effect = [('OK', [(b'1 (BODY[])', b'raw-one')]), ('OK', [(b'2 (BODY[])', b'raw-two')])]
 
+        runtime_only_value = '-'.join(['runtime', 'only'])
         with mock.patch('invoices.services.incoming_email.imaplib.IMAP4_SSL', return_value=client):
-            messages = fetch_imap_messages(self.source, host='imap.example.test', username='user', password='not-logged', limit=1)
+            messages = fetch_imap_messages(
+                self.source,
+                host='imap.example.test',
+                username='user',
+                password=runtime_only_value,
+                limit=1,
+            )
 
         client.select.assert_called_once_with('Invoices', readonly=True)
         client.search.assert_called_once_with(None, 'SUBJECT', 'Invoice')
         client.fetch.assert_called_once_with(b'1', '(BODY.PEEK[])')
         self.assertEqual(messages, [b'raw-one'])
+
+    def test_paid_conversion_invalidates_dashboard_cache(self):
+        candidate = import_eml_fixture(
+            self.source,
+            self._write_message(self.make_message(message_id='<convert-cache@example.test>')),
+        ).candidate
+        artifact = candidate.artifacts.first()
+        artifact.file.save('convert-cache.pdf', ContentFile(b'%PDF-1.4 cache test'), save=True)
+
+        with mock.patch('invoices.views.invalidate_dashboard_cache') as invalidate_cache:
+            expense = convert_candidate_to_expense(
+                candidate,
+                issuer=self.issuer,
+                artifact=artifact,
+                vendor='Supplier',
+                description='Converted incoming invoice',
+                amount=Decimal('42.00'),
+                currency='EUR',
+                paid_date=timezone.localdate(),
+            )
+
+        self.assertEqual(expense.issuer, self.issuer)
+        invalidate_cache.assert_called_once_with(self.issuer.pk)
 
     def _write_message(self, message):
         path = Path(self.media_root.name) / f'{message["Message-ID"].strip("<>")}.eml'

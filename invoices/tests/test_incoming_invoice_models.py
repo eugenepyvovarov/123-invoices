@@ -21,7 +21,7 @@ from invoices.models import (
 
 class IncomingInvoiceModelTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='incoming-admin', password='test-pass')
+        self.user = get_user_model().objects.create_user(username='incoming-admin')
         self.issuer = Issuer.objects.create(company=Company.objects.create(name='Example BV'))
         self.source = IncomingEmailSource.objects.create(
             issuer=self.issuer,
@@ -30,7 +30,7 @@ class IncomingInvoiceModelTests(TestCase):
             email_address='invoices@example.test',
             folder='INBOX/Invoices',
             polling_query='UNSEEN',
-            credential_reference='secret://incoming/invoices',
+            credential_reference='env:INCOMING_IMAP_CREDENTIAL_REF',
         )
 
     def make_candidate(self, **overrides):

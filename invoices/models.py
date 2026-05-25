@@ -743,6 +743,7 @@ class IncomingInvoiceCandidate(models.Model):
     STATUS_READY = 'ready'
     STATUS_REVIEWED_UNPAID = 'reviewed_unpaid'
     STATUS_CONVERTED = 'converted'
+    STATUS_REJECTED = 'rejected'
     STATUS_NOT_INVOICE = 'not_invoice'
     STATUS_DUPLICATE = 'duplicate'
     STATUS_NEEDS_FETCH = 'needs_fetch'
@@ -753,6 +754,7 @@ class IncomingInvoiceCandidate(models.Model):
         (STATUS_READY, 'Ready'),
         (STATUS_REVIEWED_UNPAID, 'Reviewed/unpaid'),
         (STATUS_CONVERTED, 'Converted'),
+        (STATUS_REJECTED, 'Rejected'),
         (STATUS_NOT_INVOICE, 'Not an invoice'),
         (STATUS_DUPLICATE, 'Duplicate'),
         (STATUS_NEEDS_FETCH, 'Needs manual fetch'),
@@ -849,8 +851,10 @@ class IncomingInvoiceCandidate(models.Model):
         return self.status in {
             self.STATUS_REVIEWED_UNPAID,
             self.STATUS_CONVERTED,
+            self.STATUS_REJECTED,
             self.STATUS_NOT_INVOICE,
             self.STATUS_DUPLICATE,
+            self.STATUS_NEEDS_FETCH,
         }
 
     def mark_reviewed_unpaid(self, issuer, artifact, metadata=None, message=''):

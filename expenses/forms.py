@@ -269,6 +269,7 @@ class IssuerEmailRoutingRuleForm(forms.ModelForm):
 
 class IncomingCandidateReviewForm(forms.Form):
     ACTION_CONFIRM = 'confirm'
+    ACTION_REJECT = 'reject'
     ACTION_NOT_INVOICE = 'not_invoice'
     ACTION_NEEDS_FETCH = 'needs_fetch'
     ACTION_REVIEWED_UNPAID = 'reviewed_unpaid'
@@ -276,6 +277,7 @@ class IncomingCandidateReviewForm(forms.Form):
     ACTION_LINK_EXISTING = 'link_existing'
     ACTION_CHOICES = (
         (ACTION_CONFIRM, 'Confirm company/artifact'),
+        (ACTION_REJECT, 'Reject'),
         (ACTION_NOT_INVOICE, 'Not an invoice'),
         (ACTION_NEEDS_FETCH, 'Needs manual fetch'),
         (ACTION_REVIEWED_UNPAID, 'Reviewed/unpaid'),

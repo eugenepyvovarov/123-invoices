@@ -67,6 +67,56 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
         self.assertEqual(self.candidate.selected_artifact, self.artifact)
         self.assertEqual(self.candidate.status, IncomingInvoiceCandidate.STATUS_READY)
 
+    def test_inbox_history_keeps_terminal_review_statuses_visible(self):
+        terminal_statuses = [
+            IncomingInvoiceCandidate.STATUS_REJECTED,
+            IncomingInvoiceCandidate.STATUS_NOT_INVOICE,
+            IncomingInvoiceCandidate.STATUS_DUPLICATE,
+            IncomingInvoiceCandidate.STATUS_NEEDS_FETCH,
+            IncomingInvoiceCandidate.STATUS_CONVERTED,
+            IncomingInvoiceCandidate.STATUS_REVIEWED_UNPAID,
+        ]
+        for index, status in enumerate(terminal_statuses, start=1):
+            IncomingInvoiceCandidate.objects.create(
+                source=self.source,
+                suggested_issuer=self.issuer,
+                status=status,
+                provider_message_id=f'history-{status}',
+                from_email='vendor@example.com',
+                subject=f'History {index} {status}',
+                received_at=timezone.now(),
+            )
+
+        response = self.client.get(reverse('expenses:incoming_inbox'))
+
+        self.assertEqual(response.status_code, 200)
+        for index, status in enumerate(terminal_statuses, start=1):
+            self.assertContains(response, f'History {index} {status}')
+
+    def test_reject_not_invoice_and_needs_fetch_actions_keep_candidate_in_history(self):
+        action_expectations = (
+            ('reject', IncomingInvoiceCandidate.STATUS_REJECTED),
+            ('not_invoice', IncomingInvoiceCandidate.STATUS_NOT_INVOICE),
+            ('needs_fetch', IncomingInvoiceCandidate.STATUS_NEEDS_FETCH),
+        )
+        for action, expected_status in action_expectations:
+            candidate = IncomingInvoiceCandidate.objects.create(
+                source=self.source,
+                suggested_issuer=self.issuer,
+                status=IncomingInvoiceCandidate.STATUS_NEEDS_REVIEW,
+                provider_message_id=f'action-{action}',
+                from_email='vendor@example.com',
+                subject=f'Action {action}',
+                received_at=timezone.now(),
+            )
+
+            response = self.client.post(reverse('expenses:incoming_action', args=[candidate.pk]), {'action': action})
+
+            self.assertRedirects(response, reverse('expenses:incoming_detail', args=[candidate.pk]))
+            candidate.refresh_from_db()
+            self.assertEqual(candidate.status, expected_status)
+            self.assertContains(self.client.get(reverse('expenses:incoming_inbox')), f'Action {action}')
+
     def test_reviewed_unpaid_does_not_create_expense(self):
         response = self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
             'action': 'reviewed_unpaid',
@@ -138,6 +188,25 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Duplicate candidates require explicit override')
+
+    def test_link_existing_marks_duplicate_with_existing_expense_reference(self):
+        expense = Expense.objects.create(
+            issuer=self.issuer,
+            paid_date=date.today(),
+            amount=Decimal('42.50'),
+            description='Existing paid invoice',
+        )
+
+        response = self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
+            'action': 'link_existing',
+            'existing_expense': expense.pk,
+        })
+
+        self.assertRedirects(response, reverse('expenses:incoming_detail', args=[self.candidate.pk]))
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, IncomingInvoiceCandidate.STATUS_DUPLICATE)
+        self.assertEqual(self.candidate.duplicate_metadata['review_action'], 'linked_existing')
+        self.assertEqual(self.candidate.duplicate_metadata['linked_existing_expense_id'], expense.pk)
 
     def test_artifact_download_is_scoped_to_accessible_candidate(self):
         response = self.client.get(reverse('expenses:incoming_artifact_download', args=[self.candidate.pk, self.artifact.pk]))

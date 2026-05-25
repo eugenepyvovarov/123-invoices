@@ -66,6 +66,12 @@ def mark_candidate_not_invoice(candidate: IncomingInvoiceCandidate) -> IncomingI
     return candidate
 
 
+def mark_candidate_rejected(candidate: IncomingInvoiceCandidate) -> IncomingInvoiceCandidate:
+    candidate.status = IncomingInvoiceCandidate.STATUS_REJECTED
+    candidate.save(update_fields=['status', 'updated_at'])
+    return candidate
+
+
 def mark_candidate_needs_fetch(candidate: IncomingInvoiceCandidate) -> IncomingInvoiceCandidate:
     candidate.status = IncomingInvoiceCandidate.STATUS_NEEDS_FETCH
     candidate.save(update_fields=['status', 'updated_at'])

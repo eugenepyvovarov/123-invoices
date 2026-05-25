@@ -39,6 +39,7 @@ from invoices.services.incoming_invoice_conversion import (
     mark_candidate_duplicate,
     mark_candidate_needs_fetch,
     mark_candidate_not_invoice,
+    mark_candidate_rejected,
     mark_candidate_reviewed_unpaid,
     review_metadata_from_cleaned,
 )
@@ -810,7 +811,10 @@ def incoming_candidate_action(request, pk):
     if not form.is_valid():
         return render(request, 'expenses/incoming_candidate_detail.html', {'candidate': candidate, 'review_form': form}, status=400)
     action = form.cleaned_data['action']
-    if action == IncomingCandidateReviewForm.ACTION_NOT_INVOICE:
+    if action == IncomingCandidateReviewForm.ACTION_REJECT:
+        mark_candidate_rejected(candidate)
+        messages.success(request, 'Candidate rejected and kept in history.')
+    elif action == IncomingCandidateReviewForm.ACTION_NOT_INVOICE:
         mark_candidate_not_invoice(candidate)
         messages.success(request, 'Candidate marked as not an invoice.')
     elif action == IncomingCandidateReviewForm.ACTION_NEEDS_FETCH:
