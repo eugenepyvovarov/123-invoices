@@ -240,6 +240,11 @@ incoming-invoice-inbox
 - The `incoming-conversion-form` baseline/current pair should show the new conversion confirmation flow using existing form visual patterns.
 - The `incoming-converted-expense` baseline/current pair should show the resulting expense state integrated with existing expense UI patterns.
 
+### Baseline SHA
+
+`4cbf3608ed927af36605a5dc37d6c593311b0584`
+
+
 ## Open Questions
 
 None.
