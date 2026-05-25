@@ -1,0 +1,78 @@
+{% extends 'invoices/base.html' %}
+{% block main %}
+<section class="page incoming-candidate-page" data-testid="incoming-candidate-review">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>{{ candidate.display_subject }}</h1>
+      <p class="page-subtitle">From {{ candidate.from_email|default:candidate.from_name }} · {{ candidate.received_at|date:'Y-m-d H:i' }} · {{ candidate.get_status_display }}</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_inbox' %}">Back to inbox</a>
+      <a class="btn btn-primary" href="{% url 'expenses:incoming_convert' candidate.pk %}" data-testid="incoming-convert-link">Convert / mark unpaid</a>
+    </div>
+  </header>
+
+  {% if candidate.status == 'reviewed_unpaid' %}
+    <article class="surface surface--padded" data-testid="incoming-reviewed-unpaid">
+      <strong>Reviewed/unpaid</strong>
+      <p>{{ candidate.conversion_limitation_message }}</p>
+    </article>
+  {% endif %}
+
+  <div class="layout-grid layout-grid--two">
+    <section class="surface surface--padded">
+      <h2>Routing and detection</h2>
+      <dl>
+        <dt>Suggested company</dt><dd>{{ candidate.suggested_issuer|default:'Unclear' }}</dd>
+        <dt>Confirmed company</dt><dd>{{ candidate.confirmed_issuer|default:'Not confirmed' }}</dd>
+        <dt>Selected artifact</dt><dd>{{ candidate.selected_artifact|default:'Not selected' }}</dd>
+      </dl>
+      <h3>Reasons and warnings</h3>
+      <pre>{{ candidate.detection_metadata|default:'{}' }}</pre>
+      {% if candidate.duplicate_metadata %}<pre data-testid="incoming-duplicate-warning">{{ candidate.duplicate_metadata }}</pre>{% endif %}
+    </section>
+
+    <section class="surface surface--padded">
+      <h2>Review actions</h2>
+      <form method="post" action="{% url 'expenses:incoming_action' candidate.pk %}">
+        {% csrf_token %}
+        {{ review_form.non_field_errors }}
+        {% for field in review_form %}
+          <div class="form-field">
+            <label class="form-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }} {{ field.errors }}
+          </div>
+        {% endfor %}
+        <button class="btn btn-primary" type="submit">Save review action</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="surface surface--padded">
+    <h2>Artifacts</h2>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Type</th><th>Filename</th><th>Content type</th><th>Size</th><th>Confidence</th><th></th></tr></thead>
+        <tbody>
+        {% for artifact in candidate.artifacts.all %}
+          <tr data-testid="incoming-artifact-row">
+            <td>{{ artifact.get_kind_display }}</td>
+            <td>{{ artifact.display_name }}</td>
+            <td>{{ artifact.content_type }}</td>
+            <td>{{ artifact.size }}</td>
+            <td>{{ artifact.invoice_confidence }}</td>
+            <td class="text-end"><a href="{% url 'expenses:incoming_artifact_preview' candidate.pk artifact.pk %}" target="_blank" rel="noopener">Preview</a> · <a href="{% url 'expenses:incoming_artifact_download' candidate.pk artifact.pk %}">Download</a></td>
+          </tr>
+        {% empty %}<tr><td colspan="6">No artifacts stored for this candidate.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="surface surface--padded">
+    <h2>Email snapshot</h2>
+    <p><strong>To:</strong> {{ candidate.to_addresses }}<br><strong>Delivered-To:</strong> {{ candidate.delivered_to_addresses }}</p>
+    <pre>{{ candidate.body_text|truncatechars:2000 }}</pre>
+  </section>
+</section>
+{% endblock %}
