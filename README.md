@@ -10,6 +10,7 @@ service plus a backup scheduler.
 - Customer, project, invoice, payment, and expense workflows.
 - Invoice and expense dashboard views with reusable UI components.
 - CSV/XLS/XLSX import support for expense and billing data.
+- IMAP-only incoming invoice inbox for review-first supplier invoice intake.
 - SQLite-friendly production deployment with persistent `db/` and `media/`
   mounts.
 - Manual and scheduled backup support for S3-compatible object storage.
@@ -145,6 +146,9 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
   verification.
 - [Backups](docs/backups.md) covers backup configuration, scheduler behavior,
   locking, object keys, and operator checks.
+- [Incoming invoice inbox](docs/incoming-invoice-inbox.md) covers IMAP setup,
+  credential references, polling and fixture imports, review/paid conversion,
+  unpaid limitations, currency metadata, privacy, and rollback guidance.
 - [Automation](docs/automation.md) covers the Gitea/OpenCode integration
   contract, previews, evidence, and production artifacts.
 - Historical task specs live under [docs/specs/issues](docs/specs/issues/).

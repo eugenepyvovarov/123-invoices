@@ -829,6 +829,27 @@ select.form-select {
   background: var(--color-success-soft);
   color: var(--color-success-strong);
 }
+.incoming-status {
+  background: color-mix(in srgb, var(--color-secondary) 14%, transparent);
+  color: var(--color-text-muted);
+}
+.incoming-status--ready,
+.incoming-status--converted {
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
+}
+.incoming-status--needs_review,
+.incoming-status--reviewed_unpaid,
+.incoming-status--needs_fetch {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+.incoming-status--duplicate,
+.incoming-status--not_invoice,
+.incoming-status--error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+}
 .icon-button {
   display: inline-flex;
   align-items: center;

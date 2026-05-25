@@ -74,7 +74,8 @@
         <li><a href="{% url 'customers:list' %}" class="sidebar__link{% if request.path|slice:':11' == '/customers/' %} is-active{% endif %}">Customers</a></li>
         <li><a href="{% url 'projects:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/projects/' %} is-active{% endif %}">Projects</a></li>
         <li><a href="{% url 'invoices:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/invoices/' %} is-active{% endif %}">Invoices</a></li>
-        <li><a href="{% url 'expenses:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/expenses/' %} is-active{% endif %}">Expenses</a></li>
+        <li><a href="{% url 'expenses:list' %}" class="sidebar__link{% if request.path|slice:':10' == '/expenses/' and request.path|slice:':19' != '/expenses/incoming/' %} is-active{% endif %}">Expenses</a></li>
+        <li><a href="{% url 'expenses:incoming_inbox' %}" class="sidebar__link{% if request.path|slice:':19' == '/expenses/incoming/' %} is-active{% endif %}" data-testid="incoming-inbox-nav">Incoming inbox</a></li>
       </ul>
     {% endif %}
     {% if not is_cross_company_dashboard %}
