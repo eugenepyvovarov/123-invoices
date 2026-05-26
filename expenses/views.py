@@ -818,8 +818,44 @@ def incoming_routing_settings(request):
 
 def incoming_candidate_detail(request, pk):
     candidate = _get_incoming_candidate(request, pk)
-    form = IncomingCandidateReviewForm(candidate=candidate, issuers=_available_issuers(request))
-    return render(request, 'expenses/incoming_candidate_detail.html', {'candidate': candidate, 'review_form': form})
+    issuers = _available_issuers(request)
+    form = IncomingCandidateReviewForm(candidate=candidate, issuers=issuers)
+    return render(
+        request,
+        'expenses/incoming_candidate_detail.html',
+        _incoming_candidate_detail_context(candidate, form, issuers),
+    )
+
+
+def _incoming_candidate_detail_context(candidate, form, issuers):
+    detection = candidate.detection_metadata or {}
+    issuer_names = {issuer.pk: str(issuer) for issuer in issuers}
+    company_scores = []
+    for score in detection.get('company_scores') or []:
+        issuer_id = score.get('issuer_id')
+        company_scores.append({
+            'issuer': issuer_names.get(issuer_id, f"Company #{issuer_id}"),
+            'confidence': score.get('confidence') or '—',
+            'reasons': score.get('reasons') or [],
+        })
+    duplicate = candidate.duplicate_metadata or {}
+    return {
+        'candidate': candidate,
+        'review_form': form,
+        'routing_feedback': {
+            'invoice_confidence': detection.get('invoice_confidence') or '—',
+            'company_confidence': detection.get('company_confidence') or '—',
+            'company_reasons': detection.get('company_reasons') or detection.get('reasons') or [],
+            'company_warning': detection.get('company_warning'),
+            'company_scores': company_scores,
+        },
+        'duplicate_feedback': {
+            'is_duplicate': duplicate.get('is_duplicate'),
+            'reasons': duplicate.get('reasons') or [],
+            'candidate_ids': duplicate.get('candidate_ids') or [],
+            'expense_ids': duplicate.get('expense_ids') or [],
+        },
+    }
 
 
 @require_POST
@@ -827,7 +863,13 @@ def incoming_candidate_action(request, pk):
     candidate = _get_incoming_candidate(request, pk)
     form = IncomingCandidateReviewForm(request.POST, candidate=candidate, issuers=_available_issuers(request))
     if not form.is_valid():
-        return render(request, 'expenses/incoming_candidate_detail.html', {'candidate': candidate, 'review_form': form}, status=400)
+        issuers = _available_issuers(request)
+        return render(
+            request,
+            'expenses/incoming_candidate_detail.html',
+            _incoming_candidate_detail_context(candidate, form, issuers),
+            status=400,
+        )
     action = form.cleaned_data['action']
     if action == IncomingCandidateReviewForm.ACTION_REJECT:
         mark_candidate_rejected(candidate)
