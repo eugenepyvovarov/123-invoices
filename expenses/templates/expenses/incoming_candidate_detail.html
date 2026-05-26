@@ -13,27 +13,23 @@
   </header>
 
   {% if candidate.status == 'reviewed_unpaid' %}
-    <article class="surface surface--padded" data-testid="incoming-reviewed-unpaid">
+    <article class="incoming-notice incoming-notice--warning" data-testid="incoming-reviewed-unpaid">
       <strong>Reviewed/unpaid</strong>
-      <p>{{ candidate.conversion_limitation_message }}</p>
+      <span>{{ candidate.conversion_limitation_message }}</span>
     </article>
   {% endif %}
 
-  <div class="layout-grid layout-grid--two">
-    <section class="surface surface--padded">
-      <h2>Routing and detection</h2>
-      <dl>
-        <dt>Suggested company</dt><dd>{{ candidate.suggested_issuer|default:'Unclear' }}</dd>
-        <dt>Confirmed company</dt><dd>{{ candidate.confirmed_issuer|default:'Not confirmed' }}</dd>
-        <dt>Selected artifact</dt><dd>{{ candidate.selected_artifact|default:'Not selected' }}</dd>
-      </dl>
-      <h3>Reasons and warnings</h3>
-      <pre>{{ candidate.detection_metadata|default:'{}' }}</pre>
-      {% if candidate.duplicate_metadata %}<pre data-testid="incoming-duplicate-warning">{{ candidate.duplicate_metadata }}</pre>{% endif %}
-    </section>
+  <section class="surface surface--padded incoming-review-workspace">
+    <div class="incoming-review-summary">
+      <div><span class="form-field__label">Suggested company</span><strong>{{ candidate.suggested_issuer|default:'Unclear' }}</strong></div>
+      <div><span class="form-field__label">Confirmed company</span><strong>{{ candidate.confirmed_issuer|default:'Not confirmed' }}</strong></div>
+      <div><span class="form-field__label">Selected artifact</span><strong>{{ candidate.selected_artifact|default:'Not selected' }}</strong></div>
+      <div><span class="form-field__label">Status</span><span class="status-badge incoming-status incoming-status--{{ candidate.status }}">{{ candidate.get_status_display }}</span></div>
+    </div>
 
-    <section class="surface surface--padded">
-      <h2>Review actions</h2>
+    <div class="incoming-review-main">
+      <div class="incoming-review-form-panel">
+        <h2>Review decision</h2>
       <form method="post" action="{% url 'expenses:incoming_action' candidate.pk %}">
         {% csrf_token %}
         {{ review_form.non_field_errors }}
@@ -45,10 +41,16 @@
         {% endfor %}
         <button class="btn btn-primary" type="submit">Save review action</button>
       </form>
-    </section>
-  </div>
+      </div>
+      <aside class="incoming-review-context">
+        <h2>Routing feedback</h2>
+        <pre>{{ candidate.detection_metadata|default:'{}' }}</pre>
+        {% if candidate.duplicate_metadata %}<pre data-testid="incoming-duplicate-warning">{{ candidate.duplicate_metadata }}</pre>{% endif %}
+      </aside>
+    </div>
+  </section>
 
-  <section class="surface surface--padded">
+  <section class="surface surface--padded incoming-artifacts-panel">
     <h2>Artifacts</h2>
     <div class="table-responsive">
       <table>
@@ -69,10 +71,10 @@
     </div>
   </section>
 
-  <section class="surface surface--padded">
-    <h2>Email snapshot</h2>
+  <details class="surface surface--padded incoming-email-snapshot">
+    <summary>Email snapshot</summary>
     <p><strong>To:</strong> {{ candidate.to_addresses }}<br><strong>Delivered-To:</strong> {{ candidate.delivered_to_addresses }}</p>
     <pre>{{ candidate.body_text|truncatechars:2000 }}</pre>
-  </section>
+  </details>
 </section>
 {% endblock %}

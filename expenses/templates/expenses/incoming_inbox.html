@@ -37,24 +37,21 @@
     </form>
   </section>
 
-  <section class="surface surface--padded">
+  <section class="surface surface--padded incoming-list-surface">
     <div class="table-responsive">
-      <table>
-        <thead><tr><th>Received</th><th>Sender</th><th>Subject</th><th>Company</th><th>Status</th><th>Confidence</th><th>Artifacts</th><th></th></tr></thead>
+      <table class="incoming-inbox-table">
+        <thead><tr><th>Invoice email</th><th>Company</th><th>Status</th><th>Artifacts</th><th></th></tr></thead>
         <tbody>
         {% for candidate in candidates %}
           <tr data-testid="incoming-candidate-row">
-            <td>{{ candidate.received_at|date:'Y-m-d H:i' }}</td>
-            <td>{{ candidate.from_email|default:candidate.from_name }}</td>
-            <td>{{ candidate.display_subject }}</td>
-            <td>{{ candidate.confirmed_issuer|default:candidate.suggested_issuer|default:'Needs review' }}</td>
+            <td class="incoming-email-cell"><a class="incoming-email-cell__subject" href="{% url 'expenses:incoming_detail' candidate.pk %}">{{ candidate.display_subject }}</a><span class="incoming-email-cell__meta">{{ candidate.from_email|default:candidate.from_name }} · {{ candidate.received_at|date:'Y-m-d H:i' }}</span></td>
+            <td><strong>{{ candidate.confirmed_issuer|default:candidate.suggested_issuer|default:'Needs review' }}</strong><br><span class="text-muted">confidence {{ candidate.detection_metadata.company_confidence|default:'—' }}</span></td>
             <td><span class="status-badge incoming-status incoming-status--{{ candidate.status }}">{{ candidate.get_status_display }}</span></td>
-            <td>{{ candidate.detection_metadata.company_confidence|default:'—' }}</td>
-            <td>{{ candidate.artifacts.count }}</td>
+            <td>{{ candidate.artifacts.count }} file{{ candidate.artifacts.count|pluralize }}</td>
             <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:incoming_detail' candidate.pk %}">Review</a></td>
           </tr>
         {% empty %}
-          <tr><td colspan="8">No incoming invoice candidates match these filters.</td></tr>
+          <tr><td colspan="5">No incoming invoice candidates match these filters.</td></tr>
         {% endfor %}
         </tbody>
       </table>

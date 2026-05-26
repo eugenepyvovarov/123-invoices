@@ -3,6 +3,10 @@
 <section class="page incoming-routing-page" data-testid="incoming-routing-settings">
   <header class="page-header"><div class="page-header__intro"><h1>Incoming routing settings</h1><p class="page-subtitle">Detection rules for {{ issuer }}. Company name and VAT/tax id are read from the company profile.</p></div><div class="page-actions"><a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_inbox' %}">Back to inbox</a></div></header>
   <section class="surface surface--padded">
+    <div class="incoming-routing-summary">
+      <div><span class="form-field__label">Company name used for matching</span><strong>{{ issuer.company.name|default:issuer }}</strong></div>
+      <div><span class="form-field__label">VAT/tax id used for matching</span><strong>{{ issuer.company.customer_information_file_number|default:'Not set on company profile' }}</strong></div>
+    </div>
     <form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-field"><label class="form-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<button class="btn btn-primary" type="submit">Save routing</button></form>
   </section>
 </section>

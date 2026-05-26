@@ -1,11 +1,39 @@
 {% extends 'invoices/base.html' %}
 {% block main %}
 <section class="page incoming-sources-page" data-testid="incoming-source-settings">
-  <header class="page-header"><div class="page-header__intro"><h1>Incoming source settings</h1><p class="page-subtitle">Configure IMAP mailbox metadata and credential references without storing secrets in git.</p></div><div class="page-actions"><a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_inbox' %}">Back to inbox</a></div></header>
-  <section class="surface surface--padded">
-    <h2>Add IMAP source</h2>
-    <form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-field"><label class="form-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-field__help">{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}<button class="btn btn-primary" type="submit">Save source</button></form>
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Incoming source settings</h1>
+      <p class="page-subtitle">Add the IMAP mailbox that receives supplier invoices. Passwords stay in runtime secrets, not in this app.</p>
+    </div>
+    <div class="page-actions"><a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_inbox' %}">Back to inbox</a></div>
+  </header>
+  <section class="surface surface--padded incoming-settings-card">
+    <div class="incoming-settings-card__intro">
+      <h2>Add IMAP source</h2>
+      <p class="text-muted">Most teams only need a display name, mailbox address, and company. Advanced IMAP scope fields can be left at their defaults.</p>
+    </div>
+    <form method="post" class="incoming-source-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="filters-grid">
+        <div class="form-field"><label class="form-field__label" for="{{ form.display_name.id_for_label }}">{{ form.display_name.label }}</label>{{ form.display_name }}{{ form.display_name.errors }}</div>
+        <div class="form-field"><label class="form-field__label" for="{{ form.email_address.id_for_label }}">{{ form.email_address.label }}</label>{{ form.email_address }}{{ form.email_address.errors }}</div>
+        <div class="form-field"><label class="form-field__label" for="{{ form.issuer.id_for_label }}">Company</label>{{ form.issuer }}{{ form.issuer.errors }}</div>
+        <div class="form-field incoming-checkbox-field"><label>{{ form.is_enabled }} Enabled for manual polling</label>{{ form.is_enabled.errors }}</div>
+      </div>
+      <details class="incoming-advanced-settings">
+        <summary>Advanced IMAP scope</summary>
+        <p class="form-field__help">Use these only when an operator needs a non-default mailbox folder, an IMAP search filter, or a named runtime secret reference. The app never stores the real mailbox password here.</p>
+        <div class="filters-grid">
+          <div class="form-field"><label class="form-field__label" for="{{ form.folder.id_for_label }}">Mailbox folder</label>{{ form.folder }}{% if form.folder.help_text %}<small class="form-field__help">{{ form.folder.help_text }}</small>{% endif %}{{ form.folder.errors }}</div>
+          <div class="form-field"><label class="form-field__label" for="{{ form.polling_query.id_for_label }}">IMAP search filter</label>{{ form.polling_query }}{% if form.polling_query.help_text %}<small class="form-field__help">{{ form.polling_query.help_text }}</small>{% endif %}{{ form.polling_query.errors }}</div>
+          <div class="form-field"><label class="form-field__label" for="{{ form.credential_reference.id_for_label }}">Secret reference name</label>{{ form.credential_reference }}{% if form.credential_reference.help_text %}<small class="form-field__help">{{ form.credential_reference.help_text }}</small>{% endif %}{{ form.credential_reference.errors }}</div>
+        </div>
+      </details>
+      <button class="btn btn-primary" type="submit">Save source</button>
+    </form>
   </section>
-  <section class="surface surface--padded"><h2>Configured sources</h2><table><thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Scope</th><th>Enabled</th></tr></thead><tbody>{% for source in sources %}<tr><td>{{ source.display_name }}</td><td>{{ source.email_address }}</td><td>{{ source.issuer|default:'Shared' }}</td><td>{{ source.folder }}{% if source.polling_query %} · filtered{% endif %}</td><td>{{ source.is_enabled|yesno:'Yes,No' }}</td></tr>{% empty %}<tr><td colspan="5">No incoming email sources configured.</td></tr>{% endfor %}</tbody></table></section>
+  <section class="surface surface--padded"><h2>Configured sources</h2><table class="incoming-compact-table"><thead><tr><th>Mailbox</th><th>Company</th><th>Polling scope</th><th>Enabled</th></tr></thead><tbody>{% for source in sources %}<tr><td><strong>{{ source.display_name }}</strong><br><span class="text-muted">{{ source.email_address }}</span></td><td>{{ source.issuer|default:'Shared' }}</td><td>{{ source.folder|default:'INBOX' }}{% if source.polling_query %}<br><span class="text-muted">Filtered search</span>{% endif %}</td><td>{{ source.is_enabled|yesno:'Yes,No' }}</td></tr>{% empty %}<tr><td colspan="4">No incoming email sources configured.</td></tr>{% endfor %}</tbody></table></section>
 </section>
 {% endblock %}
