@@ -262,7 +262,6 @@ class IssuerEmailRoutingRuleForm(forms.ModelForm):
             company = self.issuer.company
             rule.legal_names = [company.name] if company and company.name else []
             rule.tax_identifiers = [company.customer_information_file_number] if company and company.customer_information_file_number else []
-            rule.keywords = []
         if commit:
             rule.save()
         return rule

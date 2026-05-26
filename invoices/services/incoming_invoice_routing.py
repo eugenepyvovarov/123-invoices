@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -28,6 +29,31 @@ def _contains_any(text: str, needles: list[str]) -> list[str]:
     return [needle for needle in needles if _normalize(needle) and _normalize(needle) in normalized_text]
 
 
+def _merge_unique(existing, additions: list[str]) -> list[str]:
+    values = _as_list(existing)
+    seen = {_normalize(value) for value in values}
+    for addition in additions:
+        value = str(addition or '').strip()
+        key = _normalize(value)
+        if value and key not in seen:
+            values.append(value)
+            seen.add(key)
+    return values
+
+
+def _learned_subject_signal(subject: str) -> str:
+    """Keep a reusable subject pattern without invoice numbers or month-specific dates."""
+    words = re.findall(r'[\w@.+-]+', subject or '')
+    reusable = [word for word in words if not any(char.isdigit() for char in word)]
+    return ' '.join(reusable[:6]).strip()
+
+
+def _learned_day_signal(candidate: IncomingInvoiceCandidate) -> str:
+    if not candidate.received_at:
+        return ''
+    return f'day-of-month:{candidate.received_at.day:02d}'
+
+
 def score_candidate_for_issuer(candidate: IncomingInvoiceCandidate, rule: IssuerEmailRoutingRule) -> IssuerScore:
     score = Decimal('0.00')
     reasons: list[str] = []
@@ -43,12 +69,18 @@ def score_candidate_for_issuer(candidate: IncomingInvoiceCandidate, rule: Issuer
         score += Decimal('0.55')
         reasons.append('delivered-to address matched')
 
-    text_parts = [candidate.subject, candidate.body_text, candidate.body_html]
+    text_parts = [candidate.from_email, candidate.subject, candidate.body_text, candidate.body_html]
     text_parts.extend(candidate.artifacts.values_list('extracted_text', flat=True))
     searchable_text = ' '.join(part or '' for part in text_parts)
     legal_matches = _contains_any(searchable_text, _as_list(rule.legal_names))
     tax_matches = _contains_any(searchable_text, _as_list(rule.tax_identifiers))
-    keyword_matches = _contains_any(searchable_text, _as_list(rule.keywords))
+    keywords = _as_list(rule.keywords)
+    keyword_matches = _contains_any(
+        searchable_text,
+        [keyword for keyword in keywords if not keyword.startswith('day-of-month:')],
+    )
+    day_signal = _learned_day_signal(candidate)
+    day_matched = day_signal and day_signal in keywords
     if legal_matches:
         score += Decimal('0.30')
         reasons.append('legal company name matched')
@@ -57,12 +89,40 @@ def score_candidate_for_issuer(candidate: IncomingInvoiceCandidate, rule: Issuer
         reasons.append('tax/VAT identifier matched')
     if keyword_matches:
         score += min(Decimal('0.20'), Decimal('0.05') * len(keyword_matches))
-        reasons.append('keyword matched')
+        reasons.append('learned sender/subject signal matched')
+    if day_matched:
+        score += Decimal('0.05')
+        reasons.append('learned monthly timing matched')
     if rule.issuer.company_id and rule.issuer.company.name:
         if _normalize(rule.issuer.company.name) in _normalize(searchable_text):
             score += Decimal('0.25')
             reasons.append('issuer company name matched')
     return IssuerScore(rule.issuer, min(score, Decimal('1.00')).quantize(Decimal('0.01')), reasons)
+
+
+def learn_routing_signals(candidate: IncomingInvoiceCandidate, issuer: Issuer) -> IssuerEmailRoutingRule:
+    """Remember reviewer-confirmed routing hints for the next similar invoice email."""
+    rule, _ = IssuerEmailRoutingRule.objects.get_or_create(issuer=issuer)
+    company = issuer.company
+    if company:
+        rule.legal_names = _merge_unique(rule.legal_names, [company.name])
+        rule.tax_identifiers = _merge_unique(rule.tax_identifiers, [company.customer_information_file_number])
+    rule.recipient_aliases = _merge_unique(
+        rule.recipient_aliases,
+        (candidate.to_addresses or []) + (candidate.cc_addresses or []),
+    )
+    rule.delivered_to_addresses = _merge_unique(rule.delivered_to_addresses, candidate.delivered_to_addresses or [])
+    keyword_additions = [candidate.from_email, _learned_subject_signal(candidate.subject), _learned_day_signal(candidate)]
+    rule.keywords = _merge_unique(rule.keywords, keyword_additions)
+    rule.save(update_fields=[
+        'recipient_aliases',
+        'delivered_to_addresses',
+        'legal_names',
+        'tax_identifiers',
+        'keywords',
+        'updated_at',
+    ])
+    return rule
 
 
 def score_candidate(candidate: IncomingInvoiceCandidate) -> list[IssuerScore]:

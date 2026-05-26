@@ -31,7 +31,7 @@
 
         <div class="incoming-review-form-panel">
           <h2>Review decision</h2>
-          <p class="section-kicker">Confirm the company and source file before any accounting record is created.</p>
+          <p class="section-kicker">Confirm the company and source file before any accounting record is created. Saved decisions teach future routing for similar sender, recipient, and subject signals.</p>
           <form method="post" action="{% url 'expenses:incoming_action' candidate.pk %}">
             {% csrf_token %}
             {{ review_form.non_field_errors }}

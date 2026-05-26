@@ -11,7 +11,7 @@
   <section class="surface surface--padded incoming-settings-card">
     <div class="incoming-settings-card__intro">
       <h2>Add IMAP source</h2>
-      <p class="text-muted">Most teams only need a display name, mailbox address, and company. Advanced IMAP scope fields can be left at their defaults.</p>
+      <p class="text-muted">Most teams only need a display name, mailbox address, and company. When routing is unclear, reviewers choose the company and the app remembers sender, recipient, and subject signals for next time.</p>
     </div>
     <form method="post" class="incoming-source-form">
       {% csrf_token %}
@@ -24,7 +24,7 @@
       </div>
       <details class="incoming-advanced-settings">
         <summary>Advanced IMAP scope</summary>
-        <p class="form-field__help">Use these only when an operator needs a non-default mailbox folder, an IMAP search filter, or a named runtime secret reference. The app never stores the real mailbox password here.</p>
+        <p class="form-field__help">Optional operator controls. Leave these defaults unless the mailbox uses a dedicated invoice folder, a narrow IMAP search, or a named runtime secret reference. The app never stores the real mailbox password here.</p>
         <div class="filters-grid">
           <div class="form-field"><label class="form-field__label" for="{{ form.folder.id_for_label }}">Mailbox folder</label>{{ form.folder }}{% if form.folder.help_text %}<small class="form-field__help">{{ form.folder.help_text }}</small>{% endif %}{{ form.folder.errors }}</div>
           <div class="form-field"><label class="form-field__label" for="{{ form.polling_query.id_for_label }}">IMAP search filter</label>{{ form.polling_query }}{% if form.polling_query.help_text %}<small class="form-field__help">{{ form.polling_query.help_text }}</small>{% endif %}{{ form.polling_query.errors }}</div>

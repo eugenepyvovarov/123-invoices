@@ -7,6 +7,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 
 from invoices.models import Expense, IncomingInvoiceArtifact, IncomingInvoiceCandidate, Issuer
+from invoices.services.incoming_invoice_routing import learn_routing_signals
 
 
 UNPAID_LIMITATION_MESSAGE = (
@@ -38,6 +39,7 @@ def mark_candidate_confirmed(
     if candidate.status not in {IncomingInvoiceCandidate.STATUS_DUPLICATE, IncomingInvoiceCandidate.STATUS_CONVERTED}:
         candidate.status = IncomingInvoiceCandidate.STATUS_READY
     candidate.save(update_fields=['confirmed_issuer', 'selected_artifact', 'reviewed_metadata', 'status', 'updated_at'])
+    learn_routing_signals(candidate, issuer)
     return candidate
 
 
@@ -57,6 +59,7 @@ def mark_candidate_reviewed_unpaid(
         'status',
         'updated_at',
     ])
+    learn_routing_signals(candidate, issuer)
     return candidate
 
 
@@ -158,6 +161,7 @@ def convert_candidate_to_expense(
         'status',
         'updated_at',
     ])
+    learn_routing_signals(candidate, issuer)
     from invoices.views import invalidate_dashboard_cache
 
     invalidate_dashboard_cache(issuer.pk)

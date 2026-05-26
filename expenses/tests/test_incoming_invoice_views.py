@@ -5,7 +5,15 @@ from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 
-from invoices.models import Company, Expense, IncomingEmailSource, IncomingInvoiceArtifact, IncomingInvoiceCandidate, Issuer
+from invoices.models import (
+    Company,
+    Expense,
+    IncomingEmailSource,
+    IncomingInvoiceArtifact,
+    IncomingInvoiceCandidate,
+    Issuer,
+    IssuerEmailRoutingRule,
+)
 
 from .base import ExpenseViewsTestCase
 
@@ -98,6 +106,40 @@ class IncomingInvoiceViewTests(ExpenseViewsTestCase):
         self.assertEqual(self.candidate.confirmed_issuer, self.issuer)
         self.assertEqual(self.candidate.selected_artifact, self.artifact)
         self.assertEqual(self.candidate.status, IncomingInvoiceCandidate.STATUS_READY)
+
+    def test_candidate_detail_confirmation_learns_future_routing_signals(self):
+        IssuerEmailRoutingRule.objects.filter(issuer=self.issuer).delete()
+        self.candidate.status = IncomingInvoiceCandidate.STATUS_NEEDS_REVIEW
+        self.candidate.suggested_issuer = None
+        self.candidate.from_email = 'learned-billing@example.com'
+        self.candidate.to_addresses = ['ap-learned@example.com']
+        self.candidate.delivered_to_addresses = ['company-invoices@example.com']
+        self.candidate.subject = 'Invoice 1030 May 2026'
+        self.candidate.save(update_fields=[
+            'status',
+            'suggested_issuer',
+            'from_email',
+            'to_addresses',
+            'delivered_to_addresses',
+            'subject',
+        ])
+
+        response = self.client.post(reverse('expenses:incoming_action', args=[self.candidate.pk]), {
+            'action': 'confirm',
+            'confirmed_issuer': self.issuer.pk,
+            'selected_artifact': self.artifact.pk,
+            'vendor': 'Vendor Ltd',
+            'description': 'Confirmed vendor invoice',
+            'amount': '42.50',
+            'currency': 'EUR',
+        })
+
+        self.assertRedirects(response, reverse('expenses:incoming_detail', args=[self.candidate.pk]))
+        rule = self.issuer.incoming_email_routing_rule
+        self.assertIn('ap-learned@example.com', rule.recipient_aliases)
+        self.assertIn('company-invoices@example.com', rule.delivered_to_addresses)
+        self.assertIn('learned-billing@example.com', rule.keywords)
+        self.assertTrue(any(keyword.startswith('day-of-month:') for keyword in rule.keywords))
 
     def test_candidate_detail_can_override_to_different_permitted_company(self):
         override_company = Company.objects.create(name='Override Issuer Co', customer_information_file_number='VATOVERRIDE')

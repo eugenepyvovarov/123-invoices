@@ -21,8 +21,12 @@ from invoices.models import (
     IssuerEmailRoutingRule,
 )
 from invoices.services.incoming_email import fetch_imap_messages, import_eml_fixture, parse_email_message
-from invoices.services.incoming_invoice_conversion import convert_candidate_to_expense
+from invoices.services.incoming_invoice_conversion import (
+    convert_candidate_to_expense,
+    mark_candidate_confirmed,
+)
 from invoices.services.incoming_invoice_duplicates import detect_duplicates
+from invoices.services.incoming_invoice_routing import apply_routing
 
 
 class IncomingInvoiceServiceTests(TestCase):
@@ -187,6 +191,52 @@ class IncomingInvoiceServiceTests(TestCase):
 
         self.assertEqual(expense.issuer, self.issuer)
         invalidate_cache.assert_called_once_with(self.issuer.pk)
+
+    def test_confirmed_review_learns_routing_signals_for_later_messages(self):
+        IssuerEmailRoutingRule.objects.filter(issuer=self.issuer).delete()
+        first = IncomingInvoiceCandidate.objects.create(
+            source=self.source,
+            status=IncomingInvoiceCandidate.STATUS_NEEDS_REVIEW,
+            provider_message_id='learned-first',
+            from_email='billing@repeat-vendor.test',
+            to_addresses=['ap-confirm@example.test'],
+            delivered_to_addresses=['invoices-confirm@example.test'],
+            subject='Invoice 1001 May 2026',
+            received_at=timezone.now(),
+        )
+        artifact = IncomingInvoiceArtifact.objects.create(
+            candidate=first,
+            kind=IncomingInvoiceArtifact.KIND_ATTACHMENT,
+            original_filename='learned.pdf',
+            content_type='application/pdf',
+            size=7,
+            sha256='b' * 64,
+        )
+
+        mark_candidate_confirmed(first, issuer=self.issuer, artifact=artifact, metadata={'vendor': 'Repeat Vendor'})
+
+        rule = self.issuer.incoming_email_routing_rule
+        self.assertIn('ap-confirm@example.test', rule.recipient_aliases)
+        self.assertIn('invoices-confirm@example.test', rule.delivered_to_addresses)
+        self.assertIn('billing@repeat-vendor.test', rule.keywords)
+        self.assertTrue(any(keyword.startswith('day-of-month:') for keyword in rule.keywords))
+
+        second = IncomingInvoiceCandidate.objects.create(
+            source=self.source,
+            status=IncomingInvoiceCandidate.STATUS_NEW,
+            provider_message_id='learned-second',
+            from_email='billing@repeat-vendor.test',
+            to_addresses=['ap-confirm@example.test'],
+            delivered_to_addresses=['invoices-confirm@example.test'],
+            subject='Invoice 1002 June 2026',
+            received_at=timezone.now(),
+        )
+
+        apply_routing(second)
+
+        second.refresh_from_db()
+        self.assertEqual(second.suggested_issuer, self.issuer)
+        self.assertEqual(second.status, IncomingInvoiceCandidate.STATUS_READY)
 
     def _write_message(self, message):
         path = Path(self.media_root.name) / f'{message["Message-ID"].strip("<>")}.eml'
