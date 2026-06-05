@@ -159,6 +159,11 @@ rolling-year-period-default
 - The `dashboard-period-default` baseline/current pair should show the default selected period changing to `Rolling Year`.
 - The surrounding dashboard layout and existing filter control placement should remain stable.
 
+### Baseline SHA
+
+`5c0022f697627c5e698058819209726a44d2ecb7`
+
+
 ## Open Questions
 
 None.
