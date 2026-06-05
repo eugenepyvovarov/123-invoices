@@ -63,12 +63,12 @@ Assumption: The requested period dropdown is the shared global `date_range` drop
 
 ## Task List
 
-- [ ] Add rolling-year date filter behavior
-  - [ ] Define a `rolling_year` period key and default date-range key in `invoices/utils/date_filters.py`.
-  - [ ] Implement month-aligned rolling bounds using standard-library date arithmetic.
-  - [ ] Add the `Rolling Year` option to the shared date range options.
-  - [ ] Update missing/invalid global period fallback behavior to use `rolling_year`.
-  - [ ] Add unit tests for option metadata, default behavior, and date-bound calculations.
+- [x] Add rolling-year date filter behavior
+  - [x] Define a `rolling_year` period key and default date-range key in `invoices/utils/date_filters.py`.
+  - [x] Implement month-aligned rolling bounds using standard-library date arithmetic.
+  - [x] Add the `Rolling Year` option to the shared date range options.
+  - [x] Update missing/invalid global period fallback behavior to use `rolling_year`.
+  - [x] Add unit tests for option metadata, default behavior, and date-bound calculations.
 
 - [ ] Preserve shared UI and view behavior
   - [ ] Verify existing templates that loop over `global_date_filter.options` render the new option without duplicate template logic.
