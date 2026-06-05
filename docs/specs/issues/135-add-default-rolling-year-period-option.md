@@ -70,12 +70,12 @@ Assumption: The requested period dropdown is the shared global `date_range` drop
   - [x] Update missing/invalid global period fallback behavior to use `rolling_year`.
   - [x] Add unit tests for option metadata, default behavior, and date-bound calculations.
 
-- [ ] Preserve shared UI and view behavior
-  - [ ] Verify existing templates that loop over `global_date_filter.options` render the new option without duplicate template logic.
-  - [ ] Update view tests that assumed `All time` by default to request `date_range=all` explicitly.
-  - [ ] Add view/context coverage that a fresh dashboard request selects `rolling_year`.
-  - [ ] Add coverage that existing explicit period options still filter as before.
-  - [ ] Include `rolling_year` in dashboard cache invalidation paths.
+- [x] Preserve shared UI and view behavior
+  - [x] Verify existing templates that loop over `global_date_filter.options` render the new option without duplicate template logic.
+  - [x] Update view tests that assumed `All time` by default to request `date_range=all` explicitly.
+  - [x] Add view/context coverage that a fresh dashboard request selects `rolling_year`.
+  - [x] Add coverage that existing explicit period options still filter as before.
+  - [x] Include `rolling_year` in dashboard cache invalidation paths.
 
 - [ ] Add reviewer evidence capture for the default period
   - [ ] Add a focused Playwright spec for the default `Rolling Year` period state.
