@@ -16,6 +16,7 @@ from invoices.forms import InvoiceForm
 from invoices.models import Company, Currency, Customer, Expense, Invoice, Issuer, IssuerBankAccount, OrderLine, Payment, PaymentApplication, PaymentTerm, Project
 from invoices.services.bank_accounts import resolve_invoice_bank_account
 from invoices.services.wise_importer import WiseImportResult, WiseStatementImporter
+from invoices.utils.date_filters import ROLLING_YEAR_DATE_RANGE_KEY
 from invoices.views import (
     DASHBOARD_DEFAULT_MAX_RESULTS,
     DASHBOARD_DEFAULT_INVOICE_STATUS,
@@ -503,6 +504,17 @@ class CrossCompanyDashboardScopeTests(AuthenticatedCompanyTestCase):
 
         self.assertIsNone(cache.get(cache_key))
 
+    def test_dashboard_invalidation_clears_rolling_year_cache_keys(self):
+        legacy_key = f'dashboard:{self.issuer_a.pk}:{ROLLING_YEAR_DATE_RANGE_KEY}'
+        versioned_key = f'dashboard:v2:{self.issuer_a.pk}:{ROLLING_YEAR_DATE_RANGE_KEY}'
+        cache.set(legacy_key, {'cached': True}, 300)
+        cache.set(versioned_key, {'cached': True}, 300)
+
+        invalidate_dashboard_cache(self.issuer_a.pk)
+
+        self.assertIsNone(cache.get(legacy_key))
+        self.assertIsNone(cache.get(versioned_key))
+
     def test_cross_company_dashboard_renders_kpis_with_two_decimal_formatting(self):
         response = self.client.get(reverse('cross_company_dashboard'), {'date_range': 'all'})
 
@@ -526,6 +538,19 @@ class CrossCompanyDashboardScopeTests(AuthenticatedCompanyTestCase):
         )
         self.assertContains(response, '<h2>Recent invoices</h2>', html=True)
         self.assertContains(response, '<h2>Recent payments</h2>', html=True)
+
+    def test_cross_company_dashboard_defaults_to_rolling_year_period(self):
+        response = self.client.get(reverse('cross_company_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_period'], ROLLING_YEAR_DATE_RANGE_KEY)
+        self.assertEqual(response.context['period_name'], 'Rolling Year')
+        self.assertEqual(response.context['global_date_filter']['key'], ROLLING_YEAR_DATE_RANGE_KEY)
+        self.assertContains(
+            response,
+            '<option value="rolling_year" selected>Rolling Year</option>',
+            html=True,
+        )
 
     def test_cross_company_dashboard_renders_shared_24_month_chart_for_accessible_issuers(self):
         today = timezone.localdate()
@@ -1477,6 +1502,40 @@ class CrossSurfaceOverdueConsistencyTests(AuthenticatedCompanyTestCase):
         cached = cache.get(f"dashboard:v2:{self.issuer.pk}:{response.context['selected_period']}")
         self.assertIsNotNone(cached)
         self.assertNotIn('total_spending', cached)
+
+    def test_dashboard_defaults_to_rolling_year_period(self):
+        self._activate_company()
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_period'], ROLLING_YEAR_DATE_RANGE_KEY)
+        self.assertEqual(response.context['period_name'], 'Rolling Year')
+        self.assertEqual(response.context['global_date_filter']['key'], ROLLING_YEAR_DATE_RANGE_KEY)
+        self.assertContains(
+            response,
+            '<option value="rolling_year" selected>Rolling Year</option>',
+            html=True,
+        )
+
+    def test_dashboard_explicit_all_period_remains_unbounded(self):
+        self._activate_company()
+        Invoice.objects.create(
+            issuer=self.issuer,
+            customer=self.customer,
+            project=self.project,
+            issued_date=self.today - timedelta(days=500),
+            status=Invoice.STATUS_PAID,
+            total_due=Decimal('300'),
+            amount_due=Decimal('0'),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'date_range': 'all'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_period'], 'all')
+        self.assertEqual(response.context['period_name'], 'All time')
+        self.assertEqual(response.context['invoiced_total'], Decimal('450'))
 
     def test_dashboard_routes_keep_per_company_template_behavior(self):
         self._activate_company()

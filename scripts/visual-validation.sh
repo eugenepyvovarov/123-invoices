@@ -1,14 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IDENTIFIER="${1:-}"
-if [ "${IDENTIFIER}" != "incoming-invoice-inbox" ]; then
-  echo "Usage: $0 incoming-invoice-inbox" >&2
-  exit 2
-fi
 
-export OPENCODE_EVIDENCE_MODE="${OPENCODE_EVIDENCE_MODE:-visual-validation}"
-export OPENCODE_VISUAL_VALIDATION_TARGET="${OPENCODE_VISUAL_VALIDATION_TARGET:-current}"
-export PLAYWRIGHT_VIDEO="${PLAYWRIGHT_VIDEO:-retain-on-failure}"
-
-exec /bin/bash ./scripts/e2e.sh tests/e2e/incoming-invoice-inbox.spec.js --project=chromium
+case "${IDENTIFIER}" in
+  incoming-invoice-inbox)
+    export OPENCODE_EVIDENCE_MODE="${OPENCODE_EVIDENCE_MODE:-visual-validation}"
+    export OPENCODE_VISUAL_VALIDATION_TARGET="${OPENCODE_VISUAL_VALIDATION_TARGET:-current}"
+    export PLAYWRIGHT_VIDEO="${PLAYWRIGHT_VIDEO:-retain-on-failure}"
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/incoming-invoice-inbox.spec.js --project=chromium
+    ;;
+  rolling-year-period-default)
+    export OPENCODE_VISUAL_VALIDATION_TARGET="${OPENCODE_VISUAL_VALIDATION_TARGET:-current}"
+    if [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "baseline" ] \
+      && [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "current" ]; then
+      echo "OPENCODE_VISUAL_VALIDATION_TARGET must be baseline or current." >&2
+      exit 2
+    fi
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/rolling-year-period.spec.js --project=chromium
+    ;;
+  "")
+    echo "Usage: ./scripts/visual-validation.sh {incoming-invoice-inbox|rolling-year-period-default}" >&2
+    exit 2
+    ;;
+  *)
+    echo "Unknown visual validation identifier: ${IDENTIFIER}" >&2
+    exit 2
+    ;;
+esac

@@ -516,7 +516,7 @@ class CompanySelectionTests(AuthenticatedCompanyTestCase):
     def test_view_invoices_filters_by_active_company(self):
         self._activate_company(self.issuer_b)
 
-        response = self.client.get(reverse('invoices:list'))
+        response = self.client.get(reverse('invoices:list'), {'date_range': 'all'})
 
         invoices_page = response.context['invoices_list']
         self.assertEqual(invoices_page.paginator.count, 1)
@@ -583,7 +583,7 @@ class CompanySelectionTests(AuthenticatedCompanyTestCase):
                 "UPDATE invoices_invoice SET sub_total='' WHERE id=%s",
                 [self.invoice_b.id],
             )
-        response = self.client.get(reverse('invoices:list'))
+        response = self.client.get(reverse('invoices:list'), {'date_range': 'all'})
         self.assertEqual(response.status_code, 200)
         invoices_page = response.context['invoices_list']
         self.assertEqual(list(invoices_page)[0].sub_total, Decimal('0'))
@@ -623,11 +623,11 @@ class CompanySelectionTests(AuthenticatedCompanyTestCase):
         OrderLine.objects.create(invoice=overdue_invoice, description='Follow-up', quantity=1, unit_price=Decimal('50'))
         Invoice.objects.filter(pk=overdue_invoice.pk).update(amount_overdue=Decimal('0'))
 
-        response = self.client.get(reverse('projects:detail', args=[self.project_b.id]))
+        response = self.client.get(reverse('projects:detail', args=[self.project_b.id]), {'date_range': 'all'})
         self.assertEqual(response.context['pending_balance'], Decimal('150'))
         self.assertEqual(response.context['overdue_total'], Decimal('50'))
 
-        projects_response = self.client.get(reverse('projects:list'))
+        projects_response = self.client.get(reverse('projects:list'), {'date_range': 'all'})
         project = projects_response.context['project_list'].get(pk=self.project_b.pk)
         self.assertEqual(project.overdue_total, Decimal('50'))
 
@@ -654,7 +654,7 @@ class CompanySelectionTests(AuthenticatedCompanyTestCase):
         OrderLine.objects.create(invoice=overdue_invoice, description='Follow-up', quantity=1, unit_price=Decimal('50'))
         Invoice.objects.filter(pk=overdue_invoice.pk).update(amount_overdue=Decimal('0'))
 
-        response = self.client.get(reverse('projects:detail', args=[self.project_b.id]))
+        response = self.client.get(reverse('projects:detail', args=[self.project_b.id]), {'date_range': 'all'})
 
         self.assertContains(response, 'account-table__amount-note--current', count=1)
         self.assertContains(response, 'account-table__amount-note--danger', count=1)
