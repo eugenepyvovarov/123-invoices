@@ -1,0 +1,120 @@
+{% extends 'invoices/base.html' %}
+{% block main %}
+<section class="page incoming-candidate-page" data-testid="incoming-candidate-review">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>{{ candidate.display_subject }}</h1>
+      <p class="page-subtitle">From {{ candidate.from_email|default:candidate.from_name }} · {{ candidate.received_at|date:'Y-m-d H:i' }} · {{ candidate.get_status_display }}</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_inbox' %}">Back to inbox</a>
+      <a class="btn btn-primary" href="{% url 'expenses:incoming_convert' candidate.pk %}" data-testid="incoming-convert-link">Convert / mark unpaid</a>
+    </div>
+  </header>
+
+  {% if candidate.status == 'reviewed_unpaid' %}
+    <article class="incoming-notice incoming-notice--warning" data-testid="incoming-reviewed-unpaid">
+      <strong>Reviewed/unpaid</strong>
+      <span>{{ candidate.conversion_limitation_message }}</span>
+    </article>
+  {% endif %}
+
+  <section class="incoming-review-layout">
+    <div class="incoming-review-primary">
+      <section class="surface surface--padded incoming-review-workspace">
+        <div class="incoming-review-summary" aria-label="Review summary">
+          <div><span class="form-field__label">Suggested company</span><strong>{{ candidate.suggested_issuer|default:'Unclear' }}</strong></div>
+          <div><span class="form-field__label">Confirmed company</span><strong>{{ candidate.confirmed_issuer|default:'Not confirmed' }}</strong></div>
+          <div><span class="form-field__label">Selected artifact</span><strong>{{ candidate.selected_artifact|default:'Not selected' }}</strong></div>
+          <div><span class="form-field__label">Status</span><span class="status-badge incoming-status incoming-status--{{ candidate.status }}">{{ candidate.get_status_display }}</span></div>
+        </div>
+
+        <div class="incoming-review-form-panel">
+          <h2>Review decision</h2>
+          <p class="section-kicker">Confirm the company and source file before any accounting record is created. Saved decisions teach future routing for similar sender, recipient, and subject signals.</p>
+          <form method="post" action="{% url 'expenses:incoming_action' candidate.pk %}">
+            {% csrf_token %}
+            {{ review_form.non_field_errors }}
+            {% for field in review_form %}
+              <div class="form-field">
+                <label class="form-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }} {{ field.errors }}
+              </div>
+            {% endfor %}
+            <button class="btn btn-primary" type="submit">Save review action</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="surface surface--padded incoming-artifacts-panel">
+        <div class="section-heading-row">
+          <div>
+            <h2>Artifacts</h2>
+            <p class="section-kicker">Choose one of these stored files as the final expense attachment.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="incoming-compact-table">
+            <thead><tr><th>Type</th><th>Filename</th><th>Content type</th><th>Size</th><th>Confidence</th><th></th></tr></thead>
+            <tbody>
+            {% for artifact in candidate.artifacts.all %}
+              <tr data-testid="incoming-artifact-row">
+                <td>{{ artifact.get_kind_display }}</td>
+                <td><strong>{{ artifact.display_name }}</strong></td>
+                <td>{{ artifact.content_type }}</td>
+                <td>{{ artifact.size }}</td>
+                <td>{{ artifact.invoice_confidence }}</td>
+                <td class="text-end"><a href="{% url 'expenses:incoming_artifact_preview' candidate.pk artifact.pk %}" target="_blank" rel="noopener">Preview</a> · <a href="{% url 'expenses:incoming_artifact_download' candidate.pk artifact.pk %}">Download</a></td>
+              </tr>
+            {% empty %}<tr><td colspan="6">No artifacts stored for this candidate.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <aside class="incoming-review-side">
+      <section class="surface surface--padded incoming-review-context">
+        <h2>Routing feedback</h2>
+        <p class="section-kicker">Readable signals used for the company suggestion.</p>
+        <dl class="incoming-signal-list">
+          <div><dt>Invoice confidence</dt><dd>{{ routing_feedback.invoice_confidence }}</dd></div>
+          <div><dt>Company confidence</dt><dd>{{ routing_feedback.company_confidence }}</dd></div>
+          <div><dt>Routing result</dt><dd>{{ routing_feedback.company_warning|default:'Single company match' }}</dd></div>
+        </dl>
+        {% if routing_feedback.company_reasons %}
+          <h3>Matched signals</h3>
+          <ul class="incoming-reason-list">
+            {% for reason in routing_feedback.company_reasons %}<li>{{ reason }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        {% if routing_feedback.company_scores %}
+          <h3>Company scores</h3>
+          <ul class="incoming-score-list">
+            {% for score in routing_feedback.company_scores %}
+              <li><strong>{{ score.issuer }}</strong><span>{{ score.confidence }}</span>{% if score.reasons %}<small>{{ score.reasons|join:', ' }}</small>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+
+      {% if duplicate_feedback.is_duplicate or duplicate_feedback.reasons %}
+        <section class="surface surface--padded incoming-review-context incoming-review-context--warning" data-testid="incoming-duplicate-warning">
+          <h2>Duplicate warning</h2>
+          <ul class="incoming-reason-list">
+            {% for reason in duplicate_feedback.reasons %}<li>{{ reason }}</li>{% empty %}<li>Possible duplicate detected.</li>{% endfor %}
+          </ul>
+          {% if duplicate_feedback.candidate_ids %}<p class="text-muted">Candidate matches: {{ duplicate_feedback.candidate_ids|join:', ' }}</p>{% endif %}
+          {% if duplicate_feedback.expense_ids %}<p class="text-muted">Expense matches: {{ duplicate_feedback.expense_ids|join:', ' }}</p>{% endif %}
+        </section>
+      {% endif %}
+
+      <details class="surface surface--padded incoming-email-snapshot">
+        <summary>Email snapshot</summary>
+        <p><strong>To:</strong> {{ candidate.to_addresses }}<br><strong>Delivered-To:</strong> {{ candidate.delivered_to_addresses }}</p>
+        <pre>{{ candidate.body_text|truncatechars:2000 }}</pre>
+      </details>
+    </aside>
+  </section>
+</section>
+{% endblock %}

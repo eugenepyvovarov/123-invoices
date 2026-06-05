@@ -1,0 +1,61 @@
+{% extends 'invoices/base.html' %}
+{% block main %}
+<section class="page incoming-inbox-page" data-testid="incoming-inbox-list">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Incoming invoice inbox</h1>
+      <p class="page-subtitle">Review fetched supplier invoices before creating expenses.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_sources' %}" data-testid="incoming-source-settings-link">
+        <span class="btn__icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-cog" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v5" /><path d="M3 7l9 6l9 -6" /><path d="M19.001 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M19.001 15.5v1.5" /><path d="M19.001 21v1.5" /><path d="M22.032 17.25l-1.299 .75" /><path d="M17.27 20l-1.3 .75" /><path d="M15.97 17.25l1.3 .75" /><path d="M20.733 20l1.3 .75" /></svg>
+        </span>
+        Source settings
+      </a>
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_routing' %}" data-testid="incoming-routing-settings-link">
+        <span class="btn__icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-route" width="20" height="20" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M19 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0" /><path d="M5 17a3 3 0 0 1 3 -3h6a3 3 0 0 0 3 -3v-4" /></svg>
+        </span>
+        Routing settings
+      </a>
+    </div>
+  </header>
+
+  <section class="surface surface--padded page-filter-panel">
+    <form method="get" class="page-filter-panel__form">
+      <div class="filters-grid">
+        <div class="form-field"><label class="form-field__label" for="status">Status</label><select id="status" name="status" class="field-control"><option value="">All</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label class="form-field__label" for="company">Company</label><select id="company" name="company" class="field-control"><option value="">All</option>{% for issuer in issuers %}<option value="{{ issuer.pk }}" {% if filters.company == issuer.pk|stringformat:'s' %}selected{% endif %}>{{ issuer }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label class="form-field__label" for="source">Source</label><select id="source" name="source" class="field-control"><option value="">All</option>{% for source in sources %}<option value="{{ source.pk }}" {% if filters.source == source.pk|stringformat:'s' %}selected{% endif %}>{{ source.display_name }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label class="form-field__label" for="confidence">Confidence</label><select id="confidence" name="confidence" class="field-control"><option value="">All</option><option value="high" {% if filters.confidence == 'high' %}selected{% endif %}>High</option><option value="low" {% if filters.confidence == 'low' %}selected{% endif %}>Low/missing</option></select></div>
+        <div class="form-field"><label class="form-field__label" for="date_from">From</label><input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="field-control" /></div>
+        <div class="form-field"><label class="form-field__label" for="date_to">To</label><input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="field-control" /></div>
+        <div class="form-field"><label class="form-field__label" for="missing_review">Review</label><label><input id="missing_review" type="checkbox" name="missing_review" value="1" {% if filters.missing_review %}checked{% endif %} /> Missing company/artifact</label></div>
+        <div class="form-field"><span class="form-field__label">Apply</span><button type="submit" class="btn btn-primary">Filter</button> <a class="btn btn-quiet" href="{% url 'expenses:incoming_inbox' %}">Clear</a></div>
+      </div>
+    </form>
+  </section>
+
+  <section class="surface surface--padded incoming-list-surface">
+    <div class="table-responsive">
+      <table class="incoming-inbox-table">
+        <thead><tr><th>Invoice email</th><th>Company</th><th>Status</th><th>Artifacts</th><th></th></tr></thead>
+        <tbody>
+        {% for candidate in candidates %}
+          <tr data-testid="incoming-candidate-row">
+            <td class="incoming-email-cell"><a class="incoming-email-cell__subject" href="{% url 'expenses:incoming_detail' candidate.pk %}">{{ candidate.display_subject }}</a><span class="incoming-email-cell__meta">{{ candidate.from_email|default:candidate.from_name }} · {{ candidate.received_at|date:'Y-m-d H:i' }}</span></td>
+            <td><strong>{{ candidate.confirmed_issuer|default:candidate.suggested_issuer|default:'Needs review' }}</strong><br><span class="text-muted">confidence {{ candidate.detection_metadata.company_confidence|default:'—' }}</span></td>
+            <td><span class="status-badge incoming-status incoming-status--{{ candidate.status }}">{{ candidate.get_status_display }}</span></td>
+            <td>{{ candidate.artifacts.count }} file{{ candidate.artifacts.count|pluralize }}</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:incoming_detail' candidate.pk %}">Review</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">No incoming invoice candidates match these filters.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

@@ -12,6 +12,9 @@ for current setup or operations.
   rollout, and verification checks.
 - [Backups](backups.md): manual and scheduled backup behavior, timezone rules,
   locking, object key layout, and operator checks.
+- [Incoming invoice inbox](incoming-invoice-inbox.md): IMAP source setup,
+  fixture import, review-first conversion, unpaid limitations, privacy, and
+  rollback guidance.
 - [Automation](automation.md): OpenCode/Gitea automation contract, managed files,
   preview/evidence behavior, and production artifact publication.
 - [Design contract](../DESIGN.md): UI tokens, layout conventions, component

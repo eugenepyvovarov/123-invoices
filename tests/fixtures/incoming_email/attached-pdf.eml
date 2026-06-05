@@ -1,0 +1,21 @@
+From: Synthetic Supplier <supplier-alpha@example.test>
+To: alpha-invoices@example.test
+Delivered-To: alpha-invoices@example.test
+Subject: Invoice FIX-ATT-001 for E2E Smoke Alpha LLC
+Message-ID: <fixture-attached-pdf@example.test>
+Date: Mon, 25 May 2026 09:30:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="fixture-attached"
+
+--fixture-attached
+Content-Type: text/plain; charset="utf-8"
+
+Synthetic invoice for E2E Smoke Alpha LLC. Amount EUR 123.45. VAT ALPHA-VAT-001.
+
+--fixture-attached
+Content-Type: application/pdf; name="fixture-attached-invoice.pdf"
+Content-Disposition: attachment; filename="fixture-attached-invoice.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBzYW5pdGl6ZWQgc3ludGhldGljIGF0dGFjaGVkIGludm9pY2UK
+--fixture-attached--

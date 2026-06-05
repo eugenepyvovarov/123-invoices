@@ -1,0 +1,10 @@
+From: Synthetic Supplier <supplier-alpha@example.test>
+To: alpha-invoices@example.test
+Delivered-To: alpha-invoices@example.test
+Subject: Invoice FIX-ATT-001 duplicate message
+Message-ID: <fixture-attached-pdf@example.test>
+Date: Mon, 25 May 2026 09:35:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Duplicate synthetic message id for idempotency checks.
