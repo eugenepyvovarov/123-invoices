@@ -77,11 +77,11 @@ Assumption: The requested period dropdown is the shared global `date_range` drop
   - [x] Add coverage that existing explicit period options still filter as before.
   - [x] Include `rolling_year` in dashboard cache invalidation paths.
 
-- [ ] Add reviewer evidence capture for the default period
-  - [ ] Add a focused Playwright spec for the default `Rolling Year` period state.
-  - [ ] Add `./scripts/demo-evidence.sh rolling-year-period-default` as the repo-owned demo command.
-  - [ ] Add `./scripts/visual-validation.sh rolling-year-period-default` as a target-aware visual capture command using `OPENCODE_VISUAL_VALIDATION_TARGET=baseline|current`.
-  - [ ] Capture full-page screenshots of the relevant dashboard state and avoid relying on exact seeded row counts.
+- [x] Add reviewer evidence capture for the default period
+  - [x] Add a focused Playwright spec for the default `Rolling Year` period state.
+  - [x] Add `./scripts/demo-evidence.sh rolling-year-period-default` as the repo-owned demo command.
+  - [x] Add `./scripts/visual-validation.sh rolling-year-period-default` as a target-aware visual capture command using `OPENCODE_VISUAL_VALIDATION_TARGET=baseline|current`.
+  - [x] Capture full-page screenshots of the relevant dashboard state and avoid relying on exact seeded row counts.
 
 ## Deployment / Rollout
 
