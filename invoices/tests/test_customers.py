@@ -161,12 +161,12 @@ class CustomerViewsTests(AuthenticatedCompanyTestCase):
             amount_due=Decimal('500'),
         )
 
-        response = self.client.get(reverse('customers:list'), {'order': 'pending_desc'})
+        response = self.client.get(reverse('customers:list'), {'order': 'pending_desc', 'date_range': 'all'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['order_filter'], 'pending_desc')
         self.assertEqual(self.client.session.get('customers_order'), 'pending_desc')
 
-        follow_up = self.client.get(reverse('customers:list'))
+        follow_up = self.client.get(reverse('customers:list'), {'date_range': 'all'})
         self.assertEqual(follow_up.context['order_filter'], 'pending_desc')
 
         customers = list(follow_up.context['customer_list'])

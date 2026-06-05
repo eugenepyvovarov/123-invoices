@@ -5,6 +5,10 @@ from datetime import date
 from typing import Dict, List, Optional, Tuple
 
 
+ROLLING_YEAR_DATE_RANGE_KEY = 'rolling_year'
+DEFAULT_DATE_RANGE_KEY = ROLLING_YEAR_DATE_RANGE_KEY
+
+
 def _month_bounds(reference: date) -> Tuple[date, date]:
     start = reference.replace(day=1)
     last_day = calendar.monthrange(reference.year, reference.month)[1]
@@ -18,9 +22,22 @@ def _previous_month(reference: date) -> date:
     return previous_month_end.replace(day=1)
 
 
+def _subtract_months(reference: date, months: int) -> date:
+    month_index = reference.year * 12 + reference.month - 1 - months
+    year = month_index // 12
+    month = month_index % 12 + 1
+    return reference.replace(year=year, month=month)
+
+
 def get_date_range_bounds(range_key: str, today: Optional[date] = None) -> Tuple[Optional[date], Optional[date]]:
     if today is None:
         today = date.today()
+
+    if range_key == ROLLING_YEAR_DATE_RANGE_KEY:
+        current_month_start = today.replace(day=1)
+        start = _subtract_months(current_month_start, 12)
+        _, end = _month_bounds(today)
+        return start, end
 
     if range_key == 'all':
         return None, None
@@ -65,6 +82,7 @@ def get_date_range_options(today: Optional[date] = None) -> List[Dict[str, str]]
     last_month_label = last_month_date.strftime("%b '%y")
 
     options = [
+        {'value': ROLLING_YEAR_DATE_RANGE_KEY, 'label': 'Rolling Year'},
         {'value': 'this_month', 'label': f"This Month({this_month_label})"},
         {'value': 'last_month', 'label': f"Last Month({last_month_label})"},
         {'value': 'ytd', 'label': f"YTD({today.year})"},
@@ -123,9 +141,9 @@ def get_global_date_filter(request) -> Dict[str, object]:
     if selected in valid_keys:
         request.session['global_date_range'] = selected
 
-    active_key = request.session.get('global_date_range', 'all')
+    active_key = request.session.get('global_date_range', DEFAULT_DATE_RANGE_KEY)
     if active_key not in valid_keys:
-        active_key = 'all'
+        active_key = DEFAULT_DATE_RANGE_KEY
 
     start, end = get_date_range_bounds(active_key, today)
     label = option_map[active_key]
