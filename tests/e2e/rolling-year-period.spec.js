@@ -7,6 +7,8 @@ const DEFAULT_PERIOD_CHECKPOINT = process.env.OPENCODE_DEMO_SCENARIO === 'rollin
   ? 'dashboard-rolling-year-default'
   : 'dashboard-period-default';
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('dashboard default period evidence', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1600, height: 1200 });
   await loginToDashboard(page);
