@@ -13,7 +13,7 @@ from django.middleware.csrf import get_token
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse, JsonResponse, QueryDict
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -23,14 +23,39 @@ from django.utils.html import conditional_escape, format_html
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from invoices.models import Expense, ImportBatch, ImportMapping, ImportPreviewRow
+from invoices.models import (
+    Expense,
+    ImportBatch,
+    ImportMapping,
+    ImportPreviewRow,
+    IncomingEmailSource,
+    IncomingInvoiceArtifact,
+    IncomingInvoiceCandidate,
+    IssuerEmailRoutingRule,
+)
+from invoices.services.incoming_invoice_conversion import (
+    convert_candidate_to_expense,
+    mark_candidate_confirmed,
+    mark_candidate_duplicate,
+    mark_candidate_needs_fetch,
+    mark_candidate_not_invoice,
+    mark_candidate_rejected,
+    mark_candidate_reviewed_unpaid,
+    review_metadata_from_cleaned,
+)
 from invoices.services.expense_import_ai import OpenAICompatibleMappingClient, OpenAICompatibleProviderConfig
 from invoices.services.expense_importer import ExpenseImportError, ExpenseImportResult, GenericExpenseImporter
 from invoices.utils.company_context import get_active_issuer
 from invoices.utils.date_filters import get_global_date_filter
 from invoices.views import invalidate_dashboard_cache
 
-from .forms import ExpenseForm
+from .forms import (
+    ExpenseForm,
+    IncomingCandidateConversionForm,
+    IncomingCandidateReviewForm,
+    IncomingEmailSourceForm,
+    IssuerEmailRoutingRuleForm,
+)
 
 ATTACHMENT_FILTER_VALUES = {'all', 'with', 'without'}
 IMPORT_MAPPING_FIELDS = ['paid_date', 'amount', 'description', 'transaction_id', 'currency']
@@ -657,3 +682,277 @@ def expense_bulk_download(request):
     response = HttpResponse(buffer.getvalue(), content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+def _available_issuers(request):
+    issuers = request.user.issuers.select_related('company').order_by('company__name')
+    if request.user.is_superuser:
+        from invoices.models import Issuer
+
+        issuers = Issuer.objects.select_related('company').order_by('company__name')
+    return issuers
+
+
+def _incoming_candidate_queryset(request):
+    issuers = _available_issuers(request)
+    if request.user.is_superuser:
+        return (
+            IncomingInvoiceCandidate.objects.select_related(
+                'source', 'suggested_issuer__company', 'confirmed_issuer__company', 'selected_artifact', 'converted_expense'
+            )
+            .prefetch_related('artifacts')
+            .distinct()
+        )
+    issuer_ids = list(issuers.values_list('id', flat=True))
+    return (
+        IncomingInvoiceCandidate.objects.select_related(
+            'source', 'suggested_issuer__company', 'confirmed_issuer__company', 'selected_artifact', 'converted_expense'
+        )
+        .prefetch_related('artifacts')
+        .filter(
+            Q(source__issuer_id__in=issuer_ids)
+            | Q(source__issuer__isnull=True, source__user=request.user, suggested_issuer__isnull=True, confirmed_issuer__isnull=True)
+            | Q(suggested_issuer_id__in=issuer_ids)
+            | Q(confirmed_issuer_id__in=issuer_ids)
+        )
+        .distinct()
+    )
+
+
+def _get_incoming_candidate(request, pk):
+    return get_object_or_404(_incoming_candidate_queryset(request), pk=pk)
+
+
+def _apply_incoming_filters(request, qs):
+    status = request.GET.get('status') or ''
+    company = request.GET.get('company') or ''
+    source = request.GET.get('source') or ''
+    confidence = request.GET.get('confidence') or ''
+    missing_review = request.GET.get('missing_review') or ''
+    date_from = request.GET.get('date_from') or ''
+    date_to = request.GET.get('date_to') or ''
+    if status:
+        qs = qs.filter(status=status)
+    if company:
+        qs = qs.filter(Q(confirmed_issuer_id=company) | Q(suggested_issuer_id=company) | Q(source__issuer_id=company))
+    if source:
+        qs = qs.filter(source_id=source)
+    if confidence == 'high':
+        qs = qs.filter(detection_metadata__company_confidence__gte=0.8)
+    elif confidence == 'low':
+        qs = qs.filter(Q(detection_metadata__company_confidence__lt=0.8) | Q(detection_metadata__company_confidence__isnull=True))
+    if missing_review:
+        qs = qs.filter(Q(confirmed_issuer__isnull=True) | Q(selected_artifact__isnull=True))
+    if date_from:
+        qs = qs.filter(received_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(received_at__date__lte=date_to)
+    return qs, {
+        'status': status,
+        'company': company,
+        'source': source,
+        'confidence': confidence,
+        'missing_review': missing_review,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+
+
+def incoming_inbox(request):
+    qs, filters = _apply_incoming_filters(request, _incoming_candidate_queryset(request))
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get('page'))
+    issuers = _available_issuers(request)
+    if request.user.is_superuser:
+        sources = IncomingEmailSource.objects.all().order_by('display_name')
+    else:
+        sources = IncomingEmailSource.objects.filter(
+            Q(issuer__in=issuers) | Q(issuer__isnull=True, user=request.user)
+        ).order_by('display_name')
+    return render(request, 'expenses/incoming_inbox.html', {
+        'candidates': page,
+        'filters': filters,
+        'status_choices': IncomingInvoiceCandidate.STATUS_CHOICES,
+        'issuers': issuers,
+        'sources': sources,
+    })
+
+
+@require_http_methods(['GET', 'POST'])
+def incoming_source_settings(request):
+    issuers = _available_issuers(request)
+    if request.user.is_superuser:
+        sources = IncomingEmailSource.objects.all().select_related('issuer__company')
+    else:
+        sources = IncomingEmailSource.objects.filter(
+            Q(issuer__in=issuers) | Q(issuer__isnull=True, user=request.user)
+        ).select_related('issuer__company')
+    if request.method == 'POST':
+        form = IncomingEmailSourceForm(request.POST, user=request.user, issuers=issuers)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Incoming email source saved.')
+            return redirect('expenses:incoming_sources')
+    else:
+        form = IncomingEmailSourceForm(user=request.user, issuers=issuers)
+    return render(request, 'expenses/incoming_sources.html', {'form': form, 'sources': sources})
+
+
+@require_http_methods(['GET', 'POST'])
+def incoming_routing_settings(request):
+    active_issuer = get_active_issuer(request)
+    if not active_issuer:
+        messages.error(request, 'Select a company before managing routing rules.')
+        return redirect('company:settings')
+    rule, _ = IssuerEmailRoutingRule.objects.get_or_create(issuer=active_issuer)
+    if request.method == 'POST':
+        form = IssuerEmailRoutingRuleForm(request.POST, instance=rule, issuer=active_issuer)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Incoming routing settings saved.')
+            return redirect('expenses:incoming_routing')
+    else:
+        form = IssuerEmailRoutingRuleForm(instance=rule, issuer=active_issuer)
+    return render(request, 'expenses/incoming_routing.html', {'form': form, 'issuer': active_issuer})
+
+
+def incoming_candidate_detail(request, pk):
+    candidate = _get_incoming_candidate(request, pk)
+    issuers = _available_issuers(request)
+    form = IncomingCandidateReviewForm(candidate=candidate, issuers=issuers)
+    return render(
+        request,
+        'expenses/incoming_candidate_detail.html',
+        _incoming_candidate_detail_context(candidate, form, issuers),
+    )
+
+
+def _incoming_candidate_detail_context(candidate, form, issuers):
+    detection = candidate.detection_metadata or {}
+    issuer_names = {issuer.pk: str(issuer) for issuer in issuers}
+    company_scores = []
+    for score in detection.get('company_scores') or []:
+        issuer_id = score.get('issuer_id')
+        company_scores.append({
+            'issuer': issuer_names.get(issuer_id, f"Company #{issuer_id}"),
+            'confidence': score.get('confidence') or '—',
+            'reasons': score.get('reasons') or [],
+        })
+    duplicate = candidate.duplicate_metadata or {}
+    return {
+        'candidate': candidate,
+        'review_form': form,
+        'routing_feedback': {
+            'invoice_confidence': detection.get('invoice_confidence') or '—',
+            'company_confidence': detection.get('company_confidence') or '—',
+            'company_reasons': detection.get('company_reasons') or detection.get('reasons') or [],
+            'company_warning': detection.get('company_warning'),
+            'company_scores': company_scores,
+        },
+        'duplicate_feedback': {
+            'is_duplicate': duplicate.get('is_duplicate'),
+            'reasons': duplicate.get('reasons') or [],
+            'candidate_ids': duplicate.get('candidate_ids') or [],
+            'expense_ids': duplicate.get('expense_ids') or [],
+        },
+    }
+
+
+@require_POST
+def incoming_candidate_action(request, pk):
+    candidate = _get_incoming_candidate(request, pk)
+    form = IncomingCandidateReviewForm(request.POST, candidate=candidate, issuers=_available_issuers(request))
+    if not form.is_valid():
+        issuers = _available_issuers(request)
+        return render(
+            request,
+            'expenses/incoming_candidate_detail.html',
+            _incoming_candidate_detail_context(candidate, form, issuers),
+            status=400,
+        )
+    action = form.cleaned_data['action']
+    if action == IncomingCandidateReviewForm.ACTION_REJECT:
+        mark_candidate_rejected(candidate)
+        messages.success(request, 'Candidate rejected and kept in history.')
+    elif action == IncomingCandidateReviewForm.ACTION_NOT_INVOICE:
+        mark_candidate_not_invoice(candidate)
+        messages.success(request, 'Candidate marked as not an invoice.')
+    elif action == IncomingCandidateReviewForm.ACTION_NEEDS_FETCH:
+        mark_candidate_needs_fetch(candidate)
+        messages.success(request, 'Candidate marked as needing manual fetch.')
+    elif action == IncomingCandidateReviewForm.ACTION_DUPLICATE:
+        mark_candidate_duplicate(candidate)
+        messages.success(request, 'Candidate marked as duplicate.')
+    elif action == IncomingCandidateReviewForm.ACTION_LINK_EXISTING:
+        mark_candidate_duplicate(candidate, existing_expense=form.cleaned_data['existing_expense'])
+        messages.success(request, 'Candidate linked to an existing expense as a duplicate.')
+    elif action == IncomingCandidateReviewForm.ACTION_REVIEWED_UNPAID:
+        mark_candidate_reviewed_unpaid(
+            candidate,
+            issuer=form.cleaned_data['confirmed_issuer'],
+            artifact=form.cleaned_data['selected_artifact'],
+            metadata=review_metadata_from_cleaned(form.cleaned_data),
+        )
+        messages.success(request, 'Candidate marked reviewed/unpaid; no expense was created.')
+    else:
+        mark_candidate_confirmed(
+            candidate,
+            issuer=form.cleaned_data['confirmed_issuer'],
+            artifact=form.cleaned_data['selected_artifact'],
+            metadata=review_metadata_from_cleaned(form.cleaned_data),
+        )
+        messages.success(request, 'Company and artifact selection saved.')
+    return redirect('expenses:incoming_detail', pk=candidate.pk)
+
+
+@require_http_methods(['GET', 'POST'])
+def incoming_candidate_convert(request, pk):
+    candidate = _get_incoming_candidate(request, pk)
+    if request.method == 'POST':
+        form = IncomingCandidateConversionForm(request.POST, candidate=candidate, issuers=_available_issuers(request))
+        if form.is_valid():
+            if form.cleaned_data['paid_state'] == 'unpaid':
+                mark_candidate_reviewed_unpaid(
+                    candidate,
+                    issuer=form.cleaned_data['confirmed_issuer'],
+                    artifact=form.cleaned_data['selected_artifact'],
+                    metadata=review_metadata_from_cleaned(form.cleaned_data),
+                )
+                messages.success(request, 'Candidate marked reviewed/unpaid; no expense was created.')
+                return redirect('expenses:incoming_detail', pk=candidate.pk)
+            expense = convert_candidate_to_expense(
+                candidate,
+                issuer=form.cleaned_data['confirmed_issuer'],
+                artifact=form.cleaned_data['selected_artifact'],
+                vendor=form.cleaned_data['vendor'],
+                description=form.cleaned_data['description'],
+                amount=form.cleaned_data['amount'],
+                currency=form.cleaned_data['currency'],
+                paid_date=form.cleaned_data['paid_date'],
+                duplicate_override=form.cleaned_data['duplicate_override'],
+            )
+            messages.success(request, 'Incoming invoice converted to an expense.')
+            return redirect(f"{reverse('expenses:list')}?q={expense.pk}")
+    else:
+        form = IncomingCandidateConversionForm(candidate=candidate, issuers=_available_issuers(request))
+    return render(request, 'expenses/incoming_conversion.html', {'candidate': candidate, 'form': form})
+
+
+def incoming_artifact_download(request, pk, artifact_id):
+    candidate = _get_incoming_candidate(request, pk)
+    artifact = get_object_or_404(candidate.artifacts, pk=artifact_id)
+    if not artifact.file:
+        raise Http404()
+    artifact.file.open('rb')
+    response = FileResponse(artifact.file, content_type=artifact.content_type or 'application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="{artifact.display_name}"'
+    return response
+
+
+def incoming_artifact_preview(request, pk, artifact_id):
+    candidate = _get_incoming_candidate(request, pk)
+    artifact = get_object_or_404(candidate.artifacts, pk=artifact_id)
+    if not artifact.file:
+        raise Http404()
+    artifact.file.open('rb')
+    return FileResponse(artifact.file, content_type=artifact.content_type or 'application/octet-stream')

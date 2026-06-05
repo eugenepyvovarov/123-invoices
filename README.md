@@ -10,6 +10,7 @@ service plus a backup scheduler.
 - Customer, project, invoice, payment, and expense workflows.
 - Invoice and expense dashboard views with reusable UI components.
 - CSV/XLS/XLSX import support for expense and billing data.
+- IMAP-only incoming invoice inbox for review-first supplier invoice intake.
 - SQLite-friendly production deployment with persistent `db/` and `media/`
   mounts.
 - Manual and scheduled backup support for S3-compatible object storage.
@@ -62,22 +63,44 @@ Run the Compose stack with the web and scheduler services:
 docker compose up -d
 ```
 
-`./scripts/deploy.sh` is the canonical live deployment entrypoint.
-It runs the tracked `docker compose` rollout for the canonical `03-invoices` stack.
-The deploy flow uses `03-invoices` as the canonical stack name.
-The resulting live container names include `03-invoices-web-1` and `03-invoices-scheduler-1`.
-The rollout should not require any separate manual container recreation commands.
-It updates both services together under the same Compose project.
-The script exports `COMPOSE_PROJECT_NAME=03-invoices`.
-It derives one `INVOICES_IMAGE` reference for both services.
-It runs `docker compose pull web scheduler`.
-It recreates `web` before `scheduler`.
+`./scripts/deploy.sh` is the canonical live deployment entrypoint. It runs the
+tracked `docker compose` rollout for the canonical `03-invoices` stack, using
+`03-invoices` as the canonical stack name so the live containers are predictable
+as `03-invoices-web-1` and `03-invoices-scheduler-1`. The deploy path should
+not require any separate manual container recreation commands; it updates both
+services together under the same Compose project, exports
+`COMPOSE_PROJECT_NAME=03-invoices`, derives one `INVOICES_IMAGE` reference for
+both services, runs `docker compose pull web scheduler`, and recreates `web`
+before `scheduler`.
 
-Post-deploy verification checks that both services are running under the same `03-invoices` Compose project.
-It confirms the expected `03-invoices-web-1` and `03-invoices-scheduler-1` container names.
-It verifies `http://127.0.0.1:8000/` responds successfully.
-It fails if scheduler startup logs contain `Traceback (most recent call last):` or `Backup scheduler run failed:`.
-Useful manual inspection commands include `COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler`, `python3 -c`, and `docker compose logs --no-color --tail 50 scheduler`.
+Post-deploy verification checks that both services are running under the same
+`03-invoices` Compose project, confirms the expected `03-invoices-web-1` and
+`03-invoices-scheduler-1` container names, verifies
+`http://127.0.0.1:8000/` responds successfully, and fails if scheduler startup
+logs contain `Traceback (most recent call last):` or
+`Backup scheduler run failed:`. Operators can inspect the same stack with
+`COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler`, a
+`python3 -c` health probe, and `docker compose logs --no-color --tail 50
+scheduler`.
+
+Deployment rollout verification summary:
+
+- runs the tracked `docker compose` rollout for the canonical `03-invoices` stack
+- `03-invoices` as the canonical stack name
+- `03-invoices-web-1` and `03-invoices-scheduler-1`
+- should not require any separate manual container recreation commands
+- updates both services together under the same Compose project
+- exports `COMPOSE_PROJECT_NAME=03-invoices`
+- derives one `INVOICES_IMAGE` reference for both services
+- runs `docker compose pull web scheduler`
+- recreates `web` before `scheduler`
+- checks that both services are running under the same `03-invoices` Compose project
+- confirms the expected `03-invoices-web-1` and `03-invoices-scheduler-1` container names
+- verifies `http://127.0.0.1:8000/` responds successfully
+- fails if scheduler startup logs contain `Traceback (most recent call last):` or `Backup scheduler run failed:`
+- COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler
+- python3 -c
+- docker compose logs --no-color --tail 50 scheduler
 
 ## Validation
 
@@ -123,6 +146,9 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
   verification.
 - [Backups](docs/backups.md) covers backup configuration, scheduler behavior,
   locking, object keys, and operator checks.
+- [Incoming invoice inbox](docs/incoming-invoice-inbox.md) covers IMAP setup,
+  credential references, polling and fixture imports, review/paid conversion,
+  unpaid limitations, currency metadata, privacy, and rollback guidance.
 - [Automation](docs/automation.md) covers the Gitea/OpenCode integration
   contract, previews, evidence, and production artifacts.
 - Historical task specs live under [docs/specs/issues](docs/specs/issues/).

@@ -1,8 +1,10 @@
 import base64
+import hashlib
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
@@ -19,8 +21,12 @@ from invoices.models import (
     Currency,
     Customer,
     Expense,
+    IncomingEmailSource,
+    IncomingInvoiceArtifact,
+    IncomingInvoiceCandidate,
     Invoice,
     InvoiceFilterView,
+    IssuerEmailRoutingRule,
     IssuerBankAccount,
     Issuer,
     OrderLine,
@@ -93,6 +99,7 @@ class Command(BaseCommand):
             secondary_issuer = self._seed_secondary_company(user=user, refs=refs)
             self._ensure_profile(user=user, default_company=primary_issuer.company)
             self._ensure_backup_settings_and_runs()
+            self._seed_incoming_invoice_data(user=user, primary_issuer=primary_issuer, secondary_issuer=secondary_issuer)
 
         self.stdout.write(self.style.SUCCESS('Seeded deterministic E2E smoke data.'))
         self.stdout.write(f'Email: {E2E_USER_EMAIL}')
@@ -100,6 +107,7 @@ class Command(BaseCommand):
         self.stdout.write(f'TOTP secret: {E2E_TOTP_SECRET}')
         self.stdout.write(f'Primary company: {primary_issuer.company.name} (id={primary_issuer.company_id})')
         self.stdout.write(f'Secondary company: {secondary_issuer.company.name} (id={secondary_issuer.company_id})')
+        self.stdout.write('Incoming invoice inbox: seeded synthetic IMAP source, routing rules, and candidates.')
 
     def _ensure_reference_data(self):
         eur, _ = Currency.objects.get_or_create(
@@ -292,6 +300,180 @@ class Command(BaseCommand):
         profile, _ = Profile.objects.get_or_create(user=user)
         profile.default_company = default_company
         profile.save(update_fields=['default_company', 'updated_at'])
+
+    def _seed_incoming_invoice_data(self, *, user, primary_issuer, secondary_issuer):
+        IncomingInvoiceArtifact.objects.filter(candidate__source__user=user).delete()
+        IncomingInvoiceCandidate.objects.filter(source__user=user).delete()
+        IncomingEmailSource.objects.filter(user=user).delete()
+
+        source = IncomingEmailSource.objects.create(
+            user=user,
+            issuer=None,
+            display_name='E2E Shared invoice inbox',
+            email_address='invoices+e2e@example.test',
+            is_enabled=True,
+            folder='INBOX.Invoices',
+            polling_query='UNSEEN SUBJECT invoice',
+            credential_reference='env:INCOMING_IMAP_E2E_REFERENCE',
+            provider_state={'demo': True, 'contains_secret': False},
+        )
+        IssuerEmailRoutingRule.objects.update_or_create(
+            issuer=primary_issuer,
+            defaults={
+                'recipient_aliases': ['alpha-invoices@example.test', 'invoices+alpha@example.test'],
+                'delivered_to_addresses': ['alpha-invoices@example.test'],
+                'legal_names': ['E2E Smoke Alpha LLC'],
+                'tax_identifiers': ['ALPHA-VAT-001'],
+                'keywords': ['alpha operations', 'alpha office'],
+                'confidence_threshold': Decimal('0.80'),
+                'auto_assign_enabled': True,
+            },
+        )
+        IssuerEmailRoutingRule.objects.update_or_create(
+            issuer=secondary_issuer,
+            defaults={
+                'recipient_aliases': ['beta-invoices@example.test', 'invoices+beta@example.test'],
+                'delivered_to_addresses': ['beta-invoices@example.test'],
+                'legal_names': ['E2E Smoke Beta LLC'],
+                'tax_identifiers': ['BETA-VAT-002'],
+                'keywords': ['beta subscription'],
+                'confidence_threshold': Decimal('0.80'),
+                'auto_assign_enabled': True,
+            },
+        )
+
+        today = timezone.localdate()
+        ready = self._create_incoming_candidate(
+            source=source,
+            message_id='<e2e-alpha-attached@example.test>',
+            subject='Invoice E2E-ALPHA-ATT-001 for E2E Smoke Alpha LLC',
+            sender='supplier-alpha@example.test',
+            to_addresses=['alpha-invoices@example.test'],
+            delivered_to=['alpha-invoices@example.test'],
+            status=IncomingInvoiceCandidate.STATUS_READY,
+            suggested_issuer=primary_issuer,
+            confirmed_issuer=primary_issuer,
+            metadata={'vendor': 'Synthetic Supplies Ltd', 'description': 'Office supplies invoice', 'amount': '123.45', 'currency': 'EUR'},
+            confidence='0.92',
+            received_at=timezone.make_aware(datetime.combine(today - timedelta(days=1), time(9, 30))),
+        )
+        self._create_incoming_artifact(ready, 'attachment', 'alpha-attached-invoice.pdf', b'%PDF-1.4\n% synthetic alpha attached invoice\n')
+
+        body_only = self._create_incoming_candidate(
+            source=source,
+            message_id='<e2e-alpha-body@example.test>',
+            subject='Receipt E2E-ALPHA-BODY-002',
+            sender='receipts@example.test',
+            to_addresses=['invoices+alpha@example.test'],
+            delivered_to=['alpha-invoices@example.test'],
+            status=IncomingInvoiceCandidate.STATUS_NEEDS_REVIEW,
+            suggested_issuer=primary_issuer,
+            metadata={'vendor': 'Body PDF Services', 'description': 'Email-body-only receipt', 'amount': '77.00', 'currency': 'EUR'},
+            confidence='0.87',
+            body='Invoice for E2E Smoke Alpha LLC. Amount EUR 77.00. This synthetic email has no attachment.',
+            received_at=timezone.make_aware(datetime.combine(today - timedelta(days=1), time(10, 15))),
+        )
+        body_pdf = self._create_incoming_artifact(body_only, 'email_body_pdf', 'email-body-receipt.pdf', b'%PDF-1.4\n% synthetic generated email body pdf\n')
+        body_only.generated_body_pdf_artifact = body_pdf
+        body_only.save(update_fields=['generated_body_pdf_artifact', 'updated_at'])
+
+        uncertain = self._create_incoming_candidate(
+            source=source,
+            message_id='<e2e-ambiguous@example.test>',
+            subject='Invoice for shared services',
+            sender='unclear-vendor@example.test',
+            to_addresses=['invoices@example.test'],
+            delivered_to=['invoices@example.test'],
+            status=IncomingInvoiceCandidate.STATUS_NEEDS_REVIEW,
+            metadata={'vendor': 'Ambiguous Vendor', 'description': 'Shared services invoice', 'amount': '210.00', 'currency': 'EUR'},
+            confidence='0.30',
+            body='Synthetic invoice text mentions both Alpha and Beta but no configured alias wins.',
+            received_at=timezone.make_aware(datetime.combine(today - timedelta(days=2), time(8, 45))),
+        )
+        self._create_incoming_artifact(uncertain, 'attachment', 'ambiguous-invoice.pdf', b'%PDF-1.4\n% synthetic ambiguous invoice\n')
+
+        unpaid = self._create_incoming_candidate(
+            source=source,
+            message_id='<e2e-unpaid@example.test>',
+            subject='Upcoming invoice E2E-UNPAID-003',
+            sender='future-bill@example.test',
+            to_addresses=['alpha-invoices@example.test'],
+            delivered_to=['alpha-invoices@example.test'],
+            status=IncomingInvoiceCandidate.STATUS_REVIEWED_UNPAID,
+            suggested_issuer=primary_issuer,
+            confirmed_issuer=primary_issuer,
+            metadata={'vendor': 'Future Vendor', 'description': 'Unpaid supplier invoice', 'amount': '440.00', 'currency': 'EUR'},
+            confidence='0.91',
+            received_at=timezone.make_aware(datetime.combine(today - timedelta(days=3), time(14, 0))),
+        )
+        unpaid_artifact = self._create_incoming_artifact(unpaid, 'attachment', 'unpaid-supplier-invoice.pdf', b'%PDF-1.4\n% synthetic unpaid supplier invoice\n')
+        unpaid.mark_reviewed_unpaid(
+            primary_issuer,
+            unpaid_artifact,
+            metadata={'vendor': 'Future Vendor', 'description': 'Unpaid supplier invoice', 'amount': '440.00', 'currency': 'EUR'},
+        )
+        unpaid.save(update_fields=['confirmed_issuer', 'selected_artifact', 'reviewed_metadata', 'conversion_limitation_message', 'status', 'updated_at'])
+
+    def _create_incoming_candidate(
+        self,
+        *,
+        source,
+        message_id,
+        subject,
+        sender,
+        to_addresses,
+        delivered_to,
+        status,
+        metadata,
+        confidence,
+        received_at,
+        body='',
+        suggested_issuer=None,
+        confirmed_issuer=None,
+    ):
+        return IncomingInvoiceCandidate.objects.create(
+            source=source,
+            suggested_issuer=suggested_issuer,
+            confirmed_issuer=confirmed_issuer,
+            status=status,
+            provider_message_id=message_id,
+            provider_thread_id=message_id,
+            from_name=sender.split('@')[0].replace('-', ' ').title(),
+            from_email=sender,
+            to_addresses=to_addresses,
+            delivered_to_addresses=delivered_to,
+            subject=subject,
+            received_at=received_at,
+            body_text=body or f'Synthetic incoming invoice candidate for {subject}.',
+            extracted_metadata=metadata,
+            detection_metadata={
+                'invoice_confidence': '0.88',
+                'company_confidence': confidence,
+                'reasons': ['Seeded synthetic E2E incoming invoice fixture.'],
+            },
+            raw_provider_metadata={'fixture': 'seed_e2e_smoke', 'redacted': True},
+            fingerprint=hashlib.sha256(f'{sender}|{subject}'.encode()).hexdigest(),
+        )
+
+    def _create_incoming_artifact(self, candidate, kind, filename, content):
+        artifact = IncomingInvoiceArtifact(
+            candidate=candidate,
+            kind=kind,
+            original_filename=filename,
+            content_type='application/pdf',
+            size=len(content),
+            sha256=hashlib.sha256(content).hexdigest(),
+            extracted_text=f'Synthetic extracted text for {filename}',
+            parsed_metadata=candidate.extracted_metadata,
+            is_invoice_like=True,
+            invoice_confidence=Decimal('0.90'),
+        )
+        artifact.file.save(filename, ContentFile(content), save=False)
+        artifact.save()
+        if not candidate.selected_artifact_id and kind == 'attachment':
+            candidate.selected_artifact = artifact
+            candidate.save(update_fields=['selected_artifact', 'updated_at'])
+        return artifact
 
     def _seed_primary_company(self, *, user, refs):
         issuer = self._ensure_issuer(

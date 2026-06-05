@@ -1,0 +1,26 @@
+{% extends 'invoices/base.html' %}
+{% block main %}
+<section class="page incoming-conversion-page" data-testid="incoming-conversion-form">
+  <header class="page-header">
+    <div class="page-header__intro">
+      <h1>Convert incoming invoice</h1>
+      <p class="page-subtitle">Confirm paid state, company, artifact, amount, and vendor details before creating an expense.</p>
+    </div>
+    <div class="page-actions"><a class="btn btn-outline-secondary" href="{% url 'expenses:incoming_detail' candidate.pk %}">Back to review</a></div>
+  </header>
+  <section class="surface surface--padded">
+    {% if candidate.status == 'duplicate' %}<p class="text-warning">This candidate is marked duplicate. Conversion requires explicit duplicate override.</p>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        <div class="form-field">
+          <label class="form-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }} {{ field.errors }}
+        </div>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">Confirm</button>
+    </form>
+  </section>
+</section>
+{% endblock %}

@@ -829,6 +829,181 @@ select.form-select {
   background: var(--color-success-soft);
   color: var(--color-success-strong);
 }
+.incoming-status {
+  background: color-mix(in srgb, var(--color-secondary) 14%, transparent);
+  color: var(--color-text-muted);
+}
+.incoming-status--ready,
+.incoming-status--converted {
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
+}
+.incoming-status--needs_review,
+.incoming-status--reviewed_unpaid,
+.incoming-status--needs_fetch {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+.incoming-status--duplicate,
+.incoming-status--not_invoice,
+.incoming-status--error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+}
+.incoming-settings-card__intro,
+.incoming-routing-summary,
+.incoming-review-summary,
+.incoming-review-layout,
+.incoming-review-primary,
+.incoming-review-side {
+  margin-bottom: var(--space-4);
+}
+.incoming-routing-summary,
+.incoming-review-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+}
+.incoming-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.incoming-review-primary,
+.incoming-review-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin-bottom: var(--space-3);
+}
+.section-kicker {
+  margin: var(--space-1) 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+.incoming-advanced-settings {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+.incoming-advanced-settings summary,
+.incoming-email-snapshot summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.incoming-checkbox-field {
+  align-self: end;
+}
+.incoming-inbox-table th,
+.incoming-inbox-table td,
+.incoming-compact-table th,
+.incoming-compact-table td {
+  vertical-align: middle;
+}
+.incoming-email-cell__subject {
+  display: block;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+.incoming-email-cell__subject:hover,
+.incoming-email-cell__subject:focus {
+  color: var(--color-accent);
+}
+.incoming-email-cell__meta,
+.text-muted {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.incoming-notice {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+.incoming-notice--warning {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background: var(--color-accent-soft);
+}
+.incoming-review-form-panel h2,
+.incoming-review-context h2,
+.incoming-artifacts-panel h2 {
+  margin-top: 0;
+}
+.incoming-review-context h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.incoming-review-context {
+  border-left: 3px solid var(--color-accent-soft);
+}
+.incoming-review-context--warning {
+  border-left-color: #f59e0b;
+  background: #fef0d0;
+}
+.incoming-signal-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.incoming-signal-list div,
+.incoming-score-list li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.incoming-signal-list dt {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.incoming-signal-list dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 700;
+}
+.incoming-reason-list,
+.incoming-score-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.incoming-score-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-2);
+}
+.incoming-score-list small {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+}
+.incoming-review-context pre,
+.incoming-email-snapshot pre {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+@media (max-width: 900px) {
+  .incoming-review-layout {
+    grid-template-columns: 1fr;
+  }
+}
 .icon-button {
   display: inline-flex;
   align-items: center;

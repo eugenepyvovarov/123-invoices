@@ -1,0 +1,10 @@
+From: Body Only Supplier <body-supplier@example.test>
+To: invoices+alpha@example.test
+Delivered-To: alpha-invoices@example.test
+Subject: Receipt FIX-BODY-002 for E2E Smoke Alpha LLC
+Message-ID: <fixture-body-only@example.test>
+Date: Mon, 25 May 2026 10:15:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+This sanitized synthetic email has no attachment. It is an invoice-like receipt for E2E Smoke Alpha LLC, VAT ALPHA-VAT-001, amount EUR 77.00.

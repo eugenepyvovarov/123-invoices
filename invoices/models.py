@@ -609,6 +609,23 @@ def expense_attachment_upload_path(instance, filename):
     return f"expenses/{year}/{month}/{prefix}-{slug}{ext}"
 
 
+def incoming_invoice_artifact_upload_path(instance, filename):
+    """Store incoming invoice artifacts under media/incoming-invoices/..."""
+
+    original_name = filename or 'artifact'
+    base, ext = os.path.splitext(original_name)
+    slug = slugify(base) or 'artifact'
+    ext = ext.lower()
+    candidate = getattr(instance, 'candidate', None)
+    received_at = getattr(candidate, 'received_at', None) or timezone.now()
+    source_id = getattr(candidate, 'source_id', None) or 'unassigned-source'
+    candidate_id = getattr(candidate, 'pk', None) or uuid4().hex
+    return (
+        f"incoming-invoices/{received_at:%Y}/{received_at:%m}/"
+        f"source-{source_id}/candidate-{candidate_id}/{slug}{ext}"
+    )
+
+
 class Expense(models.Model):
     issuer = models.ForeignKey(Issuer, on_delete=models.CASCADE)
     customer = models.ForeignKey(
@@ -645,6 +662,253 @@ class Expense(models.Model):
         if self.project and self.project.customer_id and not self.customer_id:
             self.customer = self.project.customer
         super().save(*args, **kwargs)
+
+
+class IncomingEmailSource(models.Model):
+    PROVIDER_IMAP = 'imap'
+    PROVIDER_CHOICES = (
+        (PROVIDER_IMAP, 'IMAP'),
+    )
+
+    issuer = models.ForeignKey(
+        Issuer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='incoming_email_sources',
+        help_text='Optional issuer for a company-specific mailbox source.',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='incoming_email_sources',
+    )
+    provider = models.CharField(max_length=16, choices=PROVIDER_CHOICES, default=PROVIDER_IMAP)
+    display_name = models.CharField(max_length=100)
+    email_address = models.EmailField()
+    is_enabled = models.BooleanField(default=True)
+    folder = models.CharField(max_length=255, default='INBOX')
+    polling_query = models.CharField(max_length=255, blank=True)
+    credential_reference = models.CharField(max_length=255, blank=True)
+    provider_state = models.JSONField(default=dict, blank=True)
+    last_seen_message_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name', 'id']
+        indexes = [
+            models.Index(fields=['provider', 'is_enabled'], name='incoming_source_provider_idx'),
+            models.Index(fields=['issuer', 'is_enabled'], name='incoming_source_issuer_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.display_name} <{self.email_address}>"
+
+    def clean(self):
+        super().clean()
+        if self.provider != self.PROVIDER_IMAP:
+            raise ValidationError({'provider': 'Only IMAP incoming email sources are supported for this issue.'})
+
+
+class IssuerEmailRoutingRule(models.Model):
+    issuer = models.OneToOneField(
+        Issuer,
+        on_delete=models.CASCADE,
+        related_name='incoming_email_routing_rule',
+    )
+    recipient_aliases = models.JSONField(default=list, blank=True)
+    delivered_to_addresses = models.JSONField(default=list, blank=True)
+    legal_names = models.JSONField(default=list, blank=True)
+    tax_identifiers = models.JSONField(default=list, blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    confidence_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.80'))
+    auto_assign_enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['issuer']
+        indexes = [
+            models.Index(fields=['issuer', 'auto_assign_enabled'], name='issuer_routing_enabled_idx'),
+        ]
+
+    def __str__(self):
+        return f"Incoming routing for {self.issuer}"
+
+
+class IncomingInvoiceCandidate(models.Model):
+    STATUS_NEW = 'new'
+    STATUS_NEEDS_REVIEW = 'needs_review'
+    STATUS_READY = 'ready'
+    STATUS_REVIEWED_UNPAID = 'reviewed_unpaid'
+    STATUS_CONVERTED = 'converted'
+    STATUS_REJECTED = 'rejected'
+    STATUS_NOT_INVOICE = 'not_invoice'
+    STATUS_DUPLICATE = 'duplicate'
+    STATUS_NEEDS_FETCH = 'needs_fetch'
+    STATUS_ERROR = 'error'
+    STATUS_CHOICES = (
+        (STATUS_NEW, 'New'),
+        (STATUS_NEEDS_REVIEW, 'Needs review'),
+        (STATUS_READY, 'Ready'),
+        (STATUS_REVIEWED_UNPAID, 'Reviewed/unpaid'),
+        (STATUS_CONVERTED, 'Converted'),
+        (STATUS_REJECTED, 'Rejected'),
+        (STATUS_NOT_INVOICE, 'Not an invoice'),
+        (STATUS_DUPLICATE, 'Duplicate'),
+        (STATUS_NEEDS_FETCH, 'Needs manual fetch'),
+        (STATUS_ERROR, 'Error'),
+    )
+
+    source = models.ForeignKey(IncomingEmailSource, on_delete=models.CASCADE, related_name='candidates')
+    suggested_issuer = models.ForeignKey(
+        Issuer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='suggested_incoming_invoice_candidates',
+    )
+    confirmed_issuer = models.ForeignKey(
+        Issuer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='confirmed_incoming_invoice_candidates',
+    )
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_NEW)
+    provider_message_id = models.CharField(max_length=255)
+    provider_thread_id = models.CharField(max_length=255, blank=True)
+    from_name = models.CharField(max_length=255, blank=True)
+    from_email = models.EmailField(blank=True)
+    to_addresses = models.JSONField(default=list, blank=True)
+    cc_addresses = models.JSONField(default=list, blank=True)
+    delivered_to_addresses = models.JSONField(default=list, blank=True)
+    subject = models.CharField(max_length=500, blank=True)
+    received_at = models.DateTimeField()
+    body_text = models.TextField(blank=True)
+    body_html = models.TextField(blank=True)
+    extracted_metadata = models.JSONField(default=dict, blank=True)
+    detection_metadata = models.JSONField(default=dict, blank=True)
+    duplicate_metadata = models.JSONField(default=dict, blank=True)
+    fingerprint = models.CharField(max_length=128, blank=True)
+    raw_provider_metadata = models.JSONField(default=dict, blank=True)
+    selected_artifact = models.ForeignKey(
+        'IncomingInvoiceArtifact',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='selected_for_candidates',
+    )
+    generated_body_pdf_artifact = models.ForeignKey(
+        'IncomingInvoiceArtifact',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='body_pdf_for_candidates',
+    )
+    reviewed_metadata = models.JSONField(default=dict, blank=True)
+    conversion_limitation_message = models.TextField(blank=True)
+    converted_expense = models.OneToOneField(
+        'Expense',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='incoming_invoice_candidate',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-received_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'provider_message_id'],
+                name='uniq_inc_cand_source_msg',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['status', 'received_at'], name='inc_cand_status_date_idx'),
+            models.Index(fields=['suggested_issuer', 'status'], name='inc_cand_suggested_idx'),
+            models.Index(fields=['confirmed_issuer', 'status'], name='inc_cand_confirmed_idx'),
+            models.Index(fields=['source', 'received_at'], name='inc_cand_source_date_idx'),
+            models.Index(fields=['fingerprint'], name='inc_cand_fingerprint_idx'),
+        ]
+
+    def __str__(self):
+        return self.display_subject
+
+    @property
+    def display_subject(self):
+        return self.subject or f"Incoming message {self.provider_message_id}"
+
+    @property
+    def issuer_for_review(self):
+        return self.confirmed_issuer or self.suggested_issuer
+
+    @property
+    def is_terminal(self):
+        return self.status in {
+            self.STATUS_REVIEWED_UNPAID,
+            self.STATUS_CONVERTED,
+            self.STATUS_REJECTED,
+            self.STATUS_NOT_INVOICE,
+            self.STATUS_DUPLICATE,
+            self.STATUS_NEEDS_FETCH,
+        }
+
+    def mark_reviewed_unpaid(self, issuer, artifact, metadata=None, message=''):
+        self.confirmed_issuer = issuer
+        self.selected_artifact = artifact
+        self.reviewed_metadata = metadata or {}
+        self.conversion_limitation_message = message or (
+            'Reviewed as unpaid; no accounting record exists yet because expenses require a paid date.'
+        )
+        self.status = self.STATUS_REVIEWED_UNPAID
+
+
+class IncomingInvoiceArtifact(models.Model):
+    KIND_ATTACHMENT = 'attachment'
+    KIND_EMAIL_BODY_PDF = 'email_body_pdf'
+    KIND_INLINE_IMAGE = 'inline_image'
+    KIND_OTHER = 'other'
+    KIND_CHOICES = (
+        (KIND_ATTACHMENT, 'Attachment'),
+        (KIND_EMAIL_BODY_PDF, 'Email body PDF'),
+        (KIND_INLINE_IMAGE, 'Inline image'),
+        (KIND_OTHER, 'Other'),
+    )
+
+    candidate = models.ForeignKey(IncomingInvoiceCandidate, on_delete=models.CASCADE, related_name='artifacts')
+    kind = models.CharField(max_length=32, choices=KIND_CHOICES, default=KIND_ATTACHMENT)
+    original_filename = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64)
+    file = models.FileField(upload_to=incoming_invoice_artifact_upload_path)
+    extracted_text = models.TextField(blank=True)
+    parsed_metadata = models.JSONField(default=dict, blank=True)
+    is_invoice_like = models.BooleanField(default=False)
+    invoice_confidence = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['candidate', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['candidate', 'sha256'], name='uniq_inc_art_cand_hash'),
+        ]
+        indexes = [
+            models.Index(fields=['sha256'], name='incoming_artifact_hash_idx'),
+            models.Index(fields=['kind', 'is_invoice_like'], name='incoming_artifact_kind_idx'),
+        ]
+
+    def __str__(self):
+        return self.display_name
+
+    @property
+    def display_name(self):
+        return self.original_filename or self.get_kind_display()
 
 
 class ImportMappingQuerySet(models.QuerySet):

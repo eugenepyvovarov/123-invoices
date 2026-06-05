@@ -1,0 +1,10 @@
+From: Portal Vendor <portal@example.test>
+To: alpha-invoices@example.test
+Delivered-To: alpha-invoices@example.test
+Subject: Billing portal notification FIX-PORTAL-004
+Message-ID: <fixture-portal-link-only@example.test>
+Date: Mon, 25 May 2026 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Your bill is available in the vendor portal: https://portal.example.test/bills/FIX-PORTAL-004
