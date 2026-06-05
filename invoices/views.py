@@ -75,7 +75,7 @@ from invoices.utils.company_context import (
     set_active_company,
     get_available_issuers,
 )
-from invoices.utils.date_filters import get_global_date_filter
+from invoices.utils.date_filters import ROLLING_YEAR_DATE_RANGE_KEY, get_global_date_filter
 from invoices.utils.sanitize import sanitize_decimal_columns
 
 logger = logging.getLogger(__name__)
@@ -313,7 +313,7 @@ def _safe_cross_company_row_redirect(next_url: str | None) -> str:
 
 
 def invalidate_dashboard_cache(issuer_id):
-    periods = ['this_month', 'last_month', 'ytd', 'last_year', 'all']
+    periods = [ROLLING_YEAR_DATE_RANGE_KEY, 'this_month', 'last_month', 'ytd', 'last_year', 'all']
     for period in periods:
         cache.delete(f'dashboard:{issuer_id}:{period}')
         cache.delete(f'dashboard:v2:{issuer_id}:{period}')
