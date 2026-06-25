@@ -126,11 +126,11 @@ customer-payment-notes-billing-defaults
   - [x] Ensure the customer profile POST save updates the new field with the other billing defaults.
   - [x] Add customer view/form tests for saving and reloading the payment notes value.
 
-- [ ] Apply payment note fallback to invoice rendering
-  - [ ] Add a shared resolver for invoice payment notes with customer override, company fallback, and empty suppression.
-  - [ ] Pass the resolved value into PDF preview and generated PDF contexts.
-  - [ ] Update `invoice_pdf.html` to use the resolved value for Payment Notes rendering.
-  - [ ] Add tests for customer override, company fallback, and no Payment Notes block when both sources are empty.
+- [x] Apply payment note fallback to invoice rendering
+  - [x] Add a shared resolver for invoice payment notes with customer override, company fallback, and empty suppression.
+  - [x] Pass the resolved value into PDF preview and generated PDF contexts.
+  - [x] Update `invoice_pdf.html` to use the resolved value for Payment Notes rendering.
+  - [x] Add tests for customer override, company fallback, and no Payment Notes block when both sources are empty.
 
 - [ ] Add issue-specific reviewer evidence hooks
   - [ ] Add a Playwright scenario for the customer payment notes override demo using real UI flows.
