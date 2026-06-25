@@ -2689,7 +2689,7 @@ def customer_profile(request, id):
             customer.issuer = issuer
             if customer.is_active != is_active:
                 customer.is_active = is_active
-            updates = ['company', 'issuer', 'currency', 'payment_term', 'is_active']
+            updates = ['company', 'issuer', 'currency', 'payment_term', 'payment_notes', 'is_active']
 
             contact_email = getattr(company, 'contact_email', '').strip() if company else ''
             contact_name = getattr(company, 'contact_name', '').strip() if company else (company.name if company else '')

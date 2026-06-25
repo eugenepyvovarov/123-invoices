@@ -172,3 +172,42 @@ class CustomerViewsTests(AuthenticatedCompanyTestCase):
         customers = list(follow_up.context['customer_list'])
         self.assertGreaterEqual(len(customers), 2)
         self.assertEqual(customers[0].pk, other_customer.pk)
+
+    def test_customer_profile_edit_saves_payment_notes(self):
+        self._activate_company()
+
+        response = self.client.post(
+            reverse('customers:detail', args=[self.customer.id]),
+            {
+                'tab': 'edit',
+                'company-name': 'Client Umbra Updated',
+                'company-customer_information_file_number': 'VATC1',
+                'company-contact_name': 'Avery Client',
+                'company-contact_email': 'avery@example.com',
+                'company-contact_cc_email': '',
+                'company-contact_phone_number': '',
+                'company-contact_country': '',
+                'address-full_address': '10 Client Street',
+                'customer_status-is_active': 'true',
+                'customer-currency': '',
+                'customer-payment_term': '',
+                'customer-payment_notes': 'Use local bank transfer details for this customer.',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('customers:detail', args=[self.customer.id])}?tab=edit",
+        )
+        self.customer.refresh_from_db()
+        self.assertEqual(
+            self.customer.payment_notes,
+            'Use local bank transfer details for this customer.',
+        )
+
+        follow_up = self.client.get(
+            reverse('customers:detail', args=[self.customer.id]),
+            {'tab': 'edit'},
+        )
+        self.assertContains(follow_up, 'Payment notes')
+        self.assertContains(follow_up, 'Use local bank transfer details for this customer.')
