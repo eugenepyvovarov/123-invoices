@@ -30,6 +30,17 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-body stack-gap-md">
+      <h2 class="section-title">Billing defaults</h2>
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=billing_form.currency cls='col-md-6' label='Currency' %}
+        {% include 'invoices/partials/form_field.html' with field=billing_form.payment_term cls='col-md-6' label='Payment period' %}
+        {% include 'invoices/partials/form_field.html' with field=billing_form.payment_notes cls='col-12' %}
+      </div>
+    </div>
+  </div>
+
   <div class="d-flex justify-content-end">
     <button type="submit" class="btn btn-primary">Save customer</button>
   </div>

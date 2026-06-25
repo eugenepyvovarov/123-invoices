@@ -463,11 +463,16 @@ class CustomerBillingForm(StyledModelForm):
         self.fields['payment_term'].empty_label = 'Select payment period'
         self.fields['payment_term'].queryset = PaymentTerm.objects.order_by('days', 'name')
         self.fields['payment_term'].label = 'Payment period'
+        self.fields['payment_notes'].required = False
+        self.fields['payment_notes'].widget = forms.Textarea(
+            attrs={'rows': 3, 'placeholder': 'Add optional customer-specific payment notes'}
+        )
+        self.fields['payment_notes'].label = 'Payment notes'
         self._apply_pico_styles()
 
     class Meta:
         model = Customer
-        fields = ['currency', 'payment_term']
+        fields = ['currency', 'payment_term', 'payment_notes']
 
 
 class IssuerCompanyForm(StyledModelForm):

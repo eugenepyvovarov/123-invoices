@@ -309,6 +309,7 @@
             <div class="row">
               {% include 'invoices/partials/form_field.html' with field=billing_form.currency cls='col-md-6' label='Currency' %}
               {% include 'invoices/partials/form_field.html' with field=billing_form.payment_term cls='col-md-6' label='Payment period' %}
+              {% include 'invoices/partials/form_field.html' with field=billing_form.payment_notes cls='col-12' %}
             </div>
           </div>
 
