@@ -132,11 +132,11 @@ customer-payment-notes-billing-defaults
   - [x] Update `invoice_pdf.html` to use the resolved value for Payment Notes rendering.
   - [x] Add tests for customer override, company fallback, and no Payment Notes block when both sources are empty.
 
-- [ ] Add issue-specific reviewer evidence hooks
-  - [ ] Add a Playwright scenario for the customer payment notes override demo using real UI flows.
-  - [ ] Wire `customer-payment-notes-override` into `scripts/demo-evidence.sh`.
-  - [ ] Add baseline/current-safe visual capture for the customer edit Billing defaults block.
-  - [ ] Wire `customer-payment-notes-billing-defaults` into `scripts/visual-validation.sh`.
+- [x] Add issue-specific reviewer evidence hooks
+  - [x] Add a Playwright scenario for the customer payment notes override demo using real UI flows.
+  - [x] Wire `customer-payment-notes-override` into `scripts/demo-evidence.sh`.
+  - [x] Add baseline/current-safe visual capture for the customer edit Billing defaults block.
+  - [x] Wire `customer-payment-notes-billing-defaults` into `scripts/visual-validation.sh`.
 
 ## Deployment / Rollout
 
