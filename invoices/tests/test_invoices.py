@@ -1,5 +1,7 @@
 import csv
 import io
+import sys
+import types
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -31,6 +33,7 @@ from invoices.views import (
     _cross_company_dashboard_cache_signature,
     _get_dashboard_filter_state,
     invalidate_dashboard_cache,
+    save_invoice_pdf,
 )
 from tests.support import AuthenticatedCompanyTestCase
 
@@ -3123,6 +3126,73 @@ class InvoiceBankAccountViewTests(AuthenticatedCompanyTestCase):
 
         self.assertContains(response, 'SECONDARY-IBAN')
         self.assertNotContains(response, 'DEFAULT-IBAN')
+
+    def _create_preview_invoice(self):
+        invoice = Invoice.objects.create(
+            issuer=self.issuer,
+            customer=self.customer,
+            project=self.project,
+            issued_date=date(2025, 1, 1),
+            status=Invoice.STATUS_DRAFT,
+        )
+        OrderLine.objects.create(
+            invoice=invoice,
+            description='Work',
+            quantity=Decimal('1'),
+            unit_price=Decimal('100'),
+        )
+        return invoice
+
+    def test_pdf_preview_uses_customer_payment_notes_override(self):
+        self.customer.payment_notes = 'Use the local transfer instructions.'
+        self.customer.save(update_fields=['payment_notes'])
+        invoice = self._create_preview_invoice()
+
+        response = self.client.get(reverse('invoices:pdf', args=[invoice.id]))
+
+        self.assertContains(response, 'Payment Notes:')
+        self.assertContains(response, 'Use the local transfer instructions.')
+        self.assertNotContains(response, 'Pay promptly.')
+
+    def test_pdf_preview_falls_back_to_company_payment_notes(self):
+        self.customer.payment_notes = '   '
+        self.customer.save(update_fields=['payment_notes'])
+        invoice = self._create_preview_invoice()
+
+        response = self.client.get(reverse('invoices:pdf', args=[invoice.id]))
+
+        self.assertContains(response, 'Payment Notes:')
+        self.assertContains(response, 'Pay promptly.')
+
+    def test_pdf_preview_omits_payment_notes_when_customer_and_company_blank(self):
+        self.issuer.company.payment_terms = ''
+        self.issuer.company.save(update_fields=['payment_terms'])
+        self.customer.payment_notes = ''
+        self.customer.save(update_fields=['payment_notes'])
+        invoice = self._create_preview_invoice()
+
+        response = self.client.get(reverse('invoices:pdf', args=[invoice.id]))
+
+        self.assertNotContains(response, 'Payment Notes:')
+
+    def test_generated_pdf_context_uses_resolved_payment_notes(self):
+        self.customer.payment_notes = 'Generated PDF override instructions.'
+        self.customer.save(update_fields=['payment_notes'])
+        invoice = self._create_preview_invoice()
+        captured = {}
+
+        class FakeWeasyTemplateResponse:
+            def __init__(self, *args, **kwargs):
+                captured['kwargs'] = kwargs
+                self.rendered_content = b'%PDF-1.4'
+
+        with patch.dict(sys.modules, {
+            'django_weasyprint': types.SimpleNamespace(),
+            'django_weasyprint.views': types.SimpleNamespace(WeasyTemplateResponse=FakeWeasyTemplateResponse),
+        }):
+            save_invoice_pdf(RequestFactory().get('/'), invoice.id)
+
+        self.assertEqual(captured['kwargs']['context']['payment_notes'], 'Generated PDF override instructions.')
 
 
 class InvoiceCurrencySnapshotTests(TestCase):

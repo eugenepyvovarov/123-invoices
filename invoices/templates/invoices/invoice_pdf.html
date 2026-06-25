@@ -162,7 +162,7 @@
     </div>
   {% endif %}
   {% with issuer_company=invoice.issuer.company selected_account=bank_account|default:invoice.bank_account %}
-    {% if selected_account or issuer_company.payment_method or issuer_company.bank_account_number or issuer_company.payment_terms %}
+    {% if selected_account or issuer_company.payment_method or issuer_company.bank_account_number or payment_notes %}
     <div class="content-box payment-data">
       {% if selected_account or issuer_company.payment_method or issuer_company.bank_account_number %}
       <div class="payment-info-detail item small-margins">
@@ -186,11 +186,11 @@
         </div>
       </div>
       {% endif %}
-      {% if issuer_company.payment_terms %}
+      {% if payment_notes %}
       <div class="payment-info-detail item small-margins">
         <h3>Payment Notes:</h3>
         <div class="payment-info-detail__content">
-          <p>{{ issuer_company.payment_terms|linebreaksbr }}</p>
+          <p>{{ payment_notes|linebreaksbr }}</p>
         </div>
       </div>
       {% endif %}

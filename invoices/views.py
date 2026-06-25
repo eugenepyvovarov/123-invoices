@@ -67,6 +67,7 @@ from invoices.models import (
 from invoices.services.backups import execute_backup, generate_backup_download_url
 from invoices.services.bank_accounts import bank_account_for_project, resolve_invoice_bank_account
 from invoices.services.invoice_state import is_invoice_overdue, overdue_q
+from invoices.services.payment_notes import resolve_invoice_payment_notes
 from invoices.services.cached_totals import recalc_invoice_amounts
 from invoices.services.backups import BackupDestinationCheckError, test_backup_destination
 from invoices.services.wise_importer import WiseImportError, WiseStatementImporter
@@ -2408,6 +2409,7 @@ def save_invoice_pdf(request, inv_id):
         'currency_code': currency_meta['code'],
         'currency_display': currency_meta['display'],
         'invoice_notes': _invoice_notes(invoice),
+        'payment_notes': resolve_invoice_payment_notes(invoice),
         'bank_account': invoice.bank_account,
         # Inline CSS for reliable PDF styling even when static URLs are not reachable (e.g., inside containers)
         'pdf_inline_css': '',
@@ -2464,6 +2466,7 @@ def check_pdf(request, id):
         'currency_code': currency_meta['code'],
         'currency_display': currency_meta['display'],
         'invoice_notes': _invoice_notes(invoice),
+        'payment_notes': resolve_invoice_payment_notes(invoice),
         'bank_account': invoice.bank_account,
     }
 
