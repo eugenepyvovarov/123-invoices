@@ -114,11 +114,11 @@ customer-payment-notes-billing-defaults
 
 ## Task List
 
-- [ ] Add customer payment notes storage and form support
-  - [ ] Add `payment_notes` to `Customer` with blank/empty-safe defaults.
-  - [ ] Generate the next `invoices` migration for the new field.
-  - [ ] Include `payment_notes` in `CustomerBillingForm`.
-  - [ ] Configure the form field as an optional textarea labeled `Payment notes`.
+- [x] Add customer payment notes storage and form support
+  - [x] Add `payment_notes` to `Customer` with blank/empty-safe defaults.
+  - [x] Generate the next `invoices` migration for the new field.
+  - [x] Include `payment_notes` in `CustomerBillingForm`.
+  - [x] Configure the form field as an optional textarea labeled `Payment notes`.
 
 - [ ] Update customer edit UI and save flow
   - [ ] Add the Payment notes field to the Billing defaults block in `customer_profile.html`.
