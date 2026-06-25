@@ -116,11 +116,23 @@ jobs:
           echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
           echo "DEMO_EVIDENCE_VENV=$PWD/.demo-evidence-venv" >> "$GITHUB_ENV"
 
-      - name: Install controller media validation tools
+      - name: Expose controller media validation tools
         shell: bash
         run: |
-          apt-get update
-          apt-get install -y ffmpeg
+          mkdir -p "$PWD/.opencode-bin"
+          cat > "$PWD/.opencode-bin/ffprobe" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          docker run --rm \
+            --entrypoint ffprobe \
+            -v "$PWD:$PWD" \
+            -w "$PWD" \
+            "$OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE" \
+            "$@"
+          EOF
+          chmod +x "$PWD/.opencode-bin/ffprobe"
+          echo "$PWD/.opencode-bin" >> "$GITHUB_PATH"
+          export PATH="$PWD/.opencode-bin:$PATH"
           ffprobe -version
 
       - name: Install controller dependencies
