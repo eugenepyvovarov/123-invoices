@@ -120,11 +120,11 @@ customer-payment-notes-billing-defaults
   - [x] Include `payment_notes` in `CustomerBillingForm`.
   - [x] Configure the form field as an optional textarea labeled `Payment notes`.
 
-- [ ] Update customer edit UI and save flow
-  - [ ] Add the Payment notes field to the Billing defaults block in `customer_profile.html`.
-  - [ ] Keep the HTMX customer edit partial aligned with the main edit form if it remains in use.
-  - [ ] Ensure the customer profile POST save updates the new field with the other billing defaults.
-  - [ ] Add customer view/form tests for saving and reloading the payment notes value.
+- [x] Update customer edit UI and save flow
+  - [x] Add the Payment notes field to the Billing defaults block in `customer_profile.html`.
+  - [x] Keep the HTMX customer edit partial aligned with the main edit form if it remains in use.
+  - [x] Ensure the customer profile POST save updates the new field with the other billing defaults.
+  - [x] Add customer view/form tests for saving and reloading the payment notes value.
 
 - [ ] Apply payment note fallback to invoice rendering
   - [ ] Add a shared resolver for invoice payment notes with customer override, company fallback, and empty suppression.
