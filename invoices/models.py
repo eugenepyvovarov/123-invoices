@@ -191,6 +191,7 @@ class Customer(models.Model):
         Currency, null=True, blank=True, on_delete=models.SET_NULL, related_name='customers')
     payment_term = models.ForeignKey(
         PaymentTerm, null=True, blank=True, on_delete=models.SET_NULL, related_name='customers')
+    payment_notes = models.TextField(blank=True, default='')
     billing_email = models.EmailField(null=True, blank=True)
     billing_contact_name = models.CharField(max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
