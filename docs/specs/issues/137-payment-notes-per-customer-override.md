@@ -101,6 +101,11 @@ customer-payment-notes-billing-defaults
 
 - The `customer-edit-billing-defaults` baseline/current pair should show the Billing defaults block gaining a Payment notes textarea while preserving the surrounding customer edit layout.
 
+### Baseline SHA
+
+`db2cd0adb7b9c777182e3d89dd80623008f15251`
+
+
 ## Implementation Plan
 
 1. Add an optional `payment_notes` text field to `Customer` and generate the corresponding Django migration.
