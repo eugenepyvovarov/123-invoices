@@ -116,6 +116,13 @@ jobs:
           echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
           echo "DEMO_EVIDENCE_VENV=$PWD/.demo-evidence-venv" >> "$GITHUB_ENV"
 
+      - name: Install controller media validation tools
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y ffmpeg
+          ffprobe -version
+
       - name: Install controller dependencies
         shell: bash
         run: |
