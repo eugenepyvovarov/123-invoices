@@ -22,6 +22,24 @@ The app is currently browser/session-oriented and uses an active company in UI s
 - Include stable IDs, optional `external_id`, issuer/company metadata, timestamps, statuses, currency/amount metadata, artifact availability, and followable API URLs.
 - Document auth, token creation/revocation, endpoint examples, filters, errors, reports, PDFs, and expense upload.
 
+Resolved open-question decisions from issue comments:
+- Question: Should issuer/company settings be writable in this first API, or should issuer/company endpoints be read-only metadata and selection endpoints for now?
+  Decision: Issuer/company settings should be read-only metadata and selection endpoints in this first API. Do not add writable issuer/company settings yet.
+  Source comments: #19369
+  Reason: The comment explicitly states that issuer/company settings should be read-only metadata and selection endpoints for the first API.
+- Question: Should product/service support use the existing invoice order-line fields only, or should this issue add a standalone product/service catalog API and backing model?
+  Decision: Product/service support should use the existing invoice order-line fields only. Do not add a standalone product/service catalog in this issue.
+  Source comments: #19369
+  Reason: The comment explicitly states that product/service support should use the existing invoice order-line fields only and not add a standalone catalog.
+- Question: Should expense uploads include only direct expense records with optional attachments, or should this issue also expose the existing CSV/XLS/XLSX/ZIP statement import workflow through the API?
+  Decision: Expense uploads should cover direct expense records with optional attachments only. Do not expose the existing CSV/XLS/XLSX/ZIP statement import workflow in this issue.
+  Source comments: #19369
+  Reason: The comment explicitly limits expense uploads to direct expense records with optional attachments, excluding the statement import workflow for this issue.
+- Question: Are dashboard-style report endpoints for totals, monthly revenue/expense trends, receivables status, and recent activity sufficient for this first API, or are specific additional report outputs required?
+  Decision: Dashboard-style report endpoints for totals, monthly revenue/expense trends, receivables status, and recent activity are sufficient for this first API. Do not add extra specialized report families unless a later issue asks for them.
+  Source comments: #19369
+  Reason: The comment confirms that the listed dashboard-style reports are sufficient for the first API and advises against adding extra specialized reports.
+
 ## Constraints / Non-Goals
 
 - API credentials must be account/user-bound, not company-bound.
@@ -154,7 +172,4 @@ The app is currently browser/session-oriented and uses an active company in UI s
 
 ## Open Questions
 
-- Should issuer/company settings be writable in this first API, or should issuer/company endpoints be read-only metadata and selection endpoints for now?
-- Should product/service support use the existing invoice order-line fields only, or should this issue add a standalone product/service catalog API and backing model?
-- Should expense uploads include only direct expense records with optional attachments, or should this issue also expose the existing CSV/XLS/XLSX/ZIP statement import workflow through the API?
-- Are dashboard-style report endpoints for totals, monthly revenue/expense trends, receivables status, and recent activity sufficient for this first API, or are specific additional report outputs required?
+None.
