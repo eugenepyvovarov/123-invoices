@@ -117,11 +117,11 @@ Resolved open-question decisions from issue comments:
   - [x] Add filtering, searching, pagination, and stable response metadata.
   - [x] Add permission and cross-account isolation tests for resource endpoints.
 
-- [ ] Add invoice workflow and PDF actions
-  - [ ] Implement invoice serializers with nested order-line create/update support.
-  - [ ] Enforce draft-only invoice update/delete behavior in API serializers/viewsets.
-  - [ ] Implement invoice finalization, total recalculation, cache invalidation, and PDF generation/download actions.
-  - [ ] Add tests for invoice lifecycle success cases, finalized immutability, PDF download, and unauthorized artifact access.
+- [x] Add invoice workflow and PDF actions
+  - [x] Implement invoice serializers with nested order-line create/update support.
+  - [x] Enforce draft-only invoice update/delete behavior in API serializers/viewsets.
+  - [x] Implement invoice finalization, total recalculation, cache invalidation, and PDF generation/download actions.
+  - [x] Add tests for invoice lifecycle success cases, finalized immutability, PDF download, and unauthorized artifact access.
 
 - [ ] Add payments, reports, and expense uploads
   - [ ] Implement payment and payment-application endpoints with invoice amount/status recalculation.
