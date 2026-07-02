@@ -3,7 +3,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.permissions import AllowAny
 from rest_framework.routers import DefaultRouter
 
-from api.views import BankAccountViewSet, CustomerViewSet, IssuerViewSet, MeView, ProjectViewSet
+from api.views import BankAccountViewSet, CustomerViewSet, InvoiceViewSet, IssuerViewSet, MeView, ProjectViewSet
 
 
 app_name = 'api'
@@ -13,6 +13,7 @@ router.register('issuers', IssuerViewSet, basename='issuer')
 router.register('bank-accounts', BankAccountViewSet, basename='bankaccount')
 router.register('customers', CustomerViewSet, basename='customer')
 router.register('projects', ProjectViewSet, basename='project')
+router.register('invoices', InvoiceViewSet, basename='invoice')
 
 urlpatterns = [
     path('', include(router.urls)),
