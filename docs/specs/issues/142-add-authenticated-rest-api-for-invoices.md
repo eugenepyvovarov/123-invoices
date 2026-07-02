@@ -111,11 +111,11 @@ Resolved open-question decisions from issue comments:
   - [x] Add API token model, migration, admin registration, and issue/list/revoke management commands.
   - [x] Add authentication tests for valid, missing, invalid, revoked, and expired tokens.
 
-- [ ] Add account-scoped resource endpoints
-  - [ ] Add shared issuer-scope helpers for account-wide reads and explicit issuer write validation.
-  - [ ] Implement `me`, issuer/company metadata, bank-account metadata, customer, and project serializers/endpoints.
-  - [ ] Add filtering, searching, pagination, and stable response metadata.
-  - [ ] Add permission and cross-account isolation tests for resource endpoints.
+- [x] Add account-scoped resource endpoints
+  - [x] Add shared issuer-scope helpers for account-wide reads and explicit issuer write validation.
+  - [x] Implement `me`, issuer/company metadata, bank-account metadata, customer, and project serializers/endpoints.
+  - [x] Add filtering, searching, pagination, and stable response metadata.
+  - [x] Add permission and cross-account isolation tests for resource endpoints.
 
 - [ ] Add invoice workflow and PDF actions
   - [ ] Implement invoice serializers with nested order-line create/update support.
