@@ -104,12 +104,12 @@ Resolved open-question decisions from issue comments:
 
 ## Task List
 
-- [ ] Add REST API foundation and account tokens
-  - [ ] Add DRF/OpenAPI/filtering dependencies and REST framework settings.
-  - [ ] Add the `api` app, `/api/` URL include, router, schema/docs routes, pagination, and JSON error handling.
-  - [ ] Exempt `/api/` from login middleware redirects without weakening browser routes.
-  - [ ] Add API token model, migration, admin registration, and issue/list/revoke management commands.
-  - [ ] Add authentication tests for valid, missing, invalid, revoked, and expired tokens.
+- [x] Add REST API foundation and account tokens
+  - [x] Add DRF/OpenAPI/filtering dependencies and REST framework settings.
+  - [x] Add the `api` app, `/api/` URL include, router, schema/docs routes, pagination, and JSON error handling.
+  - [x] Exempt `/api/` from login middleware redirects without weakening browser routes.
+  - [x] Add API token model, migration, admin registration, and issue/list/revoke management commands.
+  - [x] Add authentication tests for valid, missing, invalid, revoked, and expired tokens.
 
 - [ ] Add account-scoped resource endpoints
   - [ ] Add shared issuer-scope helpers for account-wide reads and explicit issuer write validation.
