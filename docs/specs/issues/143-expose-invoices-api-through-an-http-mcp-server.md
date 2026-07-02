@@ -1,16 +1,16 @@
 ## Overview
 
-Add a network-accessible HTTP MCP server for the invoices project so approved AI clients can discover invoice automation tools, search and inspect invoices, create/update draft invoices, retrieve invoice artifacts, and request guarded finalization through the authenticated DRF API from #142.
+Add a network-accessible HTTP MCP server for the invoices project so approved AI clients can search and inspect invoices, create/update draft invoices, retrieve invoice artifacts, and request guarded finalization through the authenticated DRF API from #142.
 
-Recommended architecture: implement a separate Python ASGI MCP service in the same repository, release image, and Compose stack. The MCP service should use the public/internal DRF API over HTTP and must not import Django models or read invoice files directly except for a clearly documented architectural exception.
+Recommended architecture: implement a separate Python ASGI MCP service in the same repository, release image, and Compose stack. The MCP service should use the public/internal DRF API over HTTP and must not import Django models or read invoice/media files directly.
 
-Default recommendation: use the current MCP Streamable HTTP transport at a service-local `/mcp/` endpoint. If a required client needs legacy SSE compatibility, resolve that before implementation expands the transport surface.
+Default recommendation: use the current MCP Streamable HTTP transport at a service-local `/mcp/` endpoint. If required clients need legacy SSE compatibility, resolve that before expanding the transport surface.
 
 ## Problem
 
-AI tools currently need direct database/filesystem knowledge or manual browser/API work to inspect and manage invoice data. That is unsafe because it bypasses invoice domain rules, active issuer scoping, draft/finalized safety, artifact access controls, and audit-friendly API validation.
+AI tools currently need direct database/filesystem knowledge or manual browser/API work to inspect and manage invoice data. That bypasses invoice domain rules, issuer scoping, draft/finalized safety, artifact access controls, and audit-friendly API validation.
 
-The current repository also does not expose a product catalog model or invoice status-history model, so the MCP tool surface must be tied to the #142 API contract rather than inventing direct model behavior in the MCP layer.
+The repository also does not currently expose a product catalog model or invoice status-history model, so the MCP tool surface must be tied to the #142 API contract rather than inventing direct model behavior in the MCP layer.
 
 ## Proposed Outcome
 
@@ -37,6 +37,7 @@ The current repository also does not expose a product catalog model or invoice s
 ## Constraints / Non-Goals
 
 - Depends on #142; implement after the authenticated DRF API and token auth are available.
+- Do not recreate #142’s base API/auth work in this issue unless closing small endpoint gaps approved for the MCP tool surface.
 - Do not ship a stdio-only MCP server.
 - Do not bypass the DRF API by importing Django models in MCP tool handlers.
 - Do not expose broad admin credentials, upstream API tokens, filesystem paths, raw stack traces, or secrets to MCP clients.
@@ -169,7 +170,7 @@ The current repository also does not expose a product catalog model or invoice s
 - `scripts/ci.sh`, `scripts/runtime_smoke.sh`, and `scripts/verify_deploy.sh` — include MCP runtime/protocol checks.
 - `README.md`, `docs/development.md`, `docs/deployment.md`, and `docs/README.md` — document setup, validation, deployment, and client configuration.
 - `env.example` — add placeholder-only MCP environment keys.
-- #142 API files, only if required endpoints/actions are missing and this issue is approved to close those API gaps before MCP wiring.
+- #142 DRF API modules under `invoices/` and URL routing only if required endpoints/actions are missing and this issue is approved to close those gaps before MCP wiring.
 
 ### Keep
 
