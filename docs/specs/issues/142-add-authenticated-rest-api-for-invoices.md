@@ -123,11 +123,11 @@ Resolved open-question decisions from issue comments:
   - [x] Implement invoice finalization, total recalculation, cache invalidation, and PDF generation/download actions.
   - [x] Add tests for invoice lifecycle success cases, finalized immutability, PDF download, and unauthorized artifact access.
 
-- [ ] Add payments, reports, and expense uploads
-  - [ ] Implement payment and payment-application endpoints with invoice amount/status recalculation.
-  - [ ] Implement account-level and issuer-filtered dashboard report JSON.
-  - [ ] Implement expense create/update with multipart attachment upload and attachment download.
-  - [ ] Add tests for payments, multi-issuer reports, expense uploads, invalid files, and attachment permissions.
+- [x] Add payments, reports, and expense uploads
+  - [x] Implement payment and payment-application endpoints with invoice amount/status recalculation.
+  - [x] Implement account-level and issuer-filtered dashboard report JSON.
+  - [x] Implement expense create/update with multipart attachment upload and attachment download.
+  - [x] Add tests for payments, multi-issuer reports, expense uploads, invalid files, and attachment permissions.
 
 - [ ] Document the API contract
   - [ ] Add `docs/api.md` with token setup, auth headers, endpoint examples, filters, errors, reports, PDFs, and expense upload examples.
