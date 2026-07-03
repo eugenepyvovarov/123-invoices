@@ -2,13 +2,22 @@ from decimal import Decimal
 
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
-from django_filters import rest_framework as filters
 from django.http import FileResponse
 from django.utils import timezone
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from django_filters import rest_framework as filters
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiTypes,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import serializers as drf_serializers
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -29,6 +38,28 @@ from invoices.services.cached_totals import recalc_invoice_amounts
 from invoices.views import invalidate_dashboard_cache, save_invoice_pdf
 
 
+me_response_serializer = inline_serializer(
+    name='AccountMetadataResponse',
+    fields={
+        'account': AccountSerializer(),
+        'issuers': IssuerSerializer(many=True),
+    },
+)
+
+
+dashboard_report_response_serializer = inline_serializer(
+    name='DashboardReportResponse',
+    fields={
+        'issuer_ids': drf_serializers.ListField(child=drf_serializers.IntegerField()),
+        'totals': drf_serializers.DictField(child=drf_serializers.CharField()),
+        'monthly_revenue': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'monthly_expenses': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'receivables': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'recent_activity': drf_serializers.DictField(),
+    },
+)
+
+
 class IssuerScopedMixin:
     issuer_lookup = 'issuer_id'
 
@@ -45,6 +76,11 @@ class IssuerScopedMixin:
 class MeView(APIView):
     """Return metadata for the authenticated API account."""
 
+    @extend_schema(
+        summary='Return authenticated account metadata and accessible issuers',
+        responses={200: me_response_serializer},
+        tags=['account'],
+    )
     def get(self, request):
         return Response({
             'account': AccountSerializer(request.user).data,
@@ -56,6 +92,10 @@ class MeView(APIView):
         })
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List accessible issuer/company metadata', tags=['issuers']),
+    retrieve=extend_schema(summary='Retrieve accessible issuer/company metadata', tags=['issuers']),
+)
 class IssuerViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = IssuerSerializer
     search_fields = ['company__name', 'company__contact_email']
@@ -66,6 +106,10 @@ class IssuerViewSet(viewsets.ReadOnlyModelViewSet):
         return accessible_issuers_for_user(self.request.user).prefetch_related('bank_accounts')
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List accessible issuer bank-account metadata', tags=['bank accounts']),
+    retrieve=extend_schema(summary='Retrieve accessible issuer bank-account metadata', tags=['bank accounts']),
+)
 class BankAccountViewSet(IssuerScopedMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = BankAccountSerializer
     filterset_fields = ['issuer', 'is_active', 'is_default', 'payment_method']
@@ -89,6 +133,14 @@ class CustomerFilter(filters.FilterSet):
         fields = ['issuer', 'external_id', 'is_active']
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped customers', tags=['customers']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped customer', tags=['customers']),
+    create=extend_schema(summary='Create a customer for an accessible issuer', tags=['customers']),
+    update=extend_schema(summary='Update a customer for an accessible issuer', tags=['customers']),
+    partial_update=extend_schema(summary='Partially update a customer for an accessible issuer', tags=['customers']),
+    destroy=extend_schema(summary='Delete a customer for an accessible issuer', tags=['customers']),
+)
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     filterset_class = CustomerFilter
@@ -116,6 +168,14 @@ class ProjectFilter(filters.FilterSet):
         fields = ['issuer', 'customer', 'status', 'external_id']
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped projects', tags=['projects']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped project', tags=['projects']),
+    create=extend_schema(summary='Create a project for an accessible customer', tags=['projects']),
+    update=extend_schema(summary='Update an account-scoped project', tags=['projects']),
+    partial_update=extend_schema(summary='Partially update an account-scoped project', tags=['projects']),
+    destroy=extend_schema(summary='Delete an account-scoped project', tags=['projects']),
+)
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     filterset_class = ProjectFilter
@@ -151,6 +211,14 @@ class InvoiceFilter(filters.FilterSet):
         ]
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped invoices with order-line metadata', tags=['invoices']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped invoice', tags=['invoices']),
+    create=extend_schema(summary='Create a draft invoice with optional nested order lines', tags=['invoices']),
+    update=extend_schema(summary='Update a draft invoice and replace provided nested order lines', tags=['invoices']),
+    partial_update=extend_schema(summary='Partially update a draft invoice', tags=['invoices']),
+    destroy=extend_schema(summary='Delete a draft invoice', tags=['invoices']),
+)
 class InvoiceViewSet(viewsets.ModelViewSet):
     serializer_class = InvoiceSerializer
     filterset_class = InvoiceFilter
@@ -188,6 +256,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         instance.delete()
         invalidate_dashboard_cache(issuer_id)
 
+    @extend_schema(
+        summary='Finalize a draft invoice',
+        description='Moves a draft invoice to the finalized invoiced state, recalculates totals, and rejects invoices that are already finalized.',
+        request=None,
+        responses={200: InvoiceSerializer},
+        tags=['invoices'],
+    )
     @action(detail=True, methods=['post'], url_path='finalize')
     def finalize(self, request, pk=None):
         invoice = self.get_object()
@@ -203,6 +278,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(invoice)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary='Generate or refresh the invoice PDF artifact',
+        description='Recalculates invoice totals, renders the PDF with existing invoice services, and returns the refreshed invoice metadata.',
+        request=None,
+        responses={200: InvoiceSerializer, 400: OpenApiResponse(description='PDF generation failed or invoice validation failed.')},
+        tags=['invoices'],
+    )
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
         invoice = self.get_object()
@@ -218,6 +300,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(invoice)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary='Download an authenticated invoice PDF artifact',
+        responses={
+            200: OpenApiResponse(response=OpenApiTypes.BINARY, description='PDF file stream.'),
+            404: OpenApiResponse(description='PDF is not available or invoice is outside the account scope.'),
+        },
+        tags=['invoices'],
+    )
     @action(detail=True, methods=['get'], url_path='download-pdf')
     def download_pdf(self, request, pk=None):
         invoice = self.get_object()
@@ -248,6 +338,14 @@ class PaymentFilter(filters.FilterSet):
         fields = ['issuer', 'customer', 'project', 'status', 'external_id', 'received_after', 'received_before']
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped payments', tags=['payments']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped payment', tags=['payments']),
+    create=extend_schema(summary='Create a payment for an accessible issuer/customer', tags=['payments']),
+    update=extend_schema(summary='Update an account-scoped payment', tags=['payments']),
+    partial_update=extend_schema(summary='Partially update an account-scoped payment', tags=['payments']),
+    destroy=extend_schema(summary='Delete an account-scoped payment', tags=['payments']),
+)
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     filterset_class = PaymentFilter
@@ -292,6 +390,14 @@ class PaymentApplicationFilter(filters.FilterSet):
         fields = ['issuer', 'payment', 'invoice', 'external_id']
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped payment applications', tags=['payment applications']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped payment application', tags=['payment applications']),
+    create=extend_schema(summary='Apply a payment to an invoice', tags=['payment applications']),
+    update=extend_schema(summary='Update a payment application', tags=['payment applications']),
+    partial_update=extend_schema(summary='Partially update a payment application', tags=['payment applications']),
+    destroy=extend_schema(summary='Delete a payment application', tags=['payment applications']),
+)
 class PaymentApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentApplicationSerializer
     filterset_class = PaymentApplicationFilter
@@ -344,6 +450,14 @@ class ExpenseFilter(filters.FilterSet):
         return queryset.filter(attachment='') | queryset.filter(attachment__isnull=True)
 
 
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped expenses', tags=['expenses']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped expense', tags=['expenses']),
+    create=extend_schema(summary='Create an expense with optional multipart attachment upload', tags=['expenses']),
+    update=extend_schema(summary='Update an expense and optionally replace/remove its attachment', tags=['expenses']),
+    partial_update=extend_schema(summary='Partially update an expense and optionally replace/remove its attachment', tags=['expenses']),
+    destroy=extend_schema(summary='Delete an account-scoped expense', tags=['expenses']),
+)
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -370,6 +484,14 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         instance.delete()
         invalidate_dashboard_cache(issuer_id)
 
+    @extend_schema(
+        summary='Download an authenticated expense attachment',
+        responses={
+            200: OpenApiResponse(response=OpenApiTypes.BINARY, description='Attachment file stream.'),
+            404: OpenApiResponse(description='Attachment is not available or expense is outside the account scope.'),
+        },
+        tags=['expenses'],
+    )
     @action(detail=True, methods=['get'], url_path='download-attachment')
     def download_attachment(self, request, pk=None):
         expense = self.get_object()
@@ -400,6 +522,20 @@ def _month_iso(value):
 class DashboardReportView(APIView):
     """Return account-level or issuer-filtered dashboard report JSON."""
 
+    @extend_schema(
+        summary='Return account-level or issuer-filtered dashboard report data',
+        parameters=[
+            OpenApiParameter(
+                name='issuer',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                many=True,
+                description='Optional issuer ID. Repeat to include multiple connected issuers; omitted means all accessible issuers.',
+            ),
+        ],
+        responses={200: dashboard_report_response_serializer},
+        tags=['reports'],
+    )
     def get(self, request):
         issuer_ids = list(accessible_issuer_ids_for_user(request.user))
         selected_issuers = request.query_params.getlist('issuer') or request.query_params.getlist('issuer[]')

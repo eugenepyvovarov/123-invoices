@@ -1,4 +1,5 @@
 from django.utils.crypto import constant_time_compare
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from rest_framework import authentication, exceptions
 
 from accounts.models import ApiToken
@@ -45,3 +46,16 @@ class ApiTokenAuthentication(authentication.BaseAuthentication):
 
     def authenticate_header(self, request):
         return self.keyword
+
+
+class ApiTokenAuthenticationScheme(OpenApiAuthenticationExtension):
+    target_class = 'api.authentication.ApiTokenAuthentication'
+    name = 'BearerAuth'
+
+    def get_security_definition(self, auto_schema):
+        return {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'Invoices API token',
+            'description': 'Account-bound API token sent as `Authorization: Bearer <token>`.',
+        }
