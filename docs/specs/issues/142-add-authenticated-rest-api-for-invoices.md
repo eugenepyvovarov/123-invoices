@@ -129,10 +129,10 @@ Resolved open-question decisions from issue comments:
   - [x] Implement expense create/update with multipart attachment upload and attachment download.
   - [x] Add tests for payments, multi-issuer reports, expense uploads, invalid files, and attachment permissions.
 
-- [ ] Document the API contract
-  - [ ] Add `docs/api.md` with token setup, auth headers, endpoint examples, filters, errors, reports, PDFs, and expense upload examples.
-  - [ ] Link API documentation from the README or docs index.
-  - [ ] Ensure OpenAPI annotations describe auth, request bodies, response fields, and custom actions.
+- [x] Document the API contract
+  - [x] Add `docs/api.md` with token setup, auth headers, endpoint examples, filters, errors, reports, PDFs, and expense upload examples.
+  - [x] Link API documentation from the README or docs index.
+  - [x] Ensure OpenAPI annotations describe auth, request bodies, response fields, and custom actions.
 
 ## Deployment / Rollout
 
