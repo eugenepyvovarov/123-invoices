@@ -3,7 +3,19 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from api.scoping import accessible_issuers_for_user, validate_writable_issuer
-from invoices.models import Company, Customer, Invoice, Issuer, IssuerBankAccount, OrderLine, Project
+from expenses.forms import ALLOWED_ATTACHMENT_EXTENSIONS, MAX_ATTACHMENT_SIZE
+from invoices.models import (
+    Company,
+    Customer,
+    Expense,
+    Invoice,
+    Issuer,
+    IssuerBankAccount,
+    OrderLine,
+    Payment,
+    PaymentApplication,
+    Project,
+)
 from invoices.services.cached_totals import recalc_invoice_amounts
 
 
@@ -291,3 +303,182 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
         self._sync_order_lines(instance, order_lines_data)
         self._recalculate_invoice(instance)
         return instance
+
+
+class PaymentApplicationSerializer(ApiUrlMixin, serializers.ModelSerializer):
+    id = serializers.IntegerField(source='pk', read_only=True)
+    url = serializers.SerializerMethodField()
+    payment = serializers.PrimaryKeyRelatedField(queryset=Payment.objects.none())
+    invoice = serializers.PrimaryKeyRelatedField(queryset=Invoice.objects.none())
+    payment_issuer_id = serializers.IntegerField(source='payment.issuer_id', read_only=True)
+    invoice_issuer_id = serializers.IntegerField(source='invoice.issuer_id', read_only=True)
+
+    class Meta:
+        model = PaymentApplication
+        view_name = 'api:paymentapplication-detail'
+        fields = [
+            'id', 'url', 'external_id', 'payment', 'invoice', 'payment_issuer_id',
+            'invoice_issuer_id', 'amount_applied', 'applied_at',
+        ]
+        read_only_fields = ['applied_at', 'payment_issuer_id', 'invoice_issuer_id']
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if request is not None:
+            issuer_ids = accessible_issuers_for_user(request.user).values('id')
+            fields['payment'].queryset = Payment.objects.filter(issuer_id__in=issuer_ids)
+            fields['invoice'].queryset = Invoice.objects.filter(issuer_id__in=issuer_ids)
+        return fields
+
+    def validate(self, attrs):
+        payment = attrs.get('payment') or getattr(self.instance, 'payment', None)
+        invoice = attrs.get('invoice') or getattr(self.instance, 'invoice', None)
+        if payment is not None and invoice is not None:
+            if payment.issuer_id != invoice.issuer_id:
+                raise serializers.ValidationError({'invoice': 'Invoice must belong to the payment issuer.'})
+            if payment.customer_id != invoice.customer_id:
+                raise serializers.ValidationError({'invoice': 'Invoice must belong to the payment customer.'})
+        return attrs
+
+
+class PaymentSerializer(ApiUrlMixin, serializers.ModelSerializer):
+    id = serializers.IntegerField(source='pk', read_only=True)
+    url = serializers.SerializerMethodField()
+    issuer = serializers.PrimaryKeyRelatedField(queryset=Issuer.objects.none())
+    issuer_id = serializers.IntegerField(source='issuer.pk', read_only=True)
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.none())
+    customer_name = serializers.CharField(source='customer.company.name', read_only=True)
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.none(), required=False, allow_null=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    currency_code = serializers.CharField(source='currency.code', read_only=True)
+    applications = PaymentApplicationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Payment
+        view_name = 'api:payment-detail'
+        fields = [
+            'id', 'url', 'external_id', 'issuer', 'issuer_id', 'customer', 'customer_name',
+            'project', 'project_title', 'currency_code', 'amount', 'exchange_rate',
+            'base_currency_amount', 'received_at', 'status', 'memo', 'created_at',
+            'updated_at', 'applications',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'issuer_id', 'currency_code', 'applications']
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if request is not None:
+            issuer_ids = accessible_issuers_for_user(request.user).values('id')
+            fields['issuer'].queryset = Issuer.objects.filter(pk__in=issuer_ids)
+            fields['customer'].queryset = Customer.objects.filter(issuer_id__in=issuer_ids).select_related('company')
+            fields['project'].queryset = Project.objects.filter(issuer_id__in=issuer_ids).select_related('customer')
+        return fields
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        issuer = attrs.get('issuer') or getattr(self.instance, 'issuer', None)
+        customer = attrs.get('customer') or getattr(self.instance, 'customer', None)
+        project = attrs.get('project') if 'project' in attrs else getattr(self.instance, 'project', None)
+        if request is not None:
+            validate_writable_issuer(request.user, issuer)
+        if customer is not None and issuer is not None and customer.issuer_id != issuer.pk:
+            raise serializers.ValidationError({'customer': 'Customer must belong to the payment issuer.'})
+        if project is not None:
+            if issuer is not None and project.issuer_id != issuer.pk:
+                raise serializers.ValidationError({'project': 'Project must belong to the payment issuer.'})
+            if customer is not None and project.customer_id != customer.pk:
+                raise serializers.ValidationError({'project': 'Project must belong to the payment customer.'})
+        return attrs
+
+
+class ExpenseSerializer(ApiUrlMixin, serializers.ModelSerializer):
+    id = serializers.IntegerField(source='pk', read_only=True)
+    url = serializers.SerializerMethodField()
+    issuer = serializers.PrimaryKeyRelatedField(queryset=Issuer.objects.none())
+    issuer_id = serializers.IntegerField(source='issuer.pk', read_only=True)
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.none(), required=False, allow_null=True)
+    customer_name = serializers.CharField(source='customer.company.name', read_only=True)
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.none(), required=False, allow_null=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    invoice = serializers.PrimaryKeyRelatedField(queryset=Invoice.objects.none(), required=False, allow_null=True)
+    has_attachment = serializers.SerializerMethodField()
+    attachment_url = serializers.SerializerMethodField()
+    remove_attachment = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    class Meta:
+        model = Expense
+        view_name = 'api:expense-detail'
+        fields = [
+            'id', 'url', 'external_id', 'issuer', 'issuer_id', 'customer', 'customer_name',
+            'project', 'project_title', 'invoice', 'paid_date', 'amount', 'description',
+            'exclude_from_reports', 'raw_data', 'attachment', 'has_attachment',
+            'attachment_url', 'remove_attachment', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['issuer_id', 'has_attachment', 'attachment_url', 'created_at', 'updated_at']
+        extra_kwargs = {'attachment': {'required': False, 'allow_null': True}}
+
+    def get_has_attachment(self, obj):
+        return bool(obj.attachment)
+
+    def get_attachment_url(self, obj):
+        request = self.context.get('request')
+        if request is None or not obj.attachment:
+            return None
+        return request.build_absolute_uri(reverse('api:expense-download-attachment', args=[obj.pk]))
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if request is not None:
+            issuer_ids = accessible_issuers_for_user(request.user).values('id')
+            fields['issuer'].queryset = Issuer.objects.filter(pk__in=issuer_ids)
+            fields['customer'].queryset = Customer.objects.filter(issuer_id__in=issuer_ids).select_related('company')
+            fields['project'].queryset = Project.objects.filter(issuer_id__in=issuer_ids).select_related('customer')
+            fields['invoice'].queryset = Invoice.objects.filter(issuer_id__in=issuer_ids)
+        return fields
+
+    def validate_attachment(self, file):
+        if not file:
+            return file
+        import os
+        ext = os.path.splitext(file.name or '')[1].lower()
+        if ext and ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+            raise serializers.ValidationError('Unsupported file type.')
+        size = getattr(file, 'size', 0)
+        if size and size > MAX_ATTACHMENT_SIZE:
+            raise serializers.ValidationError('File exceeds the 10 MB size limit.')
+        return file
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        issuer = attrs.get('issuer') or getattr(self.instance, 'issuer', None)
+        customer = attrs.get('customer') if 'customer' in attrs else getattr(self.instance, 'customer', None)
+        project = attrs.get('project') if 'project' in attrs else getattr(self.instance, 'project', None)
+        invoice = attrs.get('invoice') if 'invoice' in attrs else getattr(self.instance, 'invoice', None)
+        if request is not None:
+            validate_writable_issuer(request.user, issuer)
+        if project is not None:
+            if issuer is not None and project.issuer_id != issuer.pk:
+                raise serializers.ValidationError({'project': 'Project must belong to the expense issuer.'})
+            if customer is None:
+                attrs['customer'] = project.customer
+                customer = project.customer
+            elif project.customer_id != customer.pk:
+                raise serializers.ValidationError({'project': 'Project must belong to the expense customer.'})
+        if customer is not None and issuer is not None and customer.issuer_id != issuer.pk:
+            raise serializers.ValidationError({'customer': 'Customer must belong to the expense issuer.'})
+        if invoice is not None and issuer is not None and invoice.issuer_id != issuer.pk:
+            raise serializers.ValidationError({'invoice': 'Invoice must belong to the expense issuer.'})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('remove_attachment', None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        remove_attachment = validated_data.pop('remove_attachment', False)
+        if remove_attachment and instance.attachment:
+            instance.attachment.delete(save=False)
+            instance.attachment = None
+        return super().update(instance, validated_data)

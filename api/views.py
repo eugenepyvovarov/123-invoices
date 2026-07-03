@@ -1,6 +1,11 @@
+from decimal import Decimal
+
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncMonth
 from django_filters import rest_framework as filters
 from django.http import FileResponse
 from django.utils import timezone
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
@@ -12,11 +17,14 @@ from api.serializers import (
     AccountSerializer,
     BankAccountSerializer,
     CustomerSerializer,
+    ExpenseSerializer,
     InvoiceSerializer,
     IssuerSerializer,
+    PaymentApplicationSerializer,
+    PaymentSerializer,
     ProjectSerializer,
 )
-from invoices.models import Customer, Invoice, IssuerBankAccount, Project
+from invoices.models import Customer, Expense, Invoice, IssuerBankAccount, Payment, PaymentApplication, Project
 from invoices.services.cached_totals import recalc_invoice_amounts
 from invoices.views import invalidate_dashboard_cache, save_invoice_pdf
 
@@ -224,3 +232,240 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
         except FileNotFoundError as exc:
             raise NotFound('PDF is not available for this invoice.') from exc
+
+
+class PaymentFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    project = filters.NumberFilter(field_name='project_id')
+    status = filters.CharFilter(field_name='status')
+    external_id = filters.CharFilter(field_name='external_id')
+    received_after = filters.DateFilter(field_name='received_at', lookup_expr='gte')
+    received_before = filters.DateFilter(field_name='received_at', lookup_expr='lte')
+
+    class Meta:
+        model = Payment
+        fields = ['issuer', 'customer', 'project', 'status', 'external_id', 'received_after', 'received_before']
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentSerializer
+    filterset_class = PaymentFilter
+    search_fields = ['external_id', 'memo', 'customer__company__name', 'project__title']
+    ordering_fields = ['id', 'external_id', 'amount', 'received_at', 'created_at', 'updated_at']
+    ordering = ['-received_at', '-id']
+
+    def get_queryset(self):
+        return Payment.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'project', 'currency'
+        ).prefetch_related('applications', 'applications__invoice').filter(
+            issuer_id__in=accessible_issuer_ids_for_user(self.request.user)
+        )
+
+    def _refresh_applications(self, payment):
+        invoice_ids = list(payment.applications.values_list('invoice_id', flat=True))
+        for invoice_id in invoice_ids:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(payment.issuer_id)
+
+    def perform_update(self, serializer):
+        payment = serializer.save()
+        self._refresh_applications(payment)
+
+    def perform_destroy(self, instance):
+        issuer_id = instance.issuer_id
+        invoice_ids = list(instance.applications.values_list('invoice_id', flat=True))
+        instance.delete()
+        for invoice_id in invoice_ids:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(issuer_id)
+
+
+class PaymentApplicationFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='payment__issuer_id')
+    payment = filters.NumberFilter(field_name='payment_id')
+    invoice = filters.NumberFilter(field_name='invoice_id')
+    external_id = filters.CharFilter(field_name='external_id')
+
+    class Meta:
+        model = PaymentApplication
+        fields = ['issuer', 'payment', 'invoice', 'external_id']
+
+
+class PaymentApplicationViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentApplicationSerializer
+    filterset_class = PaymentApplicationFilter
+    search_fields = ['external_id', 'payment__memo', 'invoice__reference_number']
+    ordering_fields = ['id', 'applied_at', 'amount_applied']
+    ordering = ['-applied_at', '-id']
+
+    def get_queryset(self):
+        return PaymentApplication.objects.select_related(
+            'payment', 'payment__issuer', 'payment__customer', 'invoice', 'invoice__issuer'
+        ).filter(payment__issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+    def perform_create(self, serializer):
+        application = serializer.save()
+        recalc_invoice_amounts(application.invoice_id)
+        invalidate_dashboard_cache(application.invoice.issuer_id)
+
+    def perform_update(self, serializer):
+        old_invoice_id = serializer.instance.invoice_id
+        application = serializer.save()
+        for invoice_id in {old_invoice_id, application.invoice_id}:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(application.invoice.issuer_id)
+
+    def perform_destroy(self, instance):
+        invoice_id = instance.invoice_id
+        issuer_id = instance.invoice.issuer_id
+        instance.delete()
+        recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(issuer_id)
+
+
+class ExpenseFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    project = filters.NumberFilter(field_name='project_id')
+    invoice = filters.NumberFilter(field_name='invoice_id')
+    external_id = filters.CharFilter(field_name='external_id')
+    paid_after = filters.DateFilter(field_name='paid_date', lookup_expr='gte')
+    paid_before = filters.DateFilter(field_name='paid_date', lookup_expr='lte')
+    has_attachment = filters.BooleanFilter(method='filter_has_attachment')
+
+    class Meta:
+        model = Expense
+        fields = ['issuer', 'customer', 'project', 'invoice', 'external_id', 'paid_after', 'paid_before', 'has_attachment']
+
+    def filter_has_attachment(self, queryset, name, value):
+        if value:
+            return queryset.exclude(attachment='').exclude(attachment__isnull=True)
+        return queryset.filter(attachment='') | queryset.filter(attachment__isnull=True)
+
+
+class ExpenseViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseSerializer
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    filterset_class = ExpenseFilter
+    search_fields = ['external_id', 'description', 'customer__company__name', 'project__title']
+    ordering_fields = ['id', 'external_id', 'paid_date', 'amount', 'created_at', 'updated_at']
+    ordering = ['-paid_date', '-id']
+
+    def get_queryset(self):
+        return Expense.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'project', 'invoice'
+        ).filter(issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+    def perform_create(self, serializer):
+        expense = serializer.save()
+        invalidate_dashboard_cache(expense.issuer_id)
+
+    def perform_update(self, serializer):
+        expense = serializer.save()
+        invalidate_dashboard_cache(expense.issuer_id)
+
+    def perform_destroy(self, instance):
+        issuer_id = instance.issuer_id
+        instance.delete()
+        invalidate_dashboard_cache(issuer_id)
+
+    @action(detail=True, methods=['get'], url_path='download-attachment')
+    def download_attachment(self, request, pk=None):
+        expense = self.get_object()
+        if not expense.attachment:
+            raise NotFound('Attachment is not available for this expense.')
+        try:
+            return FileResponse(
+                expense.attachment.open('rb'),
+                as_attachment=True,
+                filename=expense.attachment.name.rsplit('/', 1)[-1],
+            )
+        except FileNotFoundError as exc:
+            raise NotFound('Attachment is not available for this expense.') from exc
+
+
+def _decimal(value):
+    return Decimal(value or 0).quantize(Decimal('0.01'))
+
+
+def _month_iso(value):
+    if value is None:
+        return None
+    if hasattr(value, 'date'):
+        value = value.date()
+    return value.isoformat()
+
+
+class DashboardReportView(APIView):
+    """Return account-level or issuer-filtered dashboard report JSON."""
+
+    def get(self, request):
+        issuer_ids = list(accessible_issuer_ids_for_user(request.user))
+        selected_issuers = request.query_params.getlist('issuer') or request.query_params.getlist('issuer[]')
+        if selected_issuers:
+            try:
+                requested_ids = {int(value) for value in selected_issuers}
+            except (TypeError, ValueError) as exc:
+                raise ValidationError({'issuer': 'Issuer filters must be numeric IDs.'}) from exc
+            issuer_ids = [issuer_id for issuer_id in issuer_ids if issuer_id in requested_ids]
+
+        invoice_qs = Invoice.objects.filter(issuer_id__in=issuer_ids)
+        payment_qs = Payment.objects.filter(issuer_id__in=issuer_ids)
+        expense_qs = Expense.objects.filter(issuer_id__in=issuer_ids, exclude_from_reports=False)
+
+        totals = {
+            'invoice_total': _decimal(invoice_qs.aggregate(total=Sum('total_due'))['total']),
+            'amount_paid': _decimal(invoice_qs.aggregate(total=Sum('amount_paid'))['total']),
+            'amount_due': _decimal(invoice_qs.aggregate(total=Sum('amount_due'))['total']),
+            'amount_overdue': _decimal(invoice_qs.aggregate(total=Sum('amount_overdue'))['total']),
+            'payment_total': _decimal(payment_qs.aggregate(total=Sum('base_currency_amount'))['total']),
+            'expense_total': _decimal(expense_qs.aggregate(total=Sum('amount'))['total']),
+        }
+        monthly_revenue = invoice_qs.annotate(month=TruncMonth('issued_date')).values('month').annotate(
+            total=Sum('total_due'), count=Count('id')
+        ).order_by('month')
+        monthly_expenses = expense_qs.annotate(month=TruncMonth('paid_date')).values('month').annotate(
+            total=Sum('amount'), count=Count('id')
+        ).order_by('month')
+        status_rows = invoice_qs.values('status').annotate(
+            count=Count('id'), amount_due=Sum('amount_due'), amount_overdue=Sum('amount_overdue')
+        ).order_by('status')
+        recent_invoices = invoice_qs.select_related('issuer__company', 'customer__company').order_by('-issued_date', '-id')[:10]
+        recent_payments = payment_qs.select_related('issuer__company', 'customer__company').order_by('-received_at', '-id')[:10]
+        recent_expenses = expense_qs.select_related('issuer__company').order_by('-paid_date', '-id')[:10]
+
+        return Response({
+            'issuer_ids': issuer_ids,
+            'totals': {key: str(value) for key, value in totals.items()},
+            'monthly_revenue': [
+                {'month': _month_iso(row['month']), 'total': str(_decimal(row['total'])), 'count': row['count']}
+                for row in monthly_revenue
+            ],
+            'monthly_expenses': [
+                {'month': _month_iso(row['month']), 'total': str(_decimal(row['total'])), 'count': row['count']}
+                for row in monthly_expenses
+            ],
+            'receivables': [
+                {
+                    'status': row['status'], 'count': row['count'],
+                    'amount_due': str(_decimal(row['amount_due'])),
+                    'amount_overdue': str(_decimal(row['amount_overdue'])),
+                }
+                for row in status_rows
+            ],
+            'recent_activity': {
+                'invoices': [
+                    {'id': invoice.pk, 'issuer_id': invoice.issuer_id, 'customer_name': str(invoice.customer), 'status': invoice.status, 'issued_date': invoice.issued_date, 'total_due': str(_decimal(invoice.total_due))}
+                    for invoice in recent_invoices
+                ],
+                'payments': [
+                    {'id': payment.pk, 'issuer_id': payment.issuer_id, 'customer_name': str(payment.customer), 'received_at': payment.received_at, 'amount': str(_decimal(payment.amount))}
+                    for payment in recent_payments
+                ],
+                'expenses': [
+                    {'id': expense.pk, 'issuer_id': expense.issuer_id, 'paid_date': expense.paid_date, 'amount': str(_decimal(expense.amount)), 'description': expense.description}
+                    for expense in recent_expenses
+                ],
+            },
+        })
