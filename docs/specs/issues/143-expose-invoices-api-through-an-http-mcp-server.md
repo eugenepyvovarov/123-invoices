@@ -113,15 +113,15 @@ The project does not currently have a standalone product catalog or persisted in
   - [x] Add MCP server startup and Streamable HTTP endpoint wiring.
   - [x] Add tests for config validation, auth handling, API client behavior, startup wiring, and redaction.
 
-- [ ] Implement the API-backed invoice MCP tools
-  - [ ] Add tool schemas and registration for invoice search/detail, reference data, reusable line suggestions, draft mutation, finalization, artifacts, and status inspection.
-  - [ ] Implement search/detail/reference tools against current `/api/` list and retrieve endpoints with bounded pagination.
-  - [ ] Implement `list_products` as reusable recent invoice order-line suggestions, adding a read-only API endpoint only if the API does not already expose that data.
-  - [ ] Implement draft create/update tools against invoice API endpoints without direct model access.
-  - [ ] Implement guarded finalization against the API finalization action.
-  - [ ] Implement PDF/artifact handling through API-approved generation/download endpoints.
-  - [ ] Implement status inspection as a derived API summary using current invoice state, timestamps, PDF state, totals, and payment-application activity.
-  - [ ] Add tests for successful tool calls, validation failures, auth failures, finalized-invoice safety, artifact limits, reusable suggestion behavior, and status inspection.
+- [x] Implement the API-backed invoice MCP tools
+  - [x] Add tool schemas and registration for invoice search/detail, reference data, reusable line suggestions, draft mutation, finalization, artifacts, and status inspection.
+  - [x] Implement search/detail/reference tools against current `/api/` list and retrieve endpoints with bounded pagination.
+  - [x] Implement `list_products` as reusable recent invoice order-line suggestions, adding a read-only API endpoint only if the API does not already expose that data.
+  - [x] Implement draft create/update tools against invoice API endpoints without direct model access.
+  - [x] Implement guarded finalization against the API finalization action.
+  - [x] Implement PDF/artifact handling through API-approved generation/download endpoints.
+  - [x] Implement status inspection as a derived API summary using current invoice state, timestamps, PDF state, totals, and payment-application activity.
+  - [x] Add tests for successful tool calls, validation failures, auth failures, finalized-invoice safety, artifact limits, reusable suggestion behavior, and status inspection.
 
 - [ ] Wire runtime and deployment support
   - [ ] Add the `mcp` service to Compose with shared image/env/mount conventions and `RUN_MIGRATIONS=0`.
