@@ -67,10 +67,10 @@ Assumption: “this block” refers to the `.sticky-toolbar` / `.bulk-toolbar` s
   - [x] Confirm toolbar controls wrap cleanly on narrow viewports with the same surrounding gap.
   - [x] Add or update Django/template tests for the shared toolbar spacing hook on Invoices and Expenses.
 
-- [ ] Add issue-specific visual evidence support
-  - [ ] Add a Playwright visual capture spec for the Invoices and Expenses list pages.
-  - [ ] Wire `bulk-toolbar-spacing` into `scripts/visual-validation.sh`.
-  - [ ] Keep capture setup preview-safe and avoid exact seeded row-count assumptions.
+- [x] Add issue-specific visual evidence support
+  - [x] Add a Playwright visual capture spec for the Invoices and Expenses list pages.
+  - [x] Wire `bulk-toolbar-spacing` into `scripts/visual-validation.sh`.
+  - [x] Keep capture setup preview-safe and avoid exact seeded row-count assumptions.
 
 ## Deployment / Rollout
 
