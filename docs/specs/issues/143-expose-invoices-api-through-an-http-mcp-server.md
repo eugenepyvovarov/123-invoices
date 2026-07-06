@@ -1,149 +1,151 @@
 ## Overview
 
-Add a network-accessible HTTP MCP server for the invoices project so approved AI clients can search and inspect invoices, create/update draft invoices, retrieve invoice artifacts, and request guarded finalization through the authenticated DRF API from #142.
+Add a network-accessible HTTP MCP server for the invoices project so approved AI clients can search, inspect, draft, update, finalize, and retrieve invoice artifacts through controlled tools.
 
-Recommended architecture: implement a separate Python ASGI MCP service in the same repository, release image, and Compose stack. The MCP service should use the public/internal DRF API over HTTP and must not import Django models or read invoice/media files directly.
+Current main now includes the #142 authenticated DRF API under `/api/`, account-bound bearer tokens, invoice draft create/update, `finalize`, `generate-pdf`, `download-pdf`, reference data endpoints, payments/payment applications, and API documentation. This issue should build on that API instead of reimplementing API/auth behavior or importing Django models directly.
 
-Default recommendation: use the current MCP Streamable HTTP transport at a service-local `/mcp/` endpoint. If required clients need legacy SSE compatibility, resolve that before expanding the transport surface.
+Recommended architecture: add a separate Python MCP ASGI service in the same repository, image, and Compose stack. Default to MCP Streamable HTTP on service-local `/mcp/`.
 
 ## Problem
 
-AI tools currently need direct database/filesystem knowledge or manual browser/API work to inspect and manage invoice data. That bypasses invoice domain rules, issuer scoping, draft/finalized safety, artifact access controls, and audit-friendly API validation.
+AI tools should not need direct database, Django model, browser session, or filesystem access to work with invoices. Current main solves the base REST API and token-auth layer, but it does not expose an MCP-compatible tool surface, inbound MCP client authentication, MCP-friendly schemas/errors, or deployment wiring for approved AI clients.
 
-The repository also does not currently expose a product catalog model or invoice status-history model, so the MCP tool surface must be tied to the #142 API contract rather than inventing direct model behavior in the MCP layer.
+Current main also intentionally has no standalone `Product` model/catalog and no persisted invoice status-history model, so those parts of the MCP surface need to be scoped against the existing API contract rather than invented inside the MCP layer.
 
 ## Proposed Outcome
 
-- Add an authenticated HTTP MCP service with discoverable tools and stable JSON schemas.
-- Use separate authentication boundaries:
+- Add an authenticated HTTP MCP service with stable tool discovery and JSON schemas.
+- Use two separate auth boundaries:
   - inbound MCP client bearer token(s) for approved AI clients;
-  - a dedicated minimum-permission upstream API bearer token for MCP-to-DRF calls.
-- Provide tools for:
+  - a dedicated minimum-permission invoices API bearer token for MCP-to-DRF calls.
+- Implement API-backed tools for:
   - `search_invoices`
   - `get_invoice`
   - `list_issuers`
+  - `list_bank_accounts`
   - `list_customers`
   - `list_projects`
-  - `list_products` or the approved product-equivalent API contract
+  - the approved product-equivalent listing behavior
   - `create_draft_invoice`
   - `update_draft_invoice`
   - `finalize_invoice`
+  - `generate_invoice_pdf`
   - `get_invoice_artifact`
   - `inspect_invoice_status_history`
-- Normalize upstream API and validation failures into AI-friendly MCP errors with stable `code`, `message`, `field_errors`, and safe next-action guidance.
-- Guard irreversible or high-risk operations with draft-only checks, explicit confirmation inputs, and API-side permission/domain-rule enforcement.
-- Add deployment wiring, runtime probes, and documentation for the MCP endpoint, tokens, environment variables, and Hermes/Codex/generic HTTP MCP client configuration.
+- Map tools to current main API endpoints wherever possible, especially `/api/me/`, `/api/issuers/`, `/api/bank-accounts/`, `/api/customers/`, `/api/projects/`, `/api/invoices/`, `/api/invoices/{id}/finalize/`, `/api/invoices/{id}/generate-pdf/`, `/api/invoices/{id}/download-pdf/`, and `/api/payment-applications/?invoice=...`.
+- Normalize upstream API failures into AI-friendly MCP errors with stable `code`, `message`, optional `field_errors`, and safe next-action guidance.
+- Return invoice artifacts only through API-approved download flows, never by exposing media paths or upstream API credentials.
+- Add Docker/Compose, rollout, verification, runtime smoke, and documentation support for the MCP service.
 
 ## Constraints / Non-Goals
 
-- Depends on #142; implement after the authenticated DRF API and token auth are available.
-- Do not recreate #142’s base API/auth work in this issue unless closing small endpoint gaps approved for the MCP tool surface.
-- Do not ship a stdio-only MCP server.
-- Do not bypass the DRF API by importing Django models in MCP tool handlers.
-- Do not expose broad admin credentials, upstream API tokens, filesystem paths, raw stack traces, or secrets to MCP clients.
-- Do not add a delete-invoice tool in this issue.
-- Do not silently mutate finalized invoices; draft update tools must reject non-draft invoices unless the API exposes a safe explicit action.
-- Do not invent a new `Product` model solely for MCP unless the product/catalog contract is confirmed.
-- Do not read PDF/media files directly from the MCP service; retrieve artifacts only through API-approved artifact endpoints or URLs.
-- Do not add UI changes, demo media, or visual validation for this code/API-only work.
+- The #142 API dependency is satisfied on current main; do not recreate its token model, API routing, or DRF serializers unless an approved gap remains.
+- Do not ship stdio-only MCP.
+- Do not import Django models or read invoice/media files directly from MCP tool handlers.
+- Do not expose broad admin credentials, upstream API tokens, raw stack traces, filesystem paths, or local secrets to MCP clients.
+- Do not add a delete-invoice MCP tool in this issue.
+- Do not silently mutate finalized invoices; use the existing API finalization action and finalized-invoice protections.
+- Do not add a standalone product/catalog model solely for MCP unless the product-listing open question is answered that way.
+- Do not add a persisted invoice status-history/audit model unless the status-history open question is answered that way.
+- Do not add UI changes, Demo Media, or Visual Validation for this code/API/deployment task.
+- Assumption: the service-local MCP path is `/mcp/`, while the operator-facing HTTPS URL is documented through configuration so it can be routed under the existing host or a separate host without code changes.
 
 ## Acceptance Criteria
 
 ### User Outcome
 
-1. An approved AI client can connect to a stable HTTPS MCP endpoint and discover invoice tools with clear schemas.
-2. An AI client can search invoices and retrieve invoice detail through DRF API-backed MCP tools.
-3. An AI client can list issuer/customer/project reference data needed to create draft invoices.
-4. An AI client can create and update draft invoices without bypassing invoice validation, totals, issuer scoping, or project/customer rules.
-5. An AI client can request invoice artifact retrieval without receiving direct filesystem access or privileged API credentials.
-6. Finalization is available only through an explicit guarded tool flow when the invoices API allows it.
+1. An approved AI client can connect to a stable HTTPS MCP endpoint with bearer authentication.
+2. The client can discover invoice MCP tools with clear names, descriptions, and JSON schemas.
+3. The client can search invoices, retrieve invoice details, and list issuer/customer/project/bank-account reference data through API-backed tools.
+4. The client can create and update draft invoices without bypassing invoice validation, totals, issuer scoping, or finalized-invoice safety rules.
+5. The client can explicitly request invoice finalization only through a guarded tool flow.
+6. The client can retrieve invoice PDF artifact metadata and content through MCP without receiving filesystem paths or invoices API credentials.
 
 ### Technical Behavior
 
-1. MCP tool handlers use a shared API client that sends `Authorization: Bearer <dedicated-api-token>` to the #142 API.
-2. MCP client requests require configured inbound authentication before tool execution.
-3. Tool input schemas constrain pagination, filters, invoice IDs, draft payloads, line items, artifact identifiers, and confirmation flags.
-4. Draft create/update tools call API endpoints that enforce invoice domain rules and validation.
-5. `update_draft_invoice` refuses finalized/non-draft invoices by default and returns an actionable safe error.
-6. `finalize_invoice` requires explicit confirmation and calls a dedicated API finalization/status action rather than patching status blindly.
-7. Artifact retrieval returns API-approved artifact metadata, content, or URL handling without local file reads by the MCP server.
-8. Upstream 400/401/403/404/409/5xx responses are mapped to stable MCP errors suitable for AI clients.
-9. Timeouts, connection failures, and configuration errors fail closed with no secret leakage.
-10. MCP logs redact tokens and avoid logging full artifact content.
+1. MCP tool handlers call the current main DRF API through a shared HTTP client using `Authorization: Bearer <dedicated-api-token>`.
+2. MCP requests require configured inbound bearer-token authentication before tool execution.
+3. Tool schemas constrain pagination, search filters, invoice IDs, reference IDs, draft payloads, line items, artifact mode, and finalization confirmation inputs.
+4. Search/list tools enforce bounded pagination compatible with the API’s `page_size` limits.
+5. Draft create/update tools call `/api/invoices/` and preserve API-side domain validation.
+6. `update_draft_invoice` returns a safe actionable error when the API rejects finalized/non-draft mutation.
+7. `finalize_invoice` requires an explicit confirmation input and calls `/api/invoices/{id}/finalize/`.
+8. Artifact retrieval calls API-approved PDF generation/download endpoints and returns MCP-safe metadata/content with a configured maximum artifact size.
+9. Upstream 400/401/403/404/409/5xx, timeouts, connection failures, and invalid configuration map to stable MCP errors without secret leakage.
+10. Logs redact inbound tokens, upstream tokens, authorization headers, and artifact bodies.
 
 ### Operations / Deployment
 
-1. Docker/Compose includes an `mcp` service or equivalent runtime entrypoint using the same release image.
-2. The MCP service can reach the web/API service internally and is exposed externally only through the approved HTTPS route.
-3. Runtime configuration is documented, including upstream API base URL, upstream API token, inbound MCP client token(s), bind host/port, endpoint path, and timeout settings.
-4. Deployment rollout includes the MCP service alongside `web` and `scheduler`.
-5. Deployment verification includes an authenticated MCP health/protocol probe and confirms missing/invalid auth is rejected.
-6. Documentation includes placeholder-only HTTP MCP client configurations for Hermes, Codex, and a generic client.
+1. Docker/Compose includes an `mcp` service using the same release image as `web` and `scheduler`.
+2. The MCP service runs with `RUN_MIGRATIONS=0` and depends on the web/API service for upstream API access.
+3. Deployment scripts pull, recreate, and verify `web`, `scheduler`, and `mcp` as one release.
+4. Runtime configuration is documented with placeholders for upstream API base URL, upstream API token, inbound MCP tokens, bind host/port, endpoint path, public URL, timeout, and artifact size limit.
+5. No API or MCP tokens are created automatically during deploy.
+6. Deployment verification confirms the MCP service is running, rejects missing/invalid auth, and accepts the configured client token for a protocol/tool-list probe.
 
 ### Validation
 
-1. Tests cover tool registration and JSON schema shape.
-2. Tests cover upstream API request construction, bearer-token forwarding, pagination/filter mapping, and response normalization.
-3. Tests cover inbound MCP auth failure, upstream API auth failure, validation failure, not-found, conflict, and upstream outage behavior.
-4. Tests cover draft-only update protection and finalized-invoice safety rules.
-5. Tests cover artifact retrieval behavior without filesystem access.
-6. Docker/runtime smoke validation starts the MCP service and verifies it is reachable with configured auth.
+1. Tests cover MCP tool registration and JSON schema shape.
+2. Tests cover inbound MCP auth success/failure and constant-time token comparison behavior.
+3. Tests cover upstream API request construction, bearer-token forwarding, pagination/filter mapping, and response normalization.
+4. Tests cover invoice search/detail, reference data, draft create/update, finalization confirmation, finalized-invoice rejection, artifact retrieval, and status inspection behavior.
+5. Tests cover upstream validation errors, API auth failures, not found, conflicts, timeouts, and upstream outage behavior.
+6. Runtime smoke or CI coverage starts the MCP service with safe test tokens and verifies authenticated protocol reachability.
 
 ## Implementation Plan
 
-1. Confirm the #142 DRF API endpoints needed for search, detail, reference data, draft create/update, finalization, artifacts, and status/history.
-2. Where #142 lacks an endpoint required by the approved MCP tool surface, add the API endpoint/action and tests first; do not add direct-model MCP fallbacks.
-3. Add an `invoices_mcp` package with configuration loading, inbound auth middleware, API client, tool definitions, schemas, and error normalization.
-4. Implement the MCP HTTP server using the selected Python MCP SDK and ASGI runner.
-5. Wire Docker/Compose, deploy, runtime smoke, and verification scripts so `web`, `scheduler`, and `mcp` roll out together.
-6. Add operator/client documentation and focused unit/integration coverage for the MCP service and API interactions.
+1. Rebase implementation on current main and treat `docs/api.md` plus the current `/api/` routes as the source API contract.
+2. Resolve the open product-listing, status-history, and transport compatibility questions before implementing those specific branches of the tool surface.
+3. Add an `invoices_mcp` package with configuration loading, inbound auth, API client, tool definitions, schemas, error normalization, logging redaction, and ASGI/server startup.
+4. Implement MCP tools by proxying the current DRF API; add API endpoints only when an approved tool cannot be safely implemented through the current API.
+5. Add artifact handling that fetches PDFs through the API and returns MCP-safe metadata/content subject to configured size limits.
+6. Wire the MCP service into dependencies, Docker, Compose, deploy, verify, and runtime smoke scripts.
+7. Document token setup, environment variables, endpoint URL shape, reverse-proxy expectations, and Hermes/Codex/generic HTTP MCP client examples.
 
 ## Task List
 
-- [ ] Close approved DRF API contract gaps
-  - [ ] Map each required MCP tool to an existing #142 API endpoint/action.
-  - [ ] Add missing read/reference/artifact/status endpoints only when required for the approved tool surface.
-  - [ ] Add missing draft mutation or guarded finalization actions only when required for safe MCP behavior.
-  - [ ] Add API tests for auth, scoping, validation, artifact access, and finalized-invoice safety.
+- [ ] Add the MCP HTTP service foundation
+  - [ ] Add MCP runtime dependencies, HTTP client dependency, and ASGI runner support.
+  - [ ] Add `invoices_mcp` configuration loading for upstream API URL/token, inbound client token(s), bind host/port, endpoint path, timeout, public URL, and artifact size limit.
+  - [ ] Add inbound bearer-token authentication with constant-time comparison and safe missing-configuration failures.
+  - [ ] Add a shared API client wrapper with bearer-token forwarding, timeouts, response parsing, binary download support, and error mapping.
+  - [ ] Add MCP server startup and Streamable HTTP endpoint wiring.
+  - [ ] Add tests for config validation, auth handling, API client behavior, startup wiring, and redaction.
 
-- [ ] Add the MCP service foundation
-  - [ ] Add configuration loading for upstream API URL/token, inbound client token(s), bind host/port, endpoint path, and request timeout.
-  - [ ] Add inbound bearer-token authentication using constant-time token comparison.
-  - [ ] Add a typed API client wrapper using `httpx` or equivalent with timeout, auth header, and error mapping.
-  - [ ] Add MCP server startup/ASGI entrypoint using the selected MCP SDK.
-  - [ ] Add tests for config validation, auth handling, startup wiring, and safe configuration errors.
-
-- [ ] Implement invoice MCP tools
-  - [ ] Add search/detail/reference-data tools that proxy the DRF API with bounded pagination and stable schemas.
-  - [ ] Add draft create/update tools that validate payload shape and call API endpoints rather than models.
-  - [ ] Add guarded finalization behavior with explicit confirmation and safe rejection when API/domain rules disallow it.
-  - [ ] Add artifact retrieval and status/history tools using only API-exposed endpoints.
-  - [ ] Add tests for tool schemas, successful API calls, validation failures, auth failures, safety refusals, and artifact handling.
+- [ ] Implement the API-backed invoice MCP tools
+  - [ ] Add tool schemas and registration for invoice search/detail, reference data, draft mutation, finalization, artifacts, and status inspection.
+  - [ ] Implement search/detail/reference tools against current `/api/` list and retrieve endpoints with bounded pagination.
+  - [ ] Implement draft create/update tools against `/api/invoices/` without direct model access.
+  - [ ] Implement guarded finalization against `/api/invoices/{id}/finalize/`.
+  - [ ] Implement PDF generation/download artifact handling through `/generate-pdf/` and `/download-pdf/`.
+  - [ ] Add tests for successful tool calls, validation failures, auth failures, finalized-invoice safety, artifact limits, and status inspection.
 
 - [ ] Wire runtime and deployment support
-  - [ ] Add MCP runtime dependencies to `requirements.txt`.
-  - [ ] Add Docker/Compose command or service wiring for the MCP HTTP server.
-  - [ ] Update deploy and verification scripts to include the MCP service and an authenticated MCP probe.
-  - [ ] Update runtime smoke/CI checks to start the MCP service with safe test tokens and verify protocol reachability.
-  - [ ] Add a repo-owned MCP probe helper if needed to avoid duplicating protocol checks across scripts.
+  - [ ] Add the `mcp` service to Compose with shared image/env/mount conventions and `RUN_MIGRATIONS=0`.
+  - [ ] Update Docker/runtime command support for launching the MCP server.
+  - [ ] Update deploy and verification scripts to include the MCP service and authenticated MCP probe.
+  - [ ] Update CI/runtime smoke coverage to start the MCP service with safe test tokens.
+  - [ ] Add a repo-owned MCP probe helper to avoid duplicating protocol checks.
 
-- [ ] Document operator and client setup
-  - [ ] Document required environment variables and token expectations with placeholders only.
-  - [ ] Document how to create/use the dedicated minimum-permission API token from the #142 API/auth flow.
-  - [ ] Document the stable endpoint URL shape and reverse-proxy/HTTPS expectations.
-  - [ ] Add Hermes, Codex, and generic HTTP MCP client configuration examples.
-  - [ ] Update README/docs index references for the new MCP server documentation.
+- [ ] Document MCP operation and client setup
+  - [ ] Add MCP server documentation covering environment variables, token boundaries, endpoint URL, artifact limits, and operational checks.
+  - [ ] Document creating the dedicated invoices API token through the existing `issue_api_token` command.
+  - [ ] Add placeholder-only Hermes, Codex, and generic HTTP MCP client examples.
+  - [ ] Update README/docs index/deployment docs to reference the MCP service.
+  - [ ] Add placeholder-only MCP keys to `env.example`.
 
 ## Deployment / Rollout
 
-- Roll out only after #142 is deployed and the required API endpoints/token auth are available.
-- No MCP-specific database migration is expected unless missing #142 API/token capabilities require one.
-- Add the MCP service to the existing Compose stack using the same image and `.env` source, with `INVOICES_MCP_API_BASE_URL` pointed at the internal web/API service.
+- Roll out only from current main or later, where the authenticated DRF API and `accounts.ApiToken` migration are present.
+- No MCP-specific database migration is expected unless an approved product/status-history API gap requires one.
+- Add `mcp` to the Compose stack using the same image and `.env` source as `web` and `scheduler`.
+- Configure `INVOICES_MCP_API_BASE_URL` to the internal web/API service, for example `http://web:8000/api/`.
 - Configure the MCP service with `RUN_MIGRATIONS=0`; keep migrations owned by the `web` startup path.
-- Expose the MCP service through the approved HTTPS route and keep direct container ports restricted to the deployment host or internal network where possible.
-- Create a dedicated minimum-permission API token for invoice automation and configure it as a runtime secret; rotate it if exposed.
-- Update rollout scripts so `web`, `scheduler`, and `mcp` are pulled/recreated/verified as one release.
-- Post-deploy verification should confirm the web, scheduler, and MCP services are running and that the MCP endpoint rejects missing/invalid auth while accepting the configured client token.
+- Create a dedicated minimum-permission invoices API token after deploy using the existing management command; store it as a runtime secret.
+- Configure separate inbound MCP client token(s); do not reuse the upstream invoices API token as a client-facing credential.
+- Expose the MCP service only through the approved HTTPS route and keep direct container ports restricted to the host/internal network where possible.
+- Update rollout verification to check `web`, `scheduler`, and `mcp`, plus authenticated and unauthenticated MCP probe behavior.
+- Rotate upstream or inbound tokens if they are exposed in logs, client configs, or issue comments.
 
 ## File-Level Changes
 
@@ -163,27 +165,26 @@ The repository also does not currently expose a product catalog model or invoice
 
 ### Modify
 
-- `requirements.txt` — add MCP SDK, HTTP client, and ASGI runtime dependencies.
-- `Dockerfile` — ensure runtime image includes MCP dependencies and entrypoint support.
-- `docker-compose.yml` — add or wire the MCP service.
-- `scripts/deploy.sh` — include the MCP service in rollout.
-- `scripts/ci.sh`, `scripts/runtime_smoke.sh`, and `scripts/verify_deploy.sh` — include MCP runtime/protocol checks.
-- `README.md`, `docs/development.md`, `docs/deployment.md`, and `docs/README.md` — document setup, validation, deployment, and client configuration.
+- `requirements.txt` — add MCP SDK, HTTP client, and ASGI/runtime dependencies.
+- `Dockerfile` — ensure runtime image supports the MCP server command.
+- `docker-compose.yml` — add the `mcp` service.
+- `scripts/deploy.sh` — include `mcp` in pull/recreate rollout.
+- `scripts/verify_deploy.sh` — verify the `mcp` container and authenticated MCP probe.
+- `scripts/runtime_smoke.sh` and `scripts/ci.sh` — include MCP runtime/protocol smoke coverage.
+- `README.md`, `docs/README.md`, and `docs/deployment.md` — document the MCP server and rollout shape.
 - `env.example` — add placeholder-only MCP environment keys.
-- #142 DRF API modules under `invoices/` and URL routing only if required endpoints/actions are missing and this issue is approved to close those gaps before MCP wiring.
+- `api/` serializers/views/URLs only if an open-question answer approves a product-equivalent or status-history endpoint not supported by the current API.
 
 ### Keep
 
-- Existing Django UI behavior and templates.
-- Existing invoice PDF generation behavior except through API-exposed artifact actions.
-- Existing web and scheduler behavior, aside from rollout/verification adding the MCP service.
-- Managed workflow files unless runtime verification explicitly requires a managed automation change.
-- Local/runtime secrets, tokens, databases, media files, and generated artifacts out of git.
+- Existing Django browser UI, templates, static assets, and active-company session behavior.
+- Existing invoice PDF rendering behavior except through API-approved MCP artifact retrieval.
+- Existing `/api/` token model and endpoint contracts unless an approved gap requires a small additive API endpoint.
+- Existing generated media/runtime files, databases, auth state, and secrets out of git.
+- Managed workflow files unless MCP runtime verification explicitly requires an automation integration change.
 
 ## Open Questions
 
-- Should the live MCP endpoint be exposed on the existing invoices host under `/mcp/`, or on a separate hostname such as `mcp.<domain>`?
+- Should the MCP product-listing capability expose recent reusable invoice order-line suggestions from the existing API, or should product listing be omitted until a real product catalog exists?
+- Should `inspect_invoice_status_history` add a new persisted invoice status-history/audit API, or should it return current status, timestamps, PDF state, totals, and payment application activity from the existing API?
 - Do Hermes, Codex, or any other required MCP clients need legacy SSE compatibility in addition to current Streamable HTTP?
-- Should `list_products` use a product/catalog endpoint from #142, or should it expose existing reusable/recent invoice line items because the current repository has no `Product` model?
-- Should this issue add an invoice status/history API when #142 does not already provide one, or should the MCP history tool only return current status, timestamps, payment applications, and artifact metadata?
-- What should `finalize_invoice` do contractually: call a dedicated draft-to-invoiced finalization API that locks finalized invoice edits, or only request the existing status change when the API allows it?
