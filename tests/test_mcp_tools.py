@@ -57,6 +57,12 @@ class MCPToolSchemaTests(TestCase):
         self.assertEqual(set(TOOL_SCHEMAS), expected)
         self.assertEqual(TOOL_SCHEMAS["search_invoices"]["input_schema"]["properties"]["page_size"]["maximum"], 100)
         self.assertIn("not a canonical product catalog", TOOL_SCHEMAS["list_products"]["description"])
+        draft_schema = TOOL_SCHEMAS["create_draft_invoice"]["input_schema"]["properties"]["invoice"]
+        self.assertEqual(draft_schema["additionalProperties"], False)
+        self.assertEqual(
+            draft_schema["properties"]["lines"]["items"]["additionalProperties"],
+            False,
+        )
 
     def test_register_tools_adds_each_schema_tool(self):
         class FakeMCP:
@@ -110,7 +116,7 @@ class MCPToolCallTests(IsolatedAsyncioTestCase):
         client = FakeAPIClient(responses=[{"id": 1, "status": "draft"}, {"id": 1, "status": "draft"}, {"id": 1, "status": "draft", "total": "10.00"}])
         tools = self.make_tools(client)
 
-        created = await tools.create_draft_invoice({"customer": 2, "lines": []})
+        created = await tools.create_draft_invoice({"customer": 2, "lines": [], "status": "paid"})
         updated = await tools.update_draft_invoice(1, {"lines": [{"description": "Work"}]})
 
         self.assertTrue(created["ok"])

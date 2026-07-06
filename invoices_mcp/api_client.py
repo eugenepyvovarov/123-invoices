@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -7,6 +8,10 @@ import httpx
 
 from .config import MCPConfig
 from .errors import MCPConfigurationError, UpstreamAPIError, map_upstream_status
+from .redaction import redact_mapping
+
+
+logger = logging.getLogger(__name__)
 
 
 class InvoicesAPIClient:
@@ -73,6 +78,7 @@ class InvoicesAPIClient:
                 **kwargs,
             )
         except httpx.TimeoutException as exc:
+            logger.warning("Invoices API timeout: %s", redact_mapping({"method": method, "path": path, "headers": headers}))
             raise UpstreamAPIError(
                 code="upstream_timeout",
                 message="The invoices API did not respond before the MCP timeout.",
@@ -80,6 +86,7 @@ class InvoicesAPIClient:
                 next_action="Retry later or increase INVOICES_MCP_TIMEOUT_SECONDS.",
             ) from exc
         except httpx.RequestError as exc:
+            logger.warning("Invoices API request failed: %s", redact_mapping({"method": method, "path": path, "headers": headers}))
             raise UpstreamAPIError(
                 code="upstream_unavailable",
                 message="The invoices API is unavailable to the MCP service.",
@@ -88,6 +95,10 @@ class InvoicesAPIClient:
             ) from exc
 
         if response.status_code >= 400:
+            logger.warning(
+                "Invoices API returned an error: %s",
+                redact_mapping({"method": method, "path": path, "status_code": response.status_code, "headers": headers}),
+            )
             raise map_upstream_status(response.status_code, _safe_json(response))
         return response
 

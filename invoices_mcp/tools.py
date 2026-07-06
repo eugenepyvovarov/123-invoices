@@ -115,7 +115,7 @@ class InvoiceMCPTools:
         return result
 
     async def create_draft_invoice(self, invoice: Mapping[str, Any]) -> dict[str, Any]:
-        payload = {**dict(invoice), "status": dict(invoice).get("status", "draft")}
+        payload = {**dict(invoice), "status": "draft"}
         return await self._call(lambda client: client.request_json("POST", "invoices/", json=payload))
 
     async def update_draft_invoice(self, invoice_id: int, invoice: Mapping[str, Any]) -> dict[str, Any]:
