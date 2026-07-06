@@ -20,8 +20,13 @@ case "${SCENARIO}" in
     export OPENCODE_DEMO_SCENARIO="${SCENARIO}"
     exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/customer-payment-notes.spec.js --project=chromium
     ;;
+  issuer-sif-settings-readiness)
+    export PLAYWRIGHT_VIDEO="${PLAYWRIGHT_VIDEO:-on}"
+    export OPENCODE_DEMO_SCENARIO="${SCENARIO}"
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/sif-settings.spec.js --project=chromium
+    ;;
   "")
-    echo "Usage: ./scripts/demo-evidence.sh {incoming-invoice-review-conversion|rolling-year-period-default|customer-payment-notes-override}" >&2
+    echo "Usage: ./scripts/demo-evidence.sh {incoming-invoice-review-conversion|rolling-year-period-default|customer-payment-notes-override|issuer-sif-settings-readiness}" >&2
     exit 2
     ;;
   *)

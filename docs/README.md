@@ -17,6 +17,8 @@ for current setup or operations.
 - [Incoming invoice inbox](incoming-invoice-inbox.md): IMAP source setup,
   fixture import, review-first conversion, unpaid limitations, privacy, and
   rollback guidance.
+- [Spanish SIF / VERI*FACTU foundation](sif.md): issuer-scoped Spanish-only
+  applicability, dual SIF modes, and downstream issue boundaries.
 - [Automation](automation.md): OpenCode/Gitea automation contract, managed files,
   preview/evidence behavior, and production artifact publication.
 - [Design contract](../DESIGN.md): UI tokens, layout conventions, component

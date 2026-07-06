@@ -30,8 +30,18 @@ case "${IDENTIFIER}" in
     fi
     exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/customer-payment-notes.spec.js --project=chromium
     ;;
+  issuer-sif-settings)
+    export OPENCODE_VISUAL_VALIDATION_TARGET="${OPENCODE_VISUAL_VALIDATION_TARGET:-current}"
+    export OPENCODE_VISUAL_VALIDATION_IDENTIFIER="${IDENTIFIER}"
+    if [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "baseline" ] \
+      && [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "current" ]; then
+      echo "OPENCODE_VISUAL_VALIDATION_TARGET must be baseline or current." >&2
+      exit 2
+    fi
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/sif-settings.spec.js --project=chromium
+    ;;
   "")
-    echo "Usage: ./scripts/visual-validation.sh {incoming-invoice-inbox|rolling-year-period-default|customer-payment-notes-billing-defaults}" >&2
+    echo "Usage: ./scripts/visual-validation.sh {incoming-invoice-inbox|rolling-year-period-default|customer-payment-notes-billing-defaults|issuer-sif-settings}" >&2
     exit 2
     ;;
   *)
