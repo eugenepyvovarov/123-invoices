@@ -20,8 +20,29 @@ const TOTP_MIN_LIFETIME_MS = 5_000;
 const TOTP_RETRY_BUFFER_MS = 1_000;
 const OTP_REDIRECT_TIMEOUT_MS = 5_000;
 const POST_LOGIN_TIMEOUT_MS = 15_000;
+const NAVIGATION_OPTIONS = { waitUntil: 'domcontentloaded', timeout: 30_000 };
 const RECOVERY_CODE_STATE_PATH = process.env.PLAYWRIGHT_RECOVERY_CODE_STATE_PATH
   || path.join(process.cwd(), 'tmp', 'playwright-recovery-code-index.txt');
+
+async function gotoWithRetry(page, url, options = {}) {
+  const navigationOptions = { ...NAVIGATION_OPTIONS, ...options };
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url, navigationOptions);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) {
+        break;
+      }
+      await page.waitForTimeout(500 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
 
 function msUntilNextTotpStep(now = Date.now()) {
   return TOTP_STEP_MS - (now % TOTP_STEP_MS);
@@ -126,8 +147,6 @@ async function ensureActiveCompany(page, companyName) {
 async function loginToDashboard(page, options = {}) {
   const companyName = options.companyName ?? E2E_DEFAULT_COMPANY;
 
-  await page.goto('/dashboard/');
-
   if (isDashboardPath(page.url())) {
     await expectSignedInAppShell(page);
     await ensureActiveCompany(page, companyName);
@@ -135,7 +154,13 @@ async function loginToDashboard(page, options = {}) {
   }
 
   if (!isLoginPath(page.url()) && !isOtpVerifyPath(page.url())) {
-    await page.goto('/accounts/login/');
+    await gotoWithRetry(page, '/accounts/login/');
+  }
+
+  if (isDashboardPath(page.url())) {
+    await expectSignedInAppShell(page);
+    await ensureActiveCompany(page, companyName);
+    return;
   }
 
   if (isLoginPath(page.url())) {
@@ -195,5 +220,6 @@ async function loginToDashboard(page, options = {}) {
 
 module.exports = {
   ensureActiveCompany,
+  gotoWithRetry,
   loginToDashboard,
 };

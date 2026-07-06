@@ -1,5 +1,5 @@
 {% load table_tags %}
-<form id="bulk-download-form" method="post" action="{% url 'expenses:bulk_download' %}">
+<form id="bulk-download-form" class="bulk-toolbar__form" method="post" action="{% url 'expenses:bulk_download' %}">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ current_list_url|default:request.get_full_path }}" />
 </form>
