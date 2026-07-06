@@ -105,13 +105,13 @@ The project does not currently have a standalone product catalog or persisted in
 
 ## Task List
 
-- [ ] Add the MCP HTTP service foundation
-  - [ ] Add MCP runtime dependencies, HTTP client dependency, and ASGI runner support.
-  - [ ] Add `invoices_mcp` configuration for upstream API URL/token, inbound client token(s), bind host/port, endpoint path, timeout, public URL, and artifact size limit.
-  - [ ] Add inbound bearer-token authentication with constant-time comparison and safe missing-configuration failures.
-  - [ ] Add a shared API client wrapper with bearer-token forwarding, timeouts, response parsing, binary download support, and error mapping.
-  - [ ] Add MCP server startup and Streamable HTTP endpoint wiring.
-  - [ ] Add tests for config validation, auth handling, API client behavior, startup wiring, and redaction.
+- [x] Add the MCP HTTP service foundation
+  - [x] Add MCP runtime dependencies, HTTP client dependency, and ASGI runner support.
+  - [x] Add `invoices_mcp` configuration for upstream API URL/token, inbound client token(s), bind host/port, endpoint path, timeout, public URL, and artifact size limit.
+  - [x] Add inbound bearer-token authentication with constant-time comparison and safe missing-configuration failures.
+  - [x] Add a shared API client wrapper with bearer-token forwarding, timeouts, response parsing, binary download support, and error mapping.
+  - [x] Add MCP server startup and Streamable HTTP endpoint wiring.
+  - [x] Add tests for config validation, auth handling, API client behavior, startup wiring, and redaction.
 
 - [ ] Implement the API-backed invoice MCP tools
   - [ ] Add tool schemas and registration for invoice search/detail, reference data, reusable line suggestions, draft mutation, finalization, artifacts, and status inspection.
