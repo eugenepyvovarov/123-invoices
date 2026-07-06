@@ -10,6 +10,7 @@ from starlette.routing import Mount, Route
 from .auth import BearerAuthASGIMiddleware
 from .config import MCPConfig, load_config
 from .errors import MCPConfigurationError
+from .tools import register_tools
 
 
 SERVICE_NAME = "invoices"
@@ -22,13 +23,14 @@ def create_mcp_server(config: MCPConfig | None = None):
         raise MCPConfigurationError("The MCP SDK is not installed.") from exc
 
     if config is None:
-        return FastMCP(SERVICE_NAME)
-    return FastMCP(
+        return register_tools(FastMCP(SERVICE_NAME), config)
+    server = FastMCP(
         SERVICE_NAME,
         host=config.host,
         port=config.port,
         streamable_http_path=config.endpoint_path,
     )
+    return register_tools(server, config)
 
 
 def create_mcp_asgi_app(config: MCPConfig | None = None, mcp_server=None):
