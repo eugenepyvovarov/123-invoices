@@ -130,12 +130,12 @@ The project does not currently have a standalone product catalog or persisted in
   - [x] Update CI/runtime smoke coverage to start the MCP service with safe test tokens.
   - [x] Add a repo-owned MCP probe helper to avoid duplicating protocol checks.
 
-- [ ] Document MCP operation and client setup
-  - [ ] Add MCP server documentation covering environment variables, token boundaries, endpoint URL, artifact limits, Streamable HTTP transport, and operational checks.
-  - [ ] Document creating the dedicated invoices API token through the existing token management command.
-  - [ ] Add placeholder-only Hermes, Codex, and generic Streamable HTTP MCP client examples.
-  - [ ] Update README/docs index/deployment docs to reference the MCP service.
-  - [ ] Add placeholder-only MCP keys to the committed environment example.
+- [x] Document MCP operation and client setup
+  - [x] Add MCP server documentation covering environment variables, token boundaries, endpoint URL, artifact limits, Streamable HTTP transport, and operational checks.
+  - [x] Document creating the dedicated invoices API token through the existing token management command.
+  - [x] Add placeholder-only Hermes, Codex, and generic Streamable HTTP MCP client examples.
+  - [x] Update README/docs index/deployment docs to reference the MCP service.
+  - [x] Add placeholder-only MCP keys to the committed environment example.
 
 ## Deployment / Rollout
 
