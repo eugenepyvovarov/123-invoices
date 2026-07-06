@@ -1,7 +1,7 @@
 {% extends 'invoices/base.html' %}
 {% load static table_tags %}
 {% block main %}
-<section class="page invoices-page">
+<section class="page invoices-page bulk-toolbar-stack">
   <header class="page-header">
     <div class="page-header__intro">
       <h1>Invoices</h1>
@@ -44,7 +44,7 @@
     </form>
   </section>
 
-  <form id="bulk-actions-form" method="post" action="{% url 'invoices:bulk_action' %}">
+  <form id="bulk-actions-form" class="bulk-toolbar__form" method="post" action="{% url 'invoices:bulk_action' %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}" />
   </form>

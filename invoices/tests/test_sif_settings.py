@@ -194,8 +194,9 @@ class IssuerSifSettingsAdminTests(TestCase):
         user = get_user_model().objects.create_superuser(
             username='admin',
             email='admin@example.com',
-            password='password',
         )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
         company = Company.objects.create(name='Admin Spanish SL', customer_information_file_number='12345678Z')
         issuer = Issuer.objects.create(company=company)
         IssuerSifSettings.objects.create(
