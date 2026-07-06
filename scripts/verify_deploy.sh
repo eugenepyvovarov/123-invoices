@@ -13,7 +13,7 @@ WEB_VERIFY_URL="${WEB_VERIFY_URL:-http://127.0.0.1:8000/}"
 WEB_VERIFY_ATTEMPTS="${WEB_VERIFY_ATTEMPTS:-10}"
 WEB_VERIFY_DELAY_SECONDS="${WEB_VERIFY_DELAY_SECONDS:-3}"
 SCHEDULER_LOG_TAIL_LINES="${SCHEDULER_LOG_TAIL_LINES:-50}"
-EXPECTED_SERVICES=(web scheduler)
+EXPECTED_SERVICES=(web scheduler mcp)
 
 runtime_env_value() {
   local key="$1"
@@ -108,6 +108,48 @@ verify_scheduler_started_cleanly() {
   fi
 }
 
+first_csv_value() {
+  local csv_value="$1"
+  local first_value
+
+  IFS=',' read -r first_value _ <<< "${csv_value}"
+  first_value="${first_value#"${first_value%%[![:space:]]*}"}"
+  first_value="${first_value%"${first_value##*[![:space:]]}"}"
+  printf '%s\n' "${first_value}"
+}
+
+normalize_mcp_path() {
+  local path="$1"
+  path="/${path#/}"
+  if [ "${path%/}" = "${path}" ]; then
+    path="${path}/"
+  fi
+  printf '%s\n' "${path}"
+}
+
+verify_mcp_protocol() {
+  local token_csv
+  local token
+  local mcp_port
+  local mcp_path
+  local mcp_url
+
+  token_csv="${INVOICES_MCP_CLIENT_TOKENS:-$(runtime_env_value INVOICES_MCP_CLIENT_TOKENS)}"
+  token="$(first_csv_value "${token_csv}")"
+  if [ -z "${token}" ]; then
+    echo "INVOICES_MCP_CLIENT_TOKENS is required to verify the MCP service." >&2
+    exit 1
+  fi
+
+  mcp_port="${INVOICES_MCP_PORT:-$(runtime_env_value INVOICES_MCP_PORT)}"
+  mcp_port="${mcp_port:-8765}"
+  mcp_path="${INVOICES_MCP_ENDPOINT_PATH:-$(runtime_env_value INVOICES_MCP_ENDPOINT_PATH)}"
+  mcp_path="$(normalize_mcp_path "${mcp_path:-/mcp/}")"
+  mcp_url="http://127.0.0.1:${mcp_port}${mcp_path}"
+
+  ${DOCKER_BIN} compose exec -T mcp python scripts/mcp_probe.py --url "${mcp_url}" --token "${token}"
+}
+
 for service in "${EXPECTED_SERVICES[@]}"; do
   running_service="$(${DOCKER_BIN} compose ps --services --status running "${service}")"
   if [ "${running_service}" != "${service}" ]; then
@@ -118,6 +160,7 @@ for service in "${EXPECTED_SERVICES[@]}"; do
 done
 
 verify_scheduler_started_cleanly
+verify_mcp_protocol
 
 WEB_VERIFY_HOST="$(resolve_web_verify_host)"
 

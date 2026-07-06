@@ -37,9 +37,11 @@ cd "${REPO_ROOT}"
 runtime_tmpdir="$(mktemp -d)"
 web_container_name="invoices-runtime-web-ci-$$"
 scheduler_container_name="invoices-runtime-scheduler-ci-$$"
+mcp_container_name="invoices-runtime-mcp-ci-$$"
 cleanup() {
   "${DOCKER_BIN}" rm -f "${web_container_name}" >/dev/null 2>&1 || true
   "${DOCKER_BIN}" rm -f "${scheduler_container_name}" >/dev/null 2>&1 || true
+  "${DOCKER_BIN}" rm -f "${mcp_container_name}" >/dev/null 2>&1 || true
   rm -rf "${runtime_tmpdir}"
 }
 trap cleanup EXIT
@@ -75,6 +77,21 @@ mkdir -p "${runtime_tmpdir}/db" "${runtime_tmpdir}/media"
   "${RUNTIME_IMAGE}" \
   python manage.py run_backup_scheduler --poll-interval 60 >/dev/null
 
+"${DOCKER_BIN}" run -d \
+  --name "${mcp_container_name}" \
+  -e DEBUG="0" \
+  -e RUN_MIGRATIONS="0" \
+  -e ALLOWED_HOSTS="${ALLOWED_HOSTS:-127.0.0.1,localhost}" \
+  -e INVOICES_MCP_API_BASE_URL="http://127.0.0.1:8000/api/" \
+  -e INVOICES_MCP_API_TOKEN="ci-upstream-token" \
+  -e INVOICES_MCP_CLIENT_TOKENS="ci-client-token" \
+  -e INVOICES_MCP_HOST="0.0.0.0" \
+  -e INVOICES_MCP_PORT="8765" \
+  -v "${runtime_tmpdir}/db:/app/db" \
+  -v "${runtime_tmpdir}/media:/app/media" \
+  "${RUNTIME_IMAGE}" \
+  python -m invoices_mcp.server >/dev/null
+
 sleep 2
 
 if [ "$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${web_container_name}")" != "true" ]; then
@@ -94,6 +111,27 @@ fi
 if [ "$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${scheduler_container_name}")" != "true" ]; then
   "${DOCKER_BIN}" logs "${scheduler_container_name}" >&2 || true
   echo "runtime smoke scheduler container failed to stay running" >&2
+  exit 1
+fi
+
+if [ "$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${mcp_container_name}")" != "true" ]; then
+  "${DOCKER_BIN}" logs "${mcp_container_name}" >&2 || true
+  echo "runtime smoke MCP container failed to stay running" >&2
+  exit 1
+fi
+
+mcp_probe_passed=0
+for _ in 1 2 3 4 5; do
+  if "${DOCKER_BIN}" exec "${mcp_container_name}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "ci-client-token"; then
+    mcp_probe_passed=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "${mcp_probe_passed}" != "1" ]; then
+  "${DOCKER_BIN}" logs "${mcp_container_name}" >&2 || true
+  echo "runtime smoke MCP probe failed" >&2
   exit 1
 fi
 

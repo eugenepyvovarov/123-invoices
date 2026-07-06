@@ -32,3 +32,17 @@ services:
     command: python manage.py run_backup_scheduler
     depends_on:
       - web
+
+  mcp:
+    <<: *app-service
+    environment:
+      - DEBUG=0
+      - RUN_MIGRATIONS=0
+      - INVOICES_MCP_HOST=0.0.0.0
+      - INVOICES_MCP_PORT=${INVOICES_MCP_PORT:-8765}
+      - INVOICES_MCP_API_BASE_URL=${INVOICES_MCP_API_BASE_URL:-http://web:8000/api/}
+    command: python -m invoices_mcp.server
+    expose:
+      - "${INVOICES_MCP_PORT:-8765}"
+    depends_on:
+      - web

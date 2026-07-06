@@ -46,12 +46,15 @@ async def redirect_to_mcp(request):
 
 def create_app(config: MCPConfig | None = None, mcp_server=None) -> Starlette:
     config = config or load_config()
-    mcp_app = BearerAuthASGIMiddleware(create_mcp_asgi_app(config, mcp_server), config.client_tokens)
+    raw_mcp_app = create_mcp_asgi_app(config, mcp_server)
+    mcp_app = BearerAuthASGIMiddleware(raw_mcp_app, config.client_tokens)
+    lifespan = getattr(getattr(raw_mcp_app, "router", None), "lifespan_context", None)
     return Starlette(
         routes=[
             Route("/", redirect_to_mcp, methods=["GET"]),
             Mount("/", app=mcp_app, name="mcp"),
-        ]
+        ],
+        lifespan=lifespan,
     )
 
 

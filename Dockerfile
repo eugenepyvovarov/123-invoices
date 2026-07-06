@@ -71,7 +71,7 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder --chown=app:app /app /app
 
-EXPOSE 8000
+EXPOSE 8000 8765
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000"]
