@@ -116,7 +116,7 @@ if [ -n "${OPENCODE_EVIDENCE_MODE:-}" ]; then
   TEST_RUNNER_PREFIX="${OPENCODE_EVIDENCE_BUILD_ROOT:-${TMPDIR:-/tmp}/opencode-evidence-build}/test-runner"
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "${TEST_RUNNER_PREFIX}" --no-save "${TEST_RUNNER_PACKAGE}"
   export NODE_PATH="$(npm root --prefix "${TEST_RUNNER_PREFIX}")${NODE_PATH:+:${NODE_PATH}}"
-  exec playwright test "$@"
+  exec npm exec --prefix "${TEST_RUNNER_PREFIX}" -- playwright test "$@"
 fi
 
 exec npm exec -- playwright test "$@"
