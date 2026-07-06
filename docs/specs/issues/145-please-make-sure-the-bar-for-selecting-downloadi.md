@@ -105,6 +105,11 @@ bulk-toolbar-spacing
 - The `expenses-bulk-toolbar-spacing` baseline/current pair should show the toolbar no longer flush against adjacent content.
 - The current screenshots for both pages should show matching vertical rhythm around the same toolbar pattern.
 
+### Baseline SHA
+
+`b256c455ef5c33c7b8f2449a9babc15b678fe3f9`
+
+
 ## File-Level Changes
 
 - Modify `invoices/static/invoices/css/design/components.css` to centralize the toolbar spacing and resolve conflicting toolbar rules if necessary.
