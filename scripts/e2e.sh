@@ -140,8 +140,20 @@ if [ "${PLAYWRIGHT_PREP_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
+PLAYWRIGHT_BIN=""
 if [ "${PLAYWRIGHT_SKIP_NPM_CI:-0}" != "1" ]; then
-  npm ci
+  if [ -n "${OPENCODE_EVIDENCE_MODE:-}" ] && [ -n "${OPENCODE_EVIDENCE_BUILD_ROOT:-}" ]; then
+    PLAYWRIGHT_NODE_DEPS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/opencode-playwright-node-deps.XXXXXX")"
+    cp package.json package-lock.json "${PLAYWRIGHT_NODE_DEPS_DIR}/"
+    (
+      cd "${PLAYWRIGHT_NODE_DEPS_DIR}"
+      npm ci
+    )
+    export NODE_PATH="${PLAYWRIGHT_NODE_DEPS_DIR}/node_modules${NODE_PATH:+:${NODE_PATH}}"
+    PLAYWRIGHT_BIN="${PLAYWRIGHT_NODE_DEPS_DIR}/node_modules/.bin/playwright"
+  else
+    npm ci
+  fi
 fi
 
 if [ "${PREVIEW_MODE}" != "1" ] \
@@ -156,6 +168,10 @@ fi
 
 if [ "${PLAYWRIGHT_SKIP_SEED:-0}" != "1" ] && "${PYTHON_BIN}" manage.py help | "${PYTHON_BIN}" -c 'import sys; sys.exit(0 if "seed_e2e_smoke" in sys.stdin.read() else 1)'; then
   "${PYTHON_BIN}" manage.py seed_e2e_smoke
+fi
+
+if [ -n "${PLAYWRIGHT_BIN}" ]; then
+  exec "${PLAYWRIGHT_BIN}" test "$@"
 fi
 
 exec npm exec -- playwright test "$@"
