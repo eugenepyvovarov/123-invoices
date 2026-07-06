@@ -10,53 +10,6 @@ if [ -n "${OPENCODE_PREVIEW_PUBLIC_URL:-}" ]; then
   PREVIEW_MODE=1
 fi
 
-if [ "${PREVIEW_MODE}" = "1" ] \
-  && [ -n "${OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE:-}" ] \
-  && [ "${OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_ACTIVE:-0}" != "1" ] \
-  && [ -z "${OPENCODE_EVIDENCE_MODE:-}" ]; then
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker is required to run preview Playwright evidence with OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE." >&2
-    exit 1
-  fi
-
-  ENV_FILE="$(mktemp)"
-  cleanup_evidence_runner_env() {
-    rm -f "${ENV_FILE}"
-  }
-  trap cleanup_evidence_runner_env EXIT
-
-  python3 - "${ENV_FILE}" <<'PY'
-import os
-import sys
-
-env_file = sys.argv[1]
-allowed_exact = {
-    "ALLOWED_HOSTS",
-    "DB_PATH",
-    "DEBUG",
-    "GIT_SSL_NO_VERIFY",
-    "NODE_TLS_REJECT_UNAUTHORIZED",
-}
-allowed_prefixes = ("OPENCODE_", "PLAYWRIGHT_")
-
-with open(env_file, "w", encoding="utf-8") as handle:
-    for key, value in sorted(os.environ.items()):
-        if key in allowed_exact or key.startswith(allowed_prefixes):
-            if "\n" in value or "\r" in value:
-                continue
-            handle.write(f"{key}={value}\n")
-PY
-
-  docker run --rm \
-    --env-file "${ENV_FILE}" \
-    -e OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_ACTIVE=1 \
-    -v "${REPO_ROOT}:/work" \
-    -w /work \
-    "${OPENCODE_PLAYWRIGHT_EVIDENCE_RUNNER_IMAGE}" \
-    /bin/bash ./scripts/e2e.sh "$@"
-  exit $?
-fi
-
 if [ "${PREVIEW_MODE}" != "1" ] && [ -f "${REPO_ROOT}/.venv/bin/activate" ]; then
   # shellcheck disable=SC1091
   source "${REPO_ROOT}/.venv/bin/activate"
@@ -140,7 +93,7 @@ if [ "${PLAYWRIGHT_PREP_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
-if [ "${PLAYWRIGHT_SKIP_NPM_CI:-0}" != "1" ]; then
+if [ "${PLAYWRIGHT_SKIP_NPM_CI:-0}" != "1" ] && [ -z "${OPENCODE_EVIDENCE_MODE:-}" ]; then
   npm ci
 fi
 
@@ -156,6 +109,10 @@ fi
 
 if [ "${PLAYWRIGHT_SKIP_SEED:-0}" != "1" ] && "${PYTHON_BIN}" manage.py help | "${PYTHON_BIN}" -c 'import sys; sys.exit(0 if "seed_e2e_smoke" in sys.stdin.read() else 1)'; then
   "${PYTHON_BIN}" manage.py seed_e2e_smoke
+fi
+
+if [ -n "${OPENCODE_EVIDENCE_MODE:-}" ]; then
+  exec playwright test "$@"
 fi
 
 exec npm exec -- playwright test "$@"
