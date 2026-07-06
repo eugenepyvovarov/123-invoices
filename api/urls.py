@@ -1,19 +1,44 @@
-from django.urls import path
+from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rest_framework.permissions import AllowAny
+from rest_framework.routers import DefaultRouter
 
-from . import views
+from api.views import (
+    BankAccountViewSet,
+    CustomerViewSet,
+    DashboardReportView,
+    ExpenseViewSet,
+    InvoiceLineSuggestionListView,
+    InvoiceViewSet,
+    IssuerViewSet,
+    MeView,
+    PaymentApplicationViewSet,
+    PaymentViewSet,
+    ProjectViewSet,
+)
 
 
 app_name = 'api'
 
+router = DefaultRouter()
+router.register('issuers', IssuerViewSet, basename='issuer')
+router.register('bank-accounts', BankAccountViewSet, basename='bankaccount')
+router.register('customers', CustomerViewSet, basename='customer')
+router.register('projects', ProjectViewSet, basename='project')
+router.register('invoices', InvoiceViewSet, basename='invoice')
+router.register('payments', PaymentViewSet, basename='payment')
+router.register('payment-applications', PaymentApplicationViewSet, basename='paymentapplication')
+router.register('expenses', ExpenseViewSet, basename='expense')
+
 urlpatterns = [
-    path('invoices/', views.InvoiceCollectionView.as_view(), name='invoice-list'),
-    path('invoices/<int:invoice_id>/', views.InvoiceDetailView.as_view(), name='invoice-detail'),
-    path('invoices/<int:invoice_id>/finalize/', views.InvoiceFinalizeView.as_view(), name='invoice-finalize'),
-    path('invoices/<int:invoice_id>/generate-pdf/', views.InvoiceGeneratePDFView.as_view(), name='invoice-generate-pdf'),
-    path('invoices/<int:invoice_id>/pdf/', views.InvoicePDFView.as_view(), name='invoice-pdf'),
-    path('issuers/', views.IssuerListView.as_view(), name='issuer-list'),
-    path('customers/', views.CustomerListView.as_view(), name='customer-list'),
-    path('projects/', views.ProjectListView.as_view(), name='project-list'),
-    path('bank-accounts/', views.BankAccountListView.as_view(), name='bank-account-list'),
-    path('invoice-line-suggestions/', views.InvoiceLineSuggestionListView.as_view(), name='invoice-line-suggestions'),
+    path('', include(router.urls)),
+    path('invoice-line-suggestions/', InvoiceLineSuggestionListView.as_view(), name='invoice-line-suggestions'),
+    path('me/', MeView.as_view(), name='me'),
+    path('reports/dashboard/', DashboardReportView.as_view(), name='report-dashboard'),
+    path('schema/', SpectacularAPIView.as_view(permission_classes=[AllowAny]), name='schema'),
+    path(
+        'docs/',
+        SpectacularSwaggerView.as_view(url_name='api:schema', permission_classes=[AllowAny]),
+        name='docs',
+    ),
 ]

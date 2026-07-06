@@ -17,6 +17,34 @@ class ExpenseListViewTests(ExpenseViewsTestCase):
         self.assertContains(response, reverse('expenses:reporting_visibility', args=[self.expense.pk]))
         self.assertContains(response, f'aria-label="Do not count expense #{self.expense.pk} in reports"')
 
+    def test_expense_index_renders_shared_bulk_toolbar_spacing_without_changing_actions(self):
+        response = self.client.get(reverse('expenses:list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<div id="expense-list-results" class="bulk-toolbar-stack" data-expense-list-results>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'<form id="bulk-download-form" class="bulk-toolbar__form" method="post" '
+            f'action="{reverse("expenses:bulk_download")}">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<button type="submit" class="btn btn-sm btn-outline-primary" '
+            'form="bulk-download-form" name="action" value="download">',
+            html=False,
+        )
+        self.assertContains(response, 'Download all Expenses')
+        self.assertContains(
+            response,
+            'class="field-control--checkbox expense-select" name="selected"',
+            html=False,
+        )
+
     def test_expense_index_marks_excluded_expense_toggle_checked(self):
         excluded = Expense.objects.create(
             issuer=self.issuer,

@@ -8,6 +8,8 @@ for current setup or operations.
 
 - [Development](development.md): repository layout, local environment, common
   commands, validation, and generated-file rules.
+- [API](api.md): authenticated REST API token setup, endpoint examples,
+  filters, reports, PDFs, errors, and expense uploads.
 - [Deployment](deployment.md): Docker image build, Compose runtime, live
   rollout, and verification checks.
 - [MCP server](mcp-server.md): Streamable HTTP endpoint, token setup,

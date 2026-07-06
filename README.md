@@ -161,6 +161,8 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
 
 - [Documentation index](docs/README.md) explains what each project document is
   for.
+- [API](docs/api.md) covers token setup, authentication headers, endpoint
+  examples, filters, errors, reports, PDFs, and expense uploads.
 - [Development](docs/development.md) covers repo structure, local setup,
   environment values, generated files, and tests.
 - [Deployment](docs/deployment.md) covers Docker/Compose rollout and

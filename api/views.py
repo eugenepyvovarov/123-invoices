@@ -1,464 +1,693 @@
-from __future__ import annotations
+from decimal import Decimal
 
-from decimal import Decimal, InvalidOperation
-from typing import Any
-
-from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncMonth
 from django.http import FileResponse
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import status
+from django_filters import rest_framework as filters
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiTypes,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import serializers as drf_serializers
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from invoices.models import (
-    Customer,
-    Invoice,
-    Issuer,
-    IssuerBankAccount,
-    OrderLine,
-    PaymentApplication,
-    Project,
+from api.pagination import DefaultPagination
+from api.scoping import accessible_issuer_ids_for_user, accessible_issuers_for_user
+from api.serializers import (
+    AccountSerializer,
+    BankAccountSerializer,
+    CustomerSerializer,
+    ExpenseSerializer,
+    InvoiceSerializer,
+    IssuerSerializer,
+    PaymentApplicationSerializer,
+    PaymentSerializer,
+    ProjectSerializer,
 )
-from invoices.views import save_invoice_pdf
-
-
-MAX_PAGE_SIZE = 100
-DRAFT_MUTATION_FIELDS = {
-    'issuer',
-    'customer',
-    'project',
-    'bank_account',
-    'issued_date',
-    'due_date',
-    'payment_term',
-    'reference_number',
-    'notes',
-    'comment',
-    'tax_value',
-    'discount_value',
-    'secondary_tax_rate',
-    'secondary_tax_name',
-    'uses_secondary_tax',
-    'lines',
-}
-FINAL_STATES = {Invoice.STATUS_INVOICED, Invoice.STATUS_OVERDUE, Invoice.STATUS_PAID}
-
-
-def _issuer_queryset_for_user(user):
-    issuers = Issuer.objects.select_related('company').order_by('company__name', 'id')
-    if not user.is_superuser:
-        issuers = issuers.filter(users=user)
-    return issuers
-
-
-def _issuer_ids_for_user(user) -> list[int]:
-    return list(_issuer_queryset_for_user(user).values_list('id', flat=True))
-
-
-def _base_invoice_queryset(user):
-    return (
-        Invoice.objects.filter(issuer_id__in=_issuer_ids_for_user(user))
-        .select_related('issuer__company', 'customer__company', 'project', 'bank_account', 'payment_term')
-        .prefetch_related('orderline_set', 'payment_applications__payment')
-    )
-
-
-def _paginate(request, queryset):
-    page = _positive_int(request.query_params.get('page'), default=1, field='page')
-    page_size = _positive_int(request.query_params.get('page_size'), default=25, field='page_size')
-    page_size = min(page_size, MAX_PAGE_SIZE)
-    offset = (page - 1) * page_size
-    count = queryset.count()
-    return {
-        'count': count,
-        'page': page,
-        'page_size': page_size,
-        'results': list(queryset[offset:offset + page_size]),
-    }
-
-
-def _positive_int(value, *, default: int, field: str) -> int:
-    if value in (None, ''):
-        return default
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f'{field} must be an integer.')
-    if parsed < 1:
-        raise ValueError(f'{field} must be at least 1.')
-    return parsed
-
-
-def _decimal(value, *, field: str) -> Decimal:
-    if value in (None, ''):
-        return Decimal('0')
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError) as exc:
-        raise ValueError(f'{field} must be a decimal value.') from exc
-
-
-def _money(value) -> str:
-    return str((value or Decimal('0')).quantize(Decimal('0.01')))
-
-
-def _list_response(request, queryset, serializer):
-    try:
-        page = _paginate(request, queryset)
-    except ValueError as exc:
-        return Response({'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-    page['results'] = [serializer(item) for item in page['results']]
-    return Response(page)
-
-
-def _company_payload(company):
-    if company is None:
-        return None
-    return {
-        'id': company.id,
-        'name': company.name,
-        'tax_id': company.customer_information_file_number,
-        'contact_email': company.contact_email,
-    }
-
-
-def _issuer_payload(issuer: Issuer):
-    return {
-        'id': issuer.id,
-        'company': _company_payload(issuer.company),
-        'invoice_format': issuer.invoice_format,
-        'next_invoice_number': issuer.next_invoice_number,
-    }
-
-
-def _customer_payload(customer: Customer):
-    return {
-        'id': customer.id,
-        'issuer_id': customer.issuer_id,
-        'company': _company_payload(customer.company),
-        'is_active': customer.is_active,
-        'billing_email': customer.billing_email,
-        'billing_contact_name': customer.billing_contact_name,
-        'payment_notes': customer.payment_notes,
-    }
-
-
-def _project_payload(project: Project):
-    return {
-        'id': project.id,
-        'issuer_id': project.issuer_id,
-        'customer_id': project.customer_id,
-        'title': project.title,
-        'project_code': project.project_code,
-        'status': project.status,
-        'billing_reference': project.billing_reference,
-    }
-
-
-def _bank_account_payload(account: IssuerBankAccount):
-    return {
-        'id': account.id,
-        'issuer_id': account.issuer_id,
-        'label': account.label,
-        'payment_method': account.payment_method,
-        'account_details': account.account_details,
-        'is_default': account.is_default,
-        'is_active': account.is_active,
-    }
-
-
-def _line_payload(line: OrderLine):
-    return {
-        'id': line.id,
-        'line_type': line.line_type,
-        'description': line.description,
-        'quantity': str(line.quantity),
-        'unit_price': _money(line.unit_price),
-        'line_total': _money(line.line_total),
-        'manual_total': line.manual_total,
-        'notes': line.notes,
-    }
-
-
-def _payment_payload(application: PaymentApplication):
-    return {
-        'payment_id': application.payment_id,
-        'amount': str(application.amount_applied),
-        'applied_at': application.applied_at.isoformat() if application.applied_at else None,
-    }
-
-
-def _pdf_payload(invoice: Invoice):
-    document = invoice.pdf_document
-    has_file = bool(document and getattr(document, 'name', ''))
-    return {
-        'available': has_file,
-        'filename': document.name.rsplit('/', 1)[-1] if has_file else None,
-        'name': document.name if has_file else None,
-        'url': document.url if has_file else None,
-        'content_type': 'application/pdf' if has_file else None,
-        'size': document.size if has_file else None,
-    }
-
-
-def _invoice_payload(invoice: Invoice, *, include_lines: bool = True):
-    payload = {
-        'id': invoice.id,
-        'issuer_id': invoice.issuer_id,
-        'customer_id': invoice.customer_id,
-        'project_id': invoice.project_id,
-        'bank_account_id': invoice.bank_account_id,
-        'reference_number': invoice.reference_number,
-        'sequence_number': invoice.sequence_number,
-        'status': invoice.status,
-        'is_finalized': invoice.status in FINAL_STATES,
-        'created_at': invoice.created_at.isoformat() if invoice.created_at else None,
-        'updated_at': invoice.updated_at.isoformat() if invoice.updated_at else None,
-        'issued_date': invoice.issued_date.isoformat() if invoice.issued_date else None,
-        'due_date': invoice.due_date.isoformat() if invoice.due_date else None,
-        'sent_date': invoice.sent_date.isoformat() if invoice.sent_date else None,
-        'notes': invoice.notes,
-        'comment': invoice.comment,
-        'totals': {
-            'subtotal': _money(invoice.sub_total),
-            'tax': _money(invoice.tax_amount),
-            'discount': _money(invoice.discount_amount),
-            'total': _money(invoice.total_due),
-            'balance_due': _money(invoice.amount_due),
-            'amount_paid': _money(invoice.amount_paid),
-            'amount_overdue': _money(invoice.amount_overdue),
-        },
-        'pdf': _pdf_payload(invoice),
-        'payment_applications': [_payment_payload(application) for application in invoice.payment_applications.all()],
-    }
-    if include_lines:
-        payload['lines'] = [_line_payload(line) for line in invoice.orderline_set.all()]
-    return payload
-
-
-def _visible_issuer_or_400(user, issuer_id):
-    issuer = _issuer_queryset_for_user(user).filter(pk=issuer_id).first()
-    if issuer is None:
-        raise ValueError('issuer does not exist or is not available.')
-    return issuer
-
-
-def _invoice_mutation_payload(data: dict[str, Any], *, partial: bool):
-    unknown = set(data) - DRAFT_MUTATION_FIELDS - {'status'}
-    if unknown:
-        raise ValueError(f'Unsupported invoice fields: {", ".join(sorted(unknown))}.')
-    if data.get('status') not in (None, '', Invoice.STATUS_DRAFT):
-        raise ValueError('Draft invoice endpoints only accept status=draft.')
-    if not partial and 'issuer' not in data:
-        raise ValueError('issuer is required.')
-    return data
-
-
-def _set_fk(instance: Invoice, field: str, model, queryset, raw_id):
-    if raw_id in (None, ''):
-        setattr(instance, field, None)
-        return
-    try:
-        obj = queryset.get(pk=int(raw_id))
-    except (model.DoesNotExist, ValueError, TypeError):
-        raise ValueError(f'{field} does not exist or is not available.')
-    setattr(instance, field, obj)
-
-
-def _apply_invoice_payload(invoice: Invoice, data: dict[str, Any], *, user, partial: bool):
-    data = _invoice_mutation_payload(data, partial=partial)
-    issuer = invoice.issuer if invoice.pk else None
-    if 'issuer' in data:
-        issuer = _visible_issuer_or_400(user, data['issuer'])
-        invoice.issuer = issuer
-    if issuer is None:
-        raise ValueError('issuer is required.')
-
-    customers = Customer.objects.filter(issuer=issuer)
-    projects = Project.objects.filter(customer__issuer=issuer)
-    bank_accounts = IssuerBankAccount.objects.filter(issuer=issuer)
-
-    if 'customer' in data:
-        _set_fk(invoice, 'customer', Customer, customers, data.get('customer'))
-    if 'project' in data:
-        _set_fk(invoice, 'project', Project, projects, data.get('project'))
-        if invoice.project_id:
-            invoice.customer = invoice.project.customer
-    if 'bank_account' in data:
-        _set_fk(invoice, 'bank_account', IssuerBankAccount, bank_accounts, data.get('bank_account'))
-
-    for attr in ('issued_date', 'due_date', 'reference_number', 'notes', 'comment', 'secondary_tax_name'):
-        if attr in data:
-            setattr(invoice, attr, data[attr] or None if attr in {'issued_date', 'due_date'} else data[attr])
-    for attr in ('tax_value', 'discount_value', 'secondary_tax_rate'):
-        if attr in data:
-            setattr(invoice, attr, _decimal(data[attr], field=attr))
-    if 'uses_secondary_tax' in data:
-        invoice.uses_secondary_tax = bool(data['uses_secondary_tax'])
-    invoice.status = Invoice.STATUS_DRAFT
-    invoice.full_clean(exclude=['pdf_document'])
-
-
-def _replace_lines(invoice: Invoice, raw_lines):
-    if raw_lines is None:
-        return
-    if not isinstance(raw_lines, list):
-        raise ValueError('lines must be a list.')
-    invoice.orderline_set.all().delete()
-    lines = []
-    for index, raw in enumerate(raw_lines, start=1):
-        if not isinstance(raw, dict):
-            raise ValueError(f'line {index} must be an object.')
-        unknown = set(raw) - {'line_type', 'description', 'quantity', 'unit_price', 'line_total', 'manual_total', 'notes'}
-        if unknown:
-            raise ValueError(f'Unsupported line fields on line {index}: {", ".join(sorted(unknown))}.')
-        line = OrderLine(
-            invoice=invoice,
-            line_type=raw.get('line_type') or OrderLine.LINE_TYPE_QUANTITY,
-            description=raw.get('description', ''),
-            quantity=_decimal(raw.get('quantity', '1'), field=f'lines[{index}].quantity'),
-            unit_price=_decimal(raw.get('unit_price', '0'), field=f'lines[{index}].unit_price'),
-            manual_total=bool(raw.get('manual_total', False)),
-            line_total=_decimal(raw.get('line_total', '0'), field=f'lines[{index}].line_total'),
-            notes=raw.get('notes', ''),
-        )
-        if not line.manual_total:
-            line.line_total = line.quantity * line.unit_price
-        lines.append(line)
-    OrderLine.objects.bulk_create(lines)
-    saved_lines = list(invoice.orderline_set.all())
-    invoice.calculate_totals(saved_lines)
-    invoice.save(update_fields=['sub_total', 'discount_amount', 'tax_base', 'tax_amount', 'total_due', 'base_currency_total', 'updated_at'])
-
-
-class InvoiceCollectionView(APIView):
-    def get(self, request):
-        invoices = _base_invoice_queryset(request.user).order_by('-issued_date', '-number', '-id')
-        search = request.query_params.get('search')
-        if search:
-            invoices = invoices.filter(
-                Q(reference_number__icontains=search)
-                | Q(customer__company__name__icontains=search)
-                | Q(project__title__icontains=search)
-                | Q(project__project_code__icontains=search)
-            )
-        for key, field in (('status', 'status'), ('customer', 'customer_id'), ('issuer', 'issuer_id'), ('project', 'project_id')):
-            value = request.query_params.get(key)
-            if value:
-                invoices = invoices.filter(**{field: value})
-        return _list_response(request, invoices, lambda invoice: _invoice_payload(invoice, include_lines=False))
-
-    @transaction.atomic
-    def post(self, request):
-        invoice = Invoice()
-        try:
-            _apply_invoice_payload(invoice, dict(request.data), user=request.user, partial=False)
-            invoice.save()
-            _replace_lines(invoice, request.data.get('lines'))
-        except ValueError as exc:
-            return Response({'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_invoice_payload(invoice), status=status.HTTP_201_CREATED)
-
-
-class InvoiceDetailView(APIView):
-    def get(self, request, invoice_id):
-        invoice = get_object_or_404(_base_invoice_queryset(request.user), pk=invoice_id)
-        return Response(_invoice_payload(invoice))
-
-    @transaction.atomic
-    def patch(self, request, invoice_id):
-        invoice = get_object_or_404(_base_invoice_queryset(request.user), pk=invoice_id)
-        if invoice.status != Invoice.STATUS_DRAFT:
-            return Response({'message': 'Only draft invoices can be updated.'}, status=status.HTTP_409_CONFLICT)
-        try:
-            _apply_invoice_payload(invoice, dict(request.data), user=request.user, partial=True)
-            invoice.save()
-            if 'lines' in request.data:
-                _replace_lines(invoice, request.data.get('lines'))
-        except ValueError as exc:
-            return Response({'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_invoice_payload(invoice))
-
-
-class InvoiceFinalizeView(APIView):
-    def post(self, request, invoice_id):
-        invoice = get_object_or_404(_base_invoice_queryset(request.user), pk=invoice_id)
-        if request.data.get('confirm') is not True:
-            return Response({'message': 'confirm=true is required.'}, status=status.HTTP_400_BAD_REQUEST)
-        if invoice.status != Invoice.STATUS_DRAFT:
-            return Response({'message': 'Only draft invoices can be finalized.'}, status=status.HTTP_409_CONFLICT)
-        invoice.status = Invoice.STATUS_INVOICED
-        invoice.sent_date = invoice.sent_date or timezone.now().date()
-        invoice.save(update_fields=['status', 'sent_date', 'updated_at'])
-        return Response(_invoice_payload(invoice))
-
-
-class InvoiceGeneratePDFView(APIView):
-    def post(self, request, invoice_id):
-        invoice = get_object_or_404(_base_invoice_queryset(request.user), pk=invoice_id)
-        save_invoice_pdf(request, invoice.id)
-        invoice.refresh_from_db()
-        return Response({'pdf': _pdf_payload(invoice)})
-
-
-class InvoicePDFView(APIView):
-    def get(self, request, invoice_id):
-        invoice = get_object_or_404(_base_invoice_queryset(request.user), pk=invoice_id)
-        if request.query_params.get('mode') == 'metadata':
-            return Response({'invoice_id': invoice.id, 'pdf': _pdf_payload(invoice)})
-        if not invoice.pdf_document or not invoice.pdf_document.name:
-            return Response({'message': 'Invoice PDF is not available.'}, status=status.HTTP_404_NOT_FOUND)
-        return FileResponse(invoice.pdf_document.open('rb'), content_type='application/pdf')
-
-
-class IssuerListView(APIView):
-    def get(self, request):
-        return _list_response(request, _issuer_queryset_for_user(request.user), _issuer_payload)
-
-
-class CustomerListView(APIView):
-    def get(self, request):
-        customers = Customer.objects.filter(issuer_id__in=_issuer_ids_for_user(request.user)).select_related('issuer', 'company').order_by('company__name', 'id')
-        search = request.query_params.get('search')
-        if search:
-            customers = customers.filter(Q(company__name__icontains=search) | Q(billing_email__icontains=search))
-        return _list_response(request, customers, _customer_payload)
-
-
-class ProjectListView(APIView):
-    def get(self, request):
-        projects = Project.objects.filter(issuer_id__in=_issuer_ids_for_user(request.user)).select_related('customer__company').order_by('title', 'id')
-        customer_id = request.query_params.get('customer')
-        search = request.query_params.get('search')
-        if customer_id:
-            projects = projects.filter(customer_id=customer_id)
-        if search:
-            projects = projects.filter(Q(title__icontains=search) | Q(project_code__icontains=search))
-        return _list_response(request, projects, _project_payload)
-
-
-class BankAccountListView(APIView):
-    def get(self, request):
-        accounts = IssuerBankAccount.objects.filter(issuer_id__in=_issuer_ids_for_user(request.user)).order_by('issuer_id', 'sort_order', 'label', 'id')
-        issuer_id = request.query_params.get('issuer')
+from invoices.models import Customer, Expense, Invoice, IssuerBankAccount, OrderLine, Payment, PaymentApplication, Project
+from invoices.services.cached_totals import recalc_invoice_amounts
+from invoices.views import invalidate_dashboard_cache, save_invoice_pdf
+
+
+me_response_serializer = inline_serializer(
+    name='AccountMetadataResponse',
+    fields={
+        'account': AccountSerializer(),
+        'issuers': IssuerSerializer(many=True),
+    },
+)
+
+
+dashboard_report_response_serializer = inline_serializer(
+    name='DashboardReportResponse',
+    fields={
+        'issuer_ids': drf_serializers.ListField(child=drf_serializers.IntegerField()),
+        'totals': drf_serializers.DictField(child=drf_serializers.CharField()),
+        'monthly_revenue': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'monthly_expenses': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'receivables': drf_serializers.ListField(child=drf_serializers.DictField()),
+        'recent_activity': drf_serializers.DictField(),
+    },
+)
+
+
+class IssuerScopedMixin:
+    issuer_lookup = 'issuer_id'
+
+    def accessible_issuer_ids(self):
+        return accessible_issuer_ids_for_user(self.request.user)
+
+    def filter_by_issuer_param(self, queryset):
+        issuer_id = self.request.query_params.get('issuer')
         if issuer_id:
-            accounts = accounts.filter(issuer_id=issuer_id)
-        return _list_response(request, accounts, _bank_account_payload)
+            queryset = queryset.filter(**{self.issuer_lookup: issuer_id})
+        return queryset
+
+
+class MeView(APIView):
+    """Return metadata for the authenticated API account."""
+
+    @extend_schema(
+        summary='Return authenticated account metadata and accessible issuers',
+        responses={200: me_response_serializer},
+        tags=['account'],
+    )
+    def get(self, request):
+        return Response({
+            'account': AccountSerializer(request.user).data,
+            'issuers': IssuerSerializer(
+                accessible_issuers_for_user(request.user).prefetch_related('bank_accounts'),
+                many=True,
+                context={'request': request},
+            ).data,
+        })
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List accessible issuer/company metadata', tags=['issuers']),
+    retrieve=extend_schema(summary='Retrieve accessible issuer/company metadata', tags=['issuers']),
+)
+class IssuerViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = IssuerSerializer
+    search_fields = ['company__name', 'company__contact_email']
+    ordering_fields = ['id', 'company__name']
+    ordering = ['company__name', 'id']
+
+    def get_queryset(self):
+        return accessible_issuers_for_user(self.request.user).prefetch_related('bank_accounts')
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List accessible issuer bank-account metadata', tags=['bank accounts']),
+    retrieve=extend_schema(summary='Retrieve accessible issuer bank-account metadata', tags=['bank accounts']),
+)
+class BankAccountViewSet(IssuerScopedMixin, viewsets.ReadOnlyModelViewSet):
+    serializer_class = BankAccountSerializer
+    filterset_fields = ['issuer', 'is_active', 'is_default', 'payment_method']
+    search_fields = ['label', 'payment_method', 'account_details', 'issuer__company__name']
+    ordering_fields = ['id', 'issuer', 'sort_order', 'label', 'created_at', 'updated_at']
+    ordering = ['issuer', 'sort_order', 'label', 'id']
+
+    def get_queryset(self):
+        return IssuerBankAccount.objects.select_related('issuer', 'issuer__company').filter(
+            issuer_id__in=self.accessible_issuer_ids()
+        )
+
+
+class CustomerFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    external_id = filters.CharFilter(field_name='external_id')
+    is_active = filters.BooleanFilter(field_name='is_active')
+
+    class Meta:
+        model = Customer
+        fields = ['issuer', 'external_id', 'is_active']
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped customers', tags=['customers']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped customer', tags=['customers']),
+    create=extend_schema(summary='Create a customer for an accessible issuer', tags=['customers']),
+    update=extend_schema(summary='Update a customer for an accessible issuer', tags=['customers']),
+    partial_update=extend_schema(summary='Partially update a customer for an accessible issuer', tags=['customers']),
+    destroy=extend_schema(summary='Delete a customer for an accessible issuer', tags=['customers']),
+)
+class CustomerViewSet(viewsets.ModelViewSet):
+    serializer_class = CustomerSerializer
+    filterset_class = CustomerFilter
+    search_fields = [
+        'external_id', 'company__name', 'company__contact_name', 'company__contact_email',
+        'billing_email', 'billing_contact_name',
+    ]
+    ordering_fields = ['id', 'external_id', 'company__name', 'is_active']
+    ordering = ['company__name', 'id']
+
+    def get_queryset(self):
+        return Customer.objects.select_related(
+            'issuer', 'company', 'currency', 'payment_term'
+        ).filter(issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+
+class ProjectFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    status = filters.CharFilter(field_name='status')
+    external_id = filters.CharFilter(field_name='external_id')
+
+    class Meta:
+        model = Project
+        fields = ['issuer', 'customer', 'status', 'external_id']
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped projects', tags=['projects']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped project', tags=['projects']),
+    create=extend_schema(summary='Create a project for an accessible customer', tags=['projects']),
+    update=extend_schema(summary='Update an account-scoped project', tags=['projects']),
+    partial_update=extend_schema(summary='Partially update an account-scoped project', tags=['projects']),
+    destroy=extend_schema(summary='Delete an account-scoped project', tags=['projects']),
+)
+class ProjectViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectSerializer
+    filterset_class = ProjectFilter
+    search_fields = [
+        'external_id', 'title', 'project_code', 'billing_reference',
+        'customer__company__name',
+    ]
+    ordering_fields = ['id', 'external_id', 'title', 'project_code', 'status', 'created_at', 'updated_at']
+    ordering = ['title', 'id']
+
+    def get_queryset(self):
+        return Project.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'payment_term'
+        ).filter(issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+
+class InvoiceFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    project = filters.NumberFilter(field_name='project_id')
+    status = filters.CharFilter(field_name='status')
+    external_id = filters.CharFilter(field_name='external_id')
+    issued_after = filters.DateFilter(field_name='issued_date', lookup_expr='gte')
+    issued_before = filters.DateFilter(field_name='issued_date', lookup_expr='lte')
+    due_after = filters.DateFilter(field_name='due_date', lookup_expr='gte')
+    due_before = filters.DateFilter(field_name='due_date', lookup_expr='lte')
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'issuer', 'customer', 'project', 'status', 'external_id',
+            'issued_after', 'issued_before', 'due_after', 'due_before',
+        ]
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped invoices with order-line metadata', tags=['invoices']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped invoice', tags=['invoices']),
+    create=extend_schema(summary='Create a draft invoice with optional nested order lines', tags=['invoices']),
+    update=extend_schema(summary='Update a draft invoice and replace provided nested order lines', tags=['invoices']),
+    partial_update=extend_schema(summary='Partially update a draft invoice', tags=['invoices']),
+    destroy=extend_schema(summary='Delete a draft invoice', tags=['invoices']),
+)
+class InvoiceViewSet(viewsets.ModelViewSet):
+    serializer_class = InvoiceSerializer
+    filterset_class = InvoiceFilter
+    search_fields = [
+        'external_id', 'reference_number', 'customer__company__name', 'project__title',
+        'comment', 'notes',
+    ]
+    ordering_fields = [
+        'id', 'external_id', 'reference_number', 'status', 'issued_date', 'due_date',
+        'total_due', 'amount_due', 'created_at', 'updated_at',
+    ]
+    ordering = ['-issued_date', '-id']
+
+    FINALIZED_STATUSES = {Invoice.STATUS_INVOICED, Invoice.STATUS_OVERDUE, Invoice.STATUS_PAID}
+
+    def get_queryset(self):
+        return Invoice.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'project', 'bank_account', 'currency'
+        ).prefetch_related('orderline_set').filter(
+            issuer_id__in=accessible_issuer_ids_for_user(self.request.user)
+        )
+
+    def perform_create(self, serializer):
+        invoice = serializer.save()
+        invalidate_dashboard_cache(invoice.issuer_id)
+
+    def perform_update(self, serializer):
+        invoice = serializer.save()
+        invalidate_dashboard_cache(invoice.issuer_id)
+
+    def perform_destroy(self, instance):
+        if instance.status in self.FINALIZED_STATUSES:
+            raise ValidationError('Finalized invoices cannot be deleted through the API.')
+        issuer_id = instance.issuer_id
+        instance.delete()
+        invalidate_dashboard_cache(issuer_id)
+
+    @extend_schema(
+        summary='Finalize a draft invoice',
+        description='Moves a draft invoice to the finalized invoiced state, recalculates totals, and rejects invoices that are already finalized.',
+        request=None,
+        responses={200: InvoiceSerializer},
+        tags=['invoices'],
+    )
+    @action(detail=True, methods=['post'], url_path='finalize')
+    def finalize(self, request, pk=None):
+        invoice = self.get_object()
+        if invoice.status in self.FINALIZED_STATUSES:
+            raise ValidationError('Invoice is already finalized.')
+        if not invoice.issued_date:
+            invoice.issued_date = timezone.localdate()
+        invoice.calculate_totals(invoice.orderline_set.all())
+        invoice.status = Invoice.STATUS_INVOICED
+        invoice.save()
+        recalc_invoice_amounts(invoice.pk)
+        invalidate_dashboard_cache(invoice.issuer_id)
+        serializer = self.get_serializer(invoice)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Generate or refresh the invoice PDF artifact',
+        description='Recalculates invoice totals, renders the PDF with existing invoice services, and returns the refreshed invoice metadata.',
+        request=None,
+        responses={200: InvoiceSerializer, 400: OpenApiResponse(description='PDF generation failed or invoice validation failed.')},
+        tags=['invoices'],
+    )
+    @action(detail=True, methods=['post'], url_path='generate-pdf')
+    def generate_pdf(self, request, pk=None):
+        invoice = self.get_object()
+        invoice.calculate_totals(invoice.orderline_set.all())
+        invoice.save()
+        recalc_invoice_amounts(invoice.pk)
+        try:
+            save_invoice_pdf(request, invoice.pk)
+        except RuntimeError as exc:
+            raise ValidationError({'pdf': str(exc)}) from exc
+        invoice.refresh_from_db()
+        invalidate_dashboard_cache(invoice.issuer_id)
+        serializer = self.get_serializer(invoice)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Download an authenticated invoice PDF artifact',
+        responses={
+            200: OpenApiResponse(response=OpenApiTypes.BINARY, description='PDF file stream.'),
+            404: OpenApiResponse(description='PDF is not available or invoice is outside the account scope.'),
+        },
+        tags=['invoices'],
+    )
+    @action(detail=True, methods=['get'], url_path='download-pdf')
+    def download_pdf(self, request, pk=None):
+        invoice = self.get_object()
+        if not getattr(invoice, 'pdf_document', None) or not invoice.pdf_document.name:
+            raise NotFound('PDF is not available for this invoice.')
+        try:
+            return FileResponse(
+                invoice.pdf_document.open('rb'),
+                as_attachment=True,
+                filename=invoice.pdf_document.name.rsplit('/', 1)[-1],
+                content_type='application/pdf',
+            )
+        except FileNotFoundError as exc:
+            raise NotFound('PDF is not available for this invoice.') from exc
+
+    @extend_schema(
+        summary='Return PDF metadata or download an authenticated invoice PDF artifact',
+        parameters=[
+            OpenApiParameter(
+                name='mode',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Use mode=metadata to return JSON metadata instead of the PDF stream.',
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description='PDF metadata or file stream.'),
+            404: OpenApiResponse(description='PDF is not available or invoice is outside the account scope.'),
+        },
+        tags=['invoices'],
+    )
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        invoice = self.get_object()
+        has_pdf = bool(getattr(invoice, 'pdf_document', None) and invoice.pdf_document.name)
+        if request.query_params.get('mode') == 'metadata':
+            return Response({
+                'invoice_id': invoice.pk,
+                'pdf': {
+                    'available': has_pdf,
+                    'filename': invoice.pdf_document.name.rsplit('/', 1)[-1] if has_pdf else None,
+                    'name': invoice.pdf_document.name if has_pdf else None,
+                    'url': request.build_absolute_uri(invoice.pdf_document.url) if has_pdf else None,
+                    'content_type': 'application/pdf' if has_pdf else None,
+                    'size': invoice.pdf_document.size if has_pdf else None,
+                },
+            })
+        return self.download_pdf(request, pk=pk)
+
+
+class PaymentFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    project = filters.NumberFilter(field_name='project_id')
+    status = filters.CharFilter(field_name='status')
+    external_id = filters.CharFilter(field_name='external_id')
+    received_after = filters.DateFilter(field_name='received_at', lookup_expr='gte')
+    received_before = filters.DateFilter(field_name='received_at', lookup_expr='lte')
+
+    class Meta:
+        model = Payment
+        fields = ['issuer', 'customer', 'project', 'status', 'external_id', 'received_after', 'received_before']
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped payments', tags=['payments']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped payment', tags=['payments']),
+    create=extend_schema(summary='Create a payment for an accessible issuer/customer', tags=['payments']),
+    update=extend_schema(summary='Update an account-scoped payment', tags=['payments']),
+    partial_update=extend_schema(summary='Partially update an account-scoped payment', tags=['payments']),
+    destroy=extend_schema(summary='Delete an account-scoped payment', tags=['payments']),
+)
+class PaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentSerializer
+    filterset_class = PaymentFilter
+    search_fields = ['external_id', 'memo', 'customer__company__name', 'project__title']
+    ordering_fields = ['id', 'external_id', 'amount', 'received_at', 'created_at', 'updated_at']
+    ordering = ['-received_at', '-id']
+
+    def get_queryset(self):
+        return Payment.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'project', 'currency'
+        ).prefetch_related('applications', 'applications__invoice').filter(
+            issuer_id__in=accessible_issuer_ids_for_user(self.request.user)
+        )
+
+    def _refresh_applications(self, payment):
+        invoice_ids = list(payment.applications.values_list('invoice_id', flat=True))
+        for invoice_id in invoice_ids:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(payment.issuer_id)
+
+    def perform_update(self, serializer):
+        payment = serializer.save()
+        self._refresh_applications(payment)
+
+    def perform_destroy(self, instance):
+        issuer_id = instance.issuer_id
+        invoice_ids = list(instance.applications.values_list('invoice_id', flat=True))
+        instance.delete()
+        for invoice_id in invoice_ids:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(issuer_id)
+
+
+class PaymentApplicationFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='payment__issuer_id')
+    payment = filters.NumberFilter(field_name='payment_id')
+    invoice = filters.NumberFilter(field_name='invoice_id')
+    external_id = filters.CharFilter(field_name='external_id')
+
+    class Meta:
+        model = PaymentApplication
+        fields = ['issuer', 'payment', 'invoice', 'external_id']
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped payment applications', tags=['payment applications']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped payment application', tags=['payment applications']),
+    create=extend_schema(summary='Apply a payment to an invoice', tags=['payment applications']),
+    update=extend_schema(summary='Update a payment application', tags=['payment applications']),
+    partial_update=extend_schema(summary='Partially update a payment application', tags=['payment applications']),
+    destroy=extend_schema(summary='Delete a payment application', tags=['payment applications']),
+)
+class PaymentApplicationViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentApplicationSerializer
+    filterset_class = PaymentApplicationFilter
+    search_fields = ['external_id', 'payment__memo', 'invoice__reference_number']
+    ordering_fields = ['id', 'applied_at', 'amount_applied']
+    ordering = ['-applied_at', '-id']
+
+    def get_queryset(self):
+        return PaymentApplication.objects.select_related(
+            'payment', 'payment__issuer', 'payment__customer', 'invoice', 'invoice__issuer'
+        ).filter(payment__issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+    def perform_create(self, serializer):
+        application = serializer.save()
+        recalc_invoice_amounts(application.invoice_id)
+        invalidate_dashboard_cache(application.invoice.issuer_id)
+
+    def perform_update(self, serializer):
+        old_invoice_id = serializer.instance.invoice_id
+        application = serializer.save()
+        for invoice_id in {old_invoice_id, application.invoice_id}:
+            recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(application.invoice.issuer_id)
+
+    def perform_destroy(self, instance):
+        invoice_id = instance.invoice_id
+        issuer_id = instance.invoice.issuer_id
+        instance.delete()
+        recalc_invoice_amounts(invoice_id)
+        invalidate_dashboard_cache(issuer_id)
+
+
+class ExpenseFilter(filters.FilterSet):
+    issuer = filters.NumberFilter(field_name='issuer_id')
+    customer = filters.NumberFilter(field_name='customer_id')
+    project = filters.NumberFilter(field_name='project_id')
+    invoice = filters.NumberFilter(field_name='invoice_id')
+    external_id = filters.CharFilter(field_name='external_id')
+    paid_after = filters.DateFilter(field_name='paid_date', lookup_expr='gte')
+    paid_before = filters.DateFilter(field_name='paid_date', lookup_expr='lte')
+    has_attachment = filters.BooleanFilter(method='filter_has_attachment')
+
+    class Meta:
+        model = Expense
+        fields = ['issuer', 'customer', 'project', 'invoice', 'external_id', 'paid_after', 'paid_before', 'has_attachment']
+
+    def filter_has_attachment(self, queryset, name, value):
+        if value:
+            return queryset.exclude(attachment='').exclude(attachment__isnull=True)
+        return queryset.filter(attachment='') | queryset.filter(attachment__isnull=True)
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List account-scoped expenses', tags=['expenses']),
+    retrieve=extend_schema(summary='Retrieve an account-scoped expense', tags=['expenses']),
+    create=extend_schema(summary='Create an expense with optional multipart attachment upload', tags=['expenses']),
+    update=extend_schema(summary='Update an expense and optionally replace/remove its attachment', tags=['expenses']),
+    partial_update=extend_schema(summary='Partially update an expense and optionally replace/remove its attachment', tags=['expenses']),
+    destroy=extend_schema(summary='Delete an account-scoped expense', tags=['expenses']),
+)
+class ExpenseViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseSerializer
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    filterset_class = ExpenseFilter
+    search_fields = ['external_id', 'description', 'customer__company__name', 'project__title']
+    ordering_fields = ['id', 'external_id', 'paid_date', 'amount', 'created_at', 'updated_at']
+    ordering = ['-paid_date', '-id']
+
+    def get_queryset(self):
+        return Expense.objects.select_related(
+            'issuer', 'customer', 'customer__company', 'project', 'invoice'
+        ).filter(issuer_id__in=accessible_issuer_ids_for_user(self.request.user))
+
+    def perform_create(self, serializer):
+        expense = serializer.save()
+        invalidate_dashboard_cache(expense.issuer_id)
+
+    def perform_update(self, serializer):
+        expense = serializer.save()
+        invalidate_dashboard_cache(expense.issuer_id)
+
+    def perform_destroy(self, instance):
+        issuer_id = instance.issuer_id
+        instance.delete()
+        invalidate_dashboard_cache(issuer_id)
+
+    @extend_schema(
+        summary='Download an authenticated expense attachment',
+        responses={
+            200: OpenApiResponse(response=OpenApiTypes.BINARY, description='Attachment file stream.'),
+            404: OpenApiResponse(description='Attachment is not available or expense is outside the account scope.'),
+        },
+        tags=['expenses'],
+    )
+    @action(detail=True, methods=['get'], url_path='download-attachment')
+    def download_attachment(self, request, pk=None):
+        expense = self.get_object()
+        if not expense.attachment:
+            raise NotFound('Attachment is not available for this expense.')
+        try:
+            return FileResponse(
+                expense.attachment.open('rb'),
+                as_attachment=True,
+                filename=expense.attachment.name.rsplit('/', 1)[-1],
+            )
+        except FileNotFoundError as exc:
+            raise NotFound('Attachment is not available for this expense.') from exc
 
 
 class InvoiceLineSuggestionListView(APIView):
+    """Return reusable recent invoice order-line suggestions for MCP product lookup."""
+
+    @extend_schema(
+        summary='List recent reusable invoice order-line suggestions',
+        parameters=[
+            OpenApiParameter(name='search', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name='issuer', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name='customer', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY),
+        ],
+        responses={200: OpenApiResponse(description='Paginated order-line suggestions.')},
+        tags=['invoices'],
+    )
     def get(self, request):
-        lines = OrderLine.objects.filter(invoice__issuer_id__in=_issuer_ids_for_user(request.user)).select_related('invoice__customer')
+        lines = OrderLine.objects.filter(
+            invoice__issuer_id__in=accessible_issuer_ids_for_user(request.user)
+        ).select_related('invoice', 'invoice__customer')
         search = request.query_params.get('search')
         customer_id = request.query_params.get('customer')
         issuer_id = request.query_params.get('issuer')
         if search:
-            lines = lines.filter(description__icontains=search)
+            lines = lines.filter(
+                Q(description__icontains=search)
+                | Q(notes__icontains=search)
+                | Q(invoice__customer__company__name__icontains=search)
+            )
         if customer_id:
             lines = lines.filter(invoice__customer_id=customer_id)
         if issuer_id:
             lines = lines.filter(invoice__issuer_id=issuer_id)
         lines = lines.order_by('-updated_at', '-id')
-        return _list_response(request, lines, _line_payload)
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(lines, request, view=self)
+        payload = [
+            {
+                'id': line.pk,
+                'invoice_id': line.invoice_id,
+                'customer_id': line.invoice.customer_id if line.invoice_id else None,
+                'line_type': line.line_type,
+                'description': line.description,
+                'quantity': str(line.quantity),
+                'unit_price': str(line.unit_price),
+                'line_total': str(line.line_total),
+                'manual_total': line.manual_total,
+                'notes': line.notes,
+            }
+            for line in page
+        ]
+        return paginator.get_paginated_response(payload)
+
+
+def _decimal(value):
+    return Decimal(value or 0).quantize(Decimal('0.01'))
+
+
+def _month_iso(value):
+    if value is None:
+        return None
+    if hasattr(value, 'date'):
+        value = value.date()
+    return value.isoformat()
+
+
+class DashboardReportView(APIView):
+    """Return account-level or issuer-filtered dashboard report JSON."""
+
+    @extend_schema(
+        summary='Return account-level or issuer-filtered dashboard report data',
+        parameters=[
+            OpenApiParameter(
+                name='issuer',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                many=True,
+                description='Optional issuer ID. Repeat to include multiple connected issuers; omitted means all accessible issuers.',
+            ),
+        ],
+        responses={200: dashboard_report_response_serializer},
+        tags=['reports'],
+    )
+    def get(self, request):
+        issuer_ids = list(accessible_issuer_ids_for_user(request.user))
+        selected_issuers = request.query_params.getlist('issuer') or request.query_params.getlist('issuer[]')
+        if selected_issuers:
+            try:
+                requested_ids = {int(value) for value in selected_issuers}
+            except (TypeError, ValueError) as exc:
+                raise ValidationError({'issuer': 'Issuer filters must be numeric IDs.'}) from exc
+            issuer_ids = [issuer_id for issuer_id in issuer_ids if issuer_id in requested_ids]
+
+        invoice_qs = Invoice.objects.filter(issuer_id__in=issuer_ids)
+        payment_qs = Payment.objects.filter(issuer_id__in=issuer_ids)
+        expense_qs = Expense.objects.filter(issuer_id__in=issuer_ids, exclude_from_reports=False)
+
+        totals = {
+            'invoice_total': _decimal(invoice_qs.aggregate(total=Sum('total_due'))['total']),
+            'amount_paid': _decimal(invoice_qs.aggregate(total=Sum('amount_paid'))['total']),
+            'amount_due': _decimal(invoice_qs.aggregate(total=Sum('amount_due'))['total']),
+            'amount_overdue': _decimal(invoice_qs.aggregate(total=Sum('amount_overdue'))['total']),
+            'payment_total': _decimal(payment_qs.aggregate(total=Sum('base_currency_amount'))['total']),
+            'expense_total': _decimal(expense_qs.aggregate(total=Sum('amount'))['total']),
+        }
+        monthly_revenue = invoice_qs.annotate(month=TruncMonth('issued_date')).values('month').annotate(
+            total=Sum('total_due'), count=Count('id')
+        ).order_by('month')
+        monthly_expenses = expense_qs.annotate(month=TruncMonth('paid_date')).values('month').annotate(
+            total=Sum('amount'), count=Count('id')
+        ).order_by('month')
+        status_rows = invoice_qs.values('status').annotate(
+            count=Count('id'), amount_due=Sum('amount_due'), amount_overdue=Sum('amount_overdue')
+        ).order_by('status')
+        recent_invoices = invoice_qs.select_related('issuer__company', 'customer__company').order_by('-issued_date', '-id')[:10]
+        recent_payments = payment_qs.select_related('issuer__company', 'customer__company').order_by('-received_at', '-id')[:10]
+        recent_expenses = expense_qs.select_related('issuer__company').order_by('-paid_date', '-id')[:10]
+
+        return Response({
+            'issuer_ids': issuer_ids,
+            'totals': {key: str(value) for key, value in totals.items()},
+            'monthly_revenue': [
+                {'month': _month_iso(row['month']), 'total': str(_decimal(row['total'])), 'count': row['count']}
+                for row in monthly_revenue
+            ],
+            'monthly_expenses': [
+                {'month': _month_iso(row['month']), 'total': str(_decimal(row['total'])), 'count': row['count']}
+                for row in monthly_expenses
+            ],
+            'receivables': [
+                {
+                    'status': row['status'], 'count': row['count'],
+                    'amount_due': str(_decimal(row['amount_due'])),
+                    'amount_overdue': str(_decimal(row['amount_overdue'])),
+                }
+                for row in status_rows
+            ],
+            'recent_activity': {
+                'invoices': [
+                    {'id': invoice.pk, 'issuer_id': invoice.issuer_id, 'customer_name': str(invoice.customer), 'status': invoice.status, 'issued_date': invoice.issued_date, 'total_due': str(_decimal(invoice.total_due))}
+                    for invoice in recent_invoices
+                ],
+                'payments': [
+                    {'id': payment.pk, 'issuer_id': payment.issuer_id, 'customer_name': str(payment.customer), 'received_at': payment.received_at, 'amount': str(_decimal(payment.amount))}
+                    for payment in recent_payments
+                ],
+                'expenses': [
+                    {'id': expense.pk, 'issuer_id': expense.issuer_id, 'paid_date': expense.paid_date, 'amount': str(_decimal(expense.amount)), 'description': expense.description}
+                    for expense in recent_expenses
+                ],
+            },
+        })

@@ -9,7 +9,7 @@ from .schemas import TOOL_SCHEMAS, bounded_page, bounded_page_size, positive_id
 
 
 APIClientFactory = Callable[[], InvoicesAPIClient]
-FINAL_STATES = {"final", "finalized", "sent", "paid", "void", "voided", "cancelled", "canceled"}
+FINAL_STATES = {"final", "finalized", "sent", "invoiced", "overdue", "paid", "void", "voided", "cancelled", "canceled"}
 
 
 def register_tools(mcp_server, config: MCPConfig | None = None, api_client_factory: APIClientFactory | None = None):
@@ -238,6 +238,8 @@ def _status_summary(invoice: Mapping[str, Any]) -> dict[str, Any]:
     pdf = invoice.get("pdf") or invoice.get("pdf_document") or invoice.get("artifact") or {}
     if not isinstance(pdf, Mapping):
         pdf = {"available": bool(pdf)}
+    if not pdf and (invoice.get("has_pdf") or invoice.get("pdf_url")):
+        pdf = {"available": bool(invoice.get("has_pdf")), "url": invoice.get("pdf_url")}
     payments = invoice.get("payments") or invoice.get("payment_applications") or []
     return {
         "invoice_id": invoice.get("id"),

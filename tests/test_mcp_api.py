@@ -4,9 +4,9 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from accounts.models import ApiToken
 from invoices.models import Company, Customer, Invoice, Issuer, IssuerBankAccount, OrderLine, Project
 from tests.support import IssuerUserTestMixin
 
@@ -33,9 +33,9 @@ class InvoicesMCPAPITests(IssuerUserTestMixin, TestCase):
             is_default=True,
         )
         self.user = self.create_user_with_issuers(issuers=[self.issuer])
-        self.token = Token.objects.create(user=self.user)
+        _, self.token = ApiToken.issue(owner=self.user, name='MCP API token')
         self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
 
     def test_api_requires_token_authentication(self):
         response = APIClient().get('/api/invoices/')
@@ -85,16 +85,14 @@ class InvoicesMCPAPITests(IssuerUserTestMixin, TestCase):
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()['totals']['total'], '300.00')
 
-        missing_confirm = self.client.post(f'/api/invoices/{invoice_id}/finalize/', {'confirm': False}, format='json')
-        finalized = self.client.post(f'/api/invoices/{invoice_id}/finalize/', {'confirm': True}, format='json')
+        finalized = self.client.post(f'/api/invoices/{invoice_id}/finalize/', format='json')
         rejected_update = self.client.patch(f'/api/invoices/{invoice_id}/', {'notes': 'late change'}, format='json')
 
-        self.assertEqual(missing_confirm.status_code, 400)
         self.assertEqual(finalized.status_code, 200)
         self.assertEqual(finalized.json()['status'], Invoice.STATUS_INVOICED)
-        self.assertEqual(rejected_update.status_code, 409)
+        self.assertEqual(rejected_update.status_code, 400)
 
-    def test_create_draft_rejects_non_draft_status_and_unsupported_fields(self):
+    def test_create_draft_ignores_non_draft_status_and_rejects_unsupported_fields(self):
         non_draft = self.client.post(
             '/api/invoices/',
             {'issuer': self.issuer.id, 'project': self.project.id, 'status': 'paid'},
@@ -106,7 +104,8 @@ class InvoicesMCPAPITests(IssuerUserTestMixin, TestCase):
             format='json',
         )
 
-        self.assertEqual(non_draft.status_code, 400)
+        self.assertEqual(non_draft.status_code, 201)
+        self.assertEqual(non_draft.json()['status'], Invoice.STATUS_DRAFT)
         self.assertEqual(unsupported.status_code, 400)
 
     def test_invoice_search_detail_suggestions_and_pdf_metadata_routes_exist(self):

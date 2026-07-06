@@ -1234,6 +1234,31 @@ class InvoiceListRowActionTests(AuthenticatedCompanyTestCase):
             html=True,
         )
 
+    def test_invoice_list_renders_shared_bulk_toolbar_spacing_without_changing_actions(self):
+        self.login_with_active_company(self.user, issuer=self.issuer)
+
+        response = self.client.get(f"{reverse('invoices:list')}?status=all&date_range=all")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<section class="page invoices-page bulk-toolbar-stack">', html=False)
+        self.assertContains(
+            response,
+            f'<form id="bulk-actions-form" class="bulk-toolbar__form" method="post" '
+            f'action="{reverse("invoices:bulk_action")}">',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<button type="submit" class="btn btn-sm btn-outline-primary" '
+            'form="bulk-actions-form" name="action" value="download_pdfs">Download PDFs</button>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'class="field-control--checkbox invoice-select" name="selected"',
+            html=False,
+        )
+
 
 class InvoiceListCombinedStatusFilterTests(AuthenticatedCompanyTestCase):
     def setUp(self):
@@ -1410,7 +1435,7 @@ class CrossSurfaceOverdueConsistencyTests(AuthenticatedCompanyTestCase):
             issuer=self.issuer,
             customer=self.customer,
             project=self.project,
-            issued_date=self.today - timedelta(days=3),
+            issued_date=self.today,
             due_date=self.today + timedelta(days=5),
             status=Invoice.STATUS_OVERDUE,
             total_due=Decimal('100'),
