@@ -123,12 +123,12 @@ The project does not currently have a standalone product catalog or persisted in
   - [x] Implement status inspection as a derived API summary using current invoice state, timestamps, PDF state, totals, and payment-application activity.
   - [x] Add tests for successful tool calls, validation failures, auth failures, finalized-invoice safety, artifact limits, reusable suggestion behavior, and status inspection.
 
-- [ ] Wire runtime and deployment support
-  - [ ] Add the `mcp` service to Compose with shared image/env/mount conventions and `RUN_MIGRATIONS=0`.
-  - [ ] Update Docker/runtime command support for launching the MCP server.
-  - [ ] Update deploy and verification scripts to include the MCP service and authenticated MCP probe.
-  - [ ] Update CI/runtime smoke coverage to start the MCP service with safe test tokens.
-  - [ ] Add a repo-owned MCP probe helper to avoid duplicating protocol checks.
+- [x] Wire runtime and deployment support
+  - [x] Add the `mcp` service to Compose with shared image/env/mount conventions and `RUN_MIGRATIONS=0`.
+  - [x] Update Docker/runtime command support for launching the MCP server.
+  - [x] Update deploy and verification scripts to include the MCP service and authenticated MCP probe.
+  - [x] Update CI/runtime smoke coverage to start the MCP service with safe test tokens.
+  - [x] Add a repo-owned MCP probe helper to avoid duplicating protocol checks.
 
 - [ ] Document MCP operation and client setup
   - [ ] Add MCP server documentation covering environment variables, token boundaries, endpoint URL, artifact limits, Streamable HTTP transport, and operational checks.
