@@ -92,11 +92,11 @@ Add the SIF / VERI*FACTU foundation for Spanish issuers in the multi-issuer invo
   - [x] Update Django admin list/detail surfaces for issuer SIF applicability and readiness.
   - [x] Add view/form/template tests for permitted users, cross-issuer access prevention, Spanish enablement, and non-Spanish behavior.
 
-- [ ] Add reviewer evidence and documentation hooks
-  - [ ] Add a Playwright spec or extend an existing company-settings spec for Spanish SIF settings and non-Spanish guardrails.
-  - [ ] Register `issuer-sif-settings-readiness` in `scripts/demo-evidence.sh`.
-  - [ ] Register `issuer-sif-settings` in `scripts/visual-validation.sh`.
-  - [ ] Document the Spanish-only, dual-mode foundation and explicitly note that AEAT streaming is #155 and non-VERI*FACTU local controls/XAdES are #158.
+- [x] Add reviewer evidence and documentation hooks
+  - [x] Add a Playwright spec or extend an existing company-settings spec for Spanish SIF settings and non-Spanish guardrails.
+  - [x] Register `issuer-sif-settings-readiness` in `scripts/demo-evidence.sh`.
+  - [x] Register `issuer-sif-settings` in `scripts/visual-validation.sh`.
+  - [x] Document the Spanish-only, dual-mode foundation and explicitly note that AEAT streaming is #155 and non-VERI*FACTU local controls/XAdES are #158.
 
 ## Deployment / Rollout
 
