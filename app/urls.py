@@ -23,6 +23,7 @@ def serve_media(request, path, **kwargs):
         return non_streaming_response
     return response
 urlpatterns = [
+    path('api/', include('api.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('', include('invoices.urls')),
