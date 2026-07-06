@@ -79,11 +79,11 @@ Add the SIF / VERI*FACTU foundation for Spanish issuers in the multi-issuer invo
 
 ## Task List
 
-- [ ] Add issuer-scoped SIF settings and applicability logic
-  - [ ] Add `IssuerSifSettings` choices, fields, computed deadline helpers, and model validation.
-  - [ ] Add the migration with disabled/default-safe values for existing issuers.
-  - [ ] Add a SIF service for settings lookup, Spanish tax ID normalization/validation, readiness, and effective activation.
-  - [ ] Add model and service tests for defaults, both modes, deadlines, invalid identities, and issuer isolation.
+- [x] Add issuer-scoped SIF settings and applicability logic
+  - [x] Add `IssuerSifSettings` choices, fields, computed deadline helpers, and model validation.
+  - [x] Add the migration with disabled/default-safe values for existing issuers.
+  - [x] Add a SIF service for settings lookup, Spanish tax ID normalization/validation, readiness, and effective activation.
+  - [x] Add model and service tests for defaults, both modes, deadlines, invalid identities, and issuer isolation.
 
 - [ ] Integrate SIF settings into company and admin UI
   - [ ] Add an `IssuerSifSettingsForm` with Spanish-only enablement validation.
