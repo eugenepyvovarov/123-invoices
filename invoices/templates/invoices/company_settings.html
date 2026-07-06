@@ -112,6 +112,51 @@
       </p>
     </section>
 
+    <section class="drawer-section drawer-section--flat" data-testid="issuer-sif-settings-section">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h2 class="section-title mb-1">Tax and Spanish SIF compliance</h2>
+          <p class="text-muted small mb-0">SIF applies only to Spanish issuers. Non-Spanish issuers keep the normal invoice flow.</p>
+        </div>
+        {% if sif_readiness %}
+          <span class="badge bg-secondary">Deadline: {{ sif_readiness.deadline|date:'Y-m-d' }}</span>
+        {% endif %}
+      </div>
+      {{ sif_form.non_field_errors }}
+      <div class="row">
+        {% include 'invoices/partials/form_field.html' with field=sif_form.tax_country cls='col-md-4' %}
+      </div>
+
+      {% if sif_form.tax_country.value == 'ES' %}
+        <div class="alert alert-info" data-testid="spanish-sif-readiness">
+          VERI*FACTU is optional. Choose <strong>VERI*FACTU</strong> for continuous AEAT remittance or <strong>No VERI*FACTU</strong> for local SIF preservation obligations.
+        </div>
+        {% if sif_readiness and sif_readiness.missing_prerequisites %}
+          <div class="alert alert-warning" data-testid="spanish-sif-warning">
+            Complete the Spanish SIF prerequisites before future SIF behavior can activate.
+          </div>
+        {% endif %}
+        <div class="row">
+          {% include 'invoices/partials/form_field.html' with field=sif_form.enabled cls='col-md-12' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.mode cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.aeat_environment cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.operational_status cls='col-md-4' %}
+        </div>
+        <div class="row">
+          {% include 'invoices/partials/form_field.html' with field=sif_form.taxpayer_role cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.deadline_category cls='col-md-4' %}
+        </div>
+        <div class="row">
+          {% include 'invoices/partials/form_field.html' with field=sif_form.software_name cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.software_version cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.software_code cls='col-md-4' %}
+          {% include 'invoices/partials/form_field.html' with field=sif_form.certificate_reference cls='col-md-12' %}
+        </div>
+      {% else %}
+        <p class="text-muted small mb-0" data-testid="non-spanish-no-sif-warning">No Spanish SIF warnings or mode selection are required for this issuer.</p>
+      {% endif %}
+    </section>
+
     <footer class="d-flex justify-content-end gap-2">
       <button type="submit" class="btn btn-primary">Save changes</button>
     </footer>

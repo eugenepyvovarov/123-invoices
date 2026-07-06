@@ -2,7 +2,10 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
+from django.contrib.auth import get_user_model
 
+from invoices.forms import IssuerSifSettingsForm
 from invoices.models import Company, Issuer, IssuerSifSettings
 from invoices.services.sif import (
     get_sif_readiness,
@@ -80,6 +83,48 @@ class IssuerSifSettingsModelTests(TestCase):
         self.assertIn('enabled', context.exception.message_dict)
 
 
+class IssuerSifSettingsFormTests(TestCase):
+    def test_form_allows_enabled_spanish_issuer_with_valid_tax_id(self):
+        form = IssuerSifSettingsForm(
+            data={
+                'sif_settings-tax_country': IssuerSifSettings.TaxCountry.SPAIN,
+                'sif_settings-enabled': 'on',
+                'sif_settings-mode': IssuerSifSettings.SifMode.NO_VERI_FACTU,
+                'sif_settings-aeat_environment': IssuerSifSettings.AeatEnvironment.TEST,
+                'sif_settings-taxpayer_role': IssuerSifSettings.TaxpayerRole.CORPORATE,
+                'sif_settings-deadline_category': IssuerSifSettings.DeadlineCategory.CORPORATE,
+                'sif_settings-operational_status': IssuerSifSettings.OperationalStatus.READY,
+            },
+            issuer_company_tax_id='12345678Z',
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_blocks_enabled_non_spanish_issuer(self):
+        form = IssuerSifSettingsForm(
+            data={
+                'sif_settings-tax_country': IssuerSifSettings.TaxCountry.OTHER,
+                'sif_settings-enabled': 'on',
+            },
+            issuer_company_tax_id='12345678Z',
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('enabled', form.errors)
+
+    def test_form_blocks_enabled_spanish_issuer_without_valid_tax_id(self):
+        form = IssuerSifSettingsForm(
+            data={
+                'sif_settings-tax_country': IssuerSifSettings.TaxCountry.SPAIN,
+                'sif_settings-enabled': 'on',
+            },
+            issuer_company_tax_id='BE0123456789',
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('enabled', form.errors)
+
+
 class SifServiceTests(TestCase):
     def _issuer(self, name, tax_id='12345678Z'):
         company = Company.objects.create(name=name, customer_information_file_number=tax_id)
@@ -142,3 +187,29 @@ class SifServiceTests(TestCase):
         self.assertFalse(non_spanish_readiness.effective_activation)
         self.assertEqual(non_spanish_readiness.missing_prerequisites, ())
         self.assertFalse(non_spanish_readiness.is_spanish_issuer)
+
+
+class IssuerSifSettingsAdminTests(TestCase):
+    def test_admin_changelist_shows_sif_readiness_fields(self):
+        user = get_user_model().objects.create_superuser(
+            username='admin',
+            email='admin@example.com',
+            password='password',
+        )
+        company = Company.objects.create(name='Admin Spanish SL', customer_information_file_number='12345678Z')
+        issuer = Issuer.objects.create(company=company)
+        IssuerSifSettings.objects.create(
+            issuer=issuer,
+            tax_country=IssuerSifSettings.TaxCountry.SPAIN,
+            enabled=True,
+            mode=IssuerSifSettings.SifMode.VERI_FACTU,
+            operational_status=IssuerSifSettings.OperationalStatus.READY,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('admin:invoices_issuersifsettings_changelist'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Admin Spanish SL')
+        self.assertContains(response, 'VERI_FACTU')
+        self.assertContains(response, 'READY')

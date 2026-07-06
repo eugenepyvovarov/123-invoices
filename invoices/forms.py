@@ -17,11 +17,13 @@ from invoices.models import (
     Invoice,
     Issuer,
     IssuerBankAccount,
+    IssuerSifSettings,
     OrderLine,
     PaymentTerm,
     Project,
 )
 from invoices.services.bank_accounts import resolve_invoice_bank_account
+from invoices.services.sif import is_valid_spanish_tax_id
 
 
 class StyledModelForm(ModelForm):
@@ -632,6 +634,68 @@ class IssuerSettingsForm(StyledModelForm):
         if value is None or value < 1:
             raise forms.ValidationError('Next invoice ID must be at least 1.')
         return value
+
+
+class IssuerSifSettingsForm(StyledModelForm):
+    prefix = 'sif_settings'
+
+    def __init__(self, *args, issuer_company_tax_id=None, **kwargs):
+        self.issuer_company_tax_id = issuer_company_tax_id
+        super().__init__(*args, **kwargs)
+        if issuer_company_tax_id is not None:
+            self.instance._validation_tax_id = issuer_company_tax_id
+
+        self.fields['tax_country'].label = 'Issuer tax country'
+        self.fields['tax_country'].required = False
+        self.fields['tax_country'].help_text = 'Choose Spain (ES) only for Spanish establishments covered by SIF.'
+        self.fields['enabled'].label = 'Enable Spanish SIF compliance for this issuer'
+        self.fields['mode'].label = 'SIF mode'
+        self.fields['mode'].help_text = 'VERI*FACTU is optional. NO VERI*FACTU is also a SIF mode with local-control obligations.'
+        self.fields['aeat_environment'].label = 'AEAT environment'
+        self.fields['deadline_category'].label = 'Readiness deadline'
+        self.fields['software_code'].label = 'Software code'
+        self.fields['certificate_reference'].label = 'Certificate reference'
+        self.fields['certificate_reference'].help_text = 'Store a non-secret label or external reference only; do not paste certificate files or passwords.'
+        self.fields['operational_status'].label = 'Operational readiness'
+        for field_name, field in self.fields.items():
+            if field_name != 'enabled':
+                field.required = False
+        self._apply_pico_styles()
+
+    class Meta:
+        model = IssuerSifSettings
+        fields = [
+            'tax_country',
+            'enabled',
+            'mode',
+            'aeat_environment',
+            'taxpayer_role',
+            'deadline_category',
+            'software_name',
+            'software_version',
+            'software_code',
+            'certificate_reference',
+            'operational_status',
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        for field_name, field in self.fields.items():
+            value = cleaned_data.get(field_name)
+            if value in (None, '') and field_name != 'enabled':
+                cleaned_data[field_name] = getattr(
+                    self.instance,
+                    field_name,
+                    self._meta.model._meta.get_field(field_name).get_default(),
+                )
+
+        enabled = cleaned_data.get('enabled')
+        tax_country = cleaned_data.get('tax_country')
+        if enabled and tax_country != IssuerSifSettings.TaxCountry.SPAIN:
+            self.add_error('enabled', 'SIF can only be enabled for Spanish issuers.')
+        if enabled and not is_valid_spanish_tax_id(self.issuer_company_tax_id):
+            self.add_error('enabled', 'SIF requires a valid Spanish NIF, NIE, or CIF for the issuer.')
+        return cleaned_data
 
 
 class ProjectForm(StyledModelForm):

@@ -46,6 +46,7 @@ from invoices.forms import (
     IssuerBankAccountFormSet,
     IssuerCompanyForm,
     IssuerSettingsForm,
+    IssuerSifSettingsForm,
     OrderLineFormSet,
     ProjectForm,
 )
@@ -63,11 +64,13 @@ from invoices.models import (
     PaymentTerm,
     BackupConfiguration,
     BackupRun,
+    IssuerSifSettings,
 )
 from invoices.services.backups import execute_backup, generate_backup_download_url
 from invoices.services.bank_accounts import bank_account_for_project, resolve_invoice_bank_account
 from invoices.services.invoice_state import is_invoice_overdue, overdue_q
 from invoices.services.payment_notes import resolve_invoice_payment_notes
+from invoices.services.sif import get_sif_readiness, get_sif_settings
 from invoices.services.cached_totals import recalc_invoice_amounts
 from invoices.services.backups import BackupDestinationCheckError, test_backup_destination
 from invoices.services.wise_importer import WiseImportError, WiseStatementImporter
@@ -3922,22 +3925,32 @@ def edit_company(request):
         company_id = request.POST.get('company_id')
         if company_id:
             target_issuer = issuer_queryset.filter(company_id=company_id).first()
+            if target_issuer is None:
+                raise PermissionDenied
     else:
         create_new = request.GET.get('new') == '1'
         company_id = request.GET.get('company')
         if company_id:
             target_issuer = issuer_queryset.filter(company_id=company_id).first()
+            if target_issuer is None:
+                raise PermissionDenied
 
     if not target_issuer and not create_new:
         target_issuer = active_issuer
 
     company_instance = target_issuer.company if target_issuer and target_issuer.company else None
     address_instance = company_instance.address if company_instance and company_instance.address else None
+    sif_settings_instance = get_sif_settings(target_issuer) if target_issuer else IssuerSifSettings()
 
     if request.method == 'POST':
         company_form = IssuerCompanyForm(request.POST, instance=None if create_new else company_instance)
         address_form = AddressForm(request.POST, instance=address_instance if not create_new else None)
         issuer_form = IssuerSettingsForm(request.POST, instance=target_issuer)
+        sif_form = IssuerSifSettingsForm(
+            request.POST,
+            instance=sif_settings_instance,
+            issuer_company_tax_id=request.POST.get('issuer_company-customer_information_file_number'),
+        )
         bank_account_formset = IssuerBankAccountFormSet(
             request.POST,
             instance=target_issuer or Issuer(),
@@ -3948,6 +3961,7 @@ def edit_company(request):
             company_form.is_valid()
             and address_form.is_valid()
             and issuer_form.is_valid()
+            and sif_form.is_valid()
             and bank_account_formset.is_valid()
         ):
             with transaction.atomic():
@@ -3960,6 +3974,10 @@ def edit_company(request):
                 issuer.company = company
                 issuer.save()
                 issuer_form.save_m2m()
+
+                sif_settings = sif_form.save(commit=False)
+                sif_settings.issuer = issuer
+                sif_settings.save()
 
                 bank_account_formset.instance = issuer
                 bank_account_formset.save()
@@ -3978,12 +3996,17 @@ def edit_company(request):
         company_form = IssuerCompanyForm(instance=company_instance)
         address_form = AddressForm(instance=address_instance)
         issuer_form = IssuerSettingsForm(instance=target_issuer)
+        sif_form = IssuerSifSettingsForm(instance=sif_settings_instance)
         bank_account_formset = IssuerBankAccountFormSet(instance=target_issuer, prefix='bank_accounts')
+
+    sif_readiness = get_sif_readiness(target_issuer) if target_issuer else None
 
     context = {
         'company_form': company_form,
         'address_form': address_form,
         'issuer_form': issuer_form,
+        'sif_form': sif_form,
+        'sif_readiness': sif_readiness,
         'bank_account_formset': bank_account_formset,
         'issuer_list': issuer_queryset,
         'target_issuer': target_issuer,

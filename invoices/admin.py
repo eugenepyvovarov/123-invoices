@@ -12,6 +12,7 @@ from .models import (
     IssuerEmailRoutingRule,
     IssuerBankAccount,
     Issuer,
+    IssuerSifSettings,
     OrderLine,
     Payment,
     PaymentApplication,
@@ -182,9 +183,49 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(Issuer)
 class IssuerAdmin(admin.ModelAdmin):
-    list_display = ("id", "company", "invoice_format", "next_invoice_number")
+    list_display = ("id", "company", "invoice_format", "next_invoice_number", "sif_tax_country", "sif_mode", "sif_readiness")
     search_fields = ("company__name",)
     autocomplete_fields = ("company",)
+
+    @admin.display(description="SIF country")
+    def sif_tax_country(self, obj):
+        return getattr(getattr(obj, "sif_settings", None), "tax_country", "") or "—"
+
+    @admin.display(description="SIF mode")
+    def sif_mode(self, obj):
+        settings = getattr(obj, "sif_settings", None)
+        return settings.get_mode_display() if settings else "—"
+
+    @admin.display(description="SIF readiness")
+    def sif_readiness(self, obj):
+        settings = getattr(obj, "sif_settings", None)
+        if not settings:
+            return "No settings"
+        return f"{'Enabled' if settings.enabled else 'Disabled'} / {settings.get_operational_status_display()}"
+
+
+@admin.register(IssuerSifSettings)
+class IssuerSifSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        "issuer",
+        "tax_country",
+        "enabled",
+        "mode",
+        "aeat_environment",
+        "deadline_category",
+        "informational_deadline",
+        "operational_status",
+    )
+    list_filter = ("tax_country", "enabled", "mode", "aeat_environment", "deadline_category", "operational_status")
+    search_fields = ("issuer__company__name", "issuer__company__customer_information_file_number", "certificate_reference")
+    autocomplete_fields = ("issuer",)
+    readonly_fields = ("created_at", "updated_at", "informational_deadline")
+    fieldsets = (
+        ("Issuer", {"fields": ("issuer", "tax_country", "enabled", "mode")}),
+        ("AEAT and readiness", {"fields": ("aeat_environment", "taxpayer_role", "deadline_category", "informational_deadline", "operational_status")}),
+        ("Software declaration", {"fields": ("software_name", "software_version", "software_code", "certificate_reference")}),
+        ("Audit", {"fields": ("created_at", "updated_at")}),
+    )
 
 
 @admin.register(Currency)

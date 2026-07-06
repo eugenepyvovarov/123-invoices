@@ -8,7 +8,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from invoices.company_deduplication import _normalize_company_contact_email, _normalize_company_tax_id
-from invoices.models import Address, Company, Customer, Invoice, Issuer, IssuerBankAccount, OrderLine, PaymentTerm, Project
+from invoices.models import Address, Company, Customer, Invoice, Issuer, IssuerBankAccount, IssuerSifSettings, OrderLine, PaymentTerm, Project
 from invoices.utils.company_context import get_active_issuer
 from tests.support import AuthenticatedCompanyTestCase, IssuerUserTestMixin
 
@@ -94,6 +94,76 @@ class EditCompanyViewTests(AuthenticatedCompanyTestCase):
         issuer = Issuer.objects.get(pk=self.issuer.pk)
         self.assertEqual(issuer.invoice_format, '{{YYYY}}-{{MM}}-{{ID}}')
         self.assertEqual(issuer.next_invoice_number, 12)
+
+    def test_updates_spanish_sif_settings_for_permitted_issuer(self):
+        payload = self._build_settings_payload(
+            **{
+                'issuer_company-customer_information_file_number': '12345678Z',
+                'sif_settings-tax_country': IssuerSifSettings.TaxCountry.SPAIN,
+                'sif_settings-enabled': 'on',
+                'sif_settings-mode': IssuerSifSettings.SifMode.NO_VERI_FACTU,
+                'sif_settings-aeat_environment': IssuerSifSettings.AeatEnvironment.TEST,
+                'sif_settings-taxpayer_role': IssuerSifSettings.TaxpayerRole.CORPORATE,
+                'sif_settings-deadline_category': IssuerSifSettings.DeadlineCategory.CORPORATE,
+                'sif_settings-software_name': 'Invoices',
+                'sif_settings-software_version': '2026.7',
+                'sif_settings-software_code': 'INV-SIF',
+                'sif_settings-certificate_reference': 'Test certificate label',
+                'sif_settings-operational_status': IssuerSifSettings.OperationalStatus.READY,
+            }
+        )
+
+        response = self.client.post(reverse('company:settings'), data=payload)
+
+        self.assertRedirects(response, reverse('company:settings'))
+        settings = self.issuer.sif_settings
+        self.assertEqual(settings.tax_country, IssuerSifSettings.TaxCountry.SPAIN)
+        self.assertTrue(settings.enabled)
+        self.assertEqual(settings.mode, IssuerSifSettings.SifMode.NO_VERI_FACTU)
+        self.assertEqual(settings.informational_deadline, date(2027, 1, 1))
+
+    def test_spanish_sif_enablement_requires_valid_spanish_tax_id(self):
+        payload = self._build_settings_payload(
+            **{
+                'issuer_company-customer_information_file_number': 'BE0123456789',
+                'sif_settings-tax_country': IssuerSifSettings.TaxCountry.SPAIN,
+                'sif_settings-enabled': 'on',
+                'sif_settings-mode': IssuerSifSettings.SifMode.VERI_FACTU,
+            }
+        )
+
+        response = self.client.post(reverse('company:settings'), data=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'SIF requires a valid Spanish NIF, NIE, or CIF for the issuer.')
+        self.issuer.sif_settings.refresh_from_db()
+        self.assertFalse(self.issuer.sif_settings.enabled)
+
+    def test_non_spanish_company_settings_show_no_sif_warnings_or_mode_controls(self):
+        settings = IssuerSifSettings.objects.create(
+            issuer=self.issuer,
+            tax_country=IssuerSifSettings.TaxCountry.OTHER,
+        )
+
+        response = self.client.get(reverse('company:settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-testid="non-spanish-no-sif-warning"', html=False)
+        self.assertNotContains(response, 'data-testid="spanish-sif-warning"', html=False)
+        self.assertNotContains(response, f'id="id_sif_settings-mode"', html=False)
+        settings.refresh_from_db()
+        self.assertFalse(settings.enabled)
+
+    def test_cross_issuer_company_settings_post_is_forbidden(self):
+        other_company = Company.objects.create(name='Other Co', customer_information_file_number='12345678Z')
+        other_issuer = Issuer.objects.create(company=other_company)
+        payload = self._build_settings_payload(company_id=str(other_issuer.company_id))
+
+        response = self.client.post(reverse('company:settings'), data=payload)
+
+        self.assertEqual(response.status_code, 403)
+        other_company.refresh_from_db()
+        self.assertEqual(other_company.name, 'Other Co')
 
     def test_updates_existing_company_allows_duplicate_tax_id_during_manual_edit(self):
         duplicate = Company.objects.create(name='Existing Duplicate', customer_information_file_number=' vat999 ')

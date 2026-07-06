@@ -242,9 +242,9 @@ class IssuerSifSettings(models.Model):
 
         from invoices.services.sif import is_valid_spanish_tax_id
 
-        tax_id = ''
+        tax_id = getattr(self, '_validation_tax_id', '')
         if self.issuer_id and self.issuer and self.issuer.company:
-            tax_id = self.issuer.company.customer_information_file_number
+            tax_id = tax_id or self.issuer.company.customer_information_file_number
         if not is_valid_spanish_tax_id(tax_id):
             errors['enabled'] = 'SIF requires a valid Spanish NIF, NIE, or CIF for the issuer.'
 
