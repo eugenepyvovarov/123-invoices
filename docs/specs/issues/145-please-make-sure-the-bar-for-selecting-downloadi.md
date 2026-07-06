@@ -62,10 +62,10 @@ Assumption: “this block” refers to the `.sticky-toolbar` / `.bulk-toolbar` s
   - [x] Update affected toolbar containers so nested fragments and direct page children use the same gap.
   - [x] Consolidate conflicting `.sticky-toolbar` styling if needed while preserving existing sticky behavior.
 
-- [ ] Preserve behavior and responsive layout
-  - [ ] Keep invoice and expense bulk action form targets, checkbox names, and download buttons unchanged.
-  - [ ] Confirm toolbar controls wrap cleanly on narrow viewports with the same surrounding gap.
-  - [ ] Add or update Django/template tests for the shared toolbar spacing hook on Invoices and Expenses.
+- [x] Preserve behavior and responsive layout
+  - [x] Keep invoice and expense bulk action form targets, checkbox names, and download buttons unchanged.
+  - [x] Confirm toolbar controls wrap cleanly on narrow viewports with the same surrounding gap.
+  - [x] Add or update Django/template tests for the shared toolbar spacing hook on Invoices and Expenses.
 
 - [ ] Add issue-specific visual evidence support
   - [ ] Add a Playwright visual capture spec for the Invoices and Expenses list pages.
