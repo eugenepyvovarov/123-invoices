@@ -10,6 +10,8 @@ for current setup or operations.
   commands, validation, and generated-file rules.
 - [Deployment](deployment.md): Docker image build, Compose runtime, live
   rollout, and verification checks.
+- [MCP server](mcp-server.md): Streamable HTTP endpoint, token setup,
+  environment values, artifact limits, client examples, and operational checks.
 - [Backups](backups.md): manual and scheduled backup behavior, timezone rules,
   locking, object key layout, and operator checks.
 - [Incoming invoice inbox](incoming-invoice-inbox.md): IMAP source setup,
