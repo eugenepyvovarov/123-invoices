@@ -156,6 +156,11 @@ issuer-sif-settings
 - The `spanish-issuer-sif-settings` baseline/current pair should show the added tax/SIF compliance section and dual-mode readiness controls without disrupting the existing general, finance, and invoice settings layout.
 - The `non-spanish-issuer-settings` baseline/current pair should show that non-Spanish issuers keep a normal settings page and are not visually pushed into Spanish SIF compliance.
 
+### Baseline SHA
+
+`f03999e02aa4ba9fea9cc1a56e71343058ac9d5a`
+
+
 ## File-Level Changes
 
 ### Add
