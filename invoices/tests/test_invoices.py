@@ -1410,7 +1410,7 @@ class CrossSurfaceOverdueConsistencyTests(AuthenticatedCompanyTestCase):
             issuer=self.issuer,
             customer=self.customer,
             project=self.project,
-            issued_date=self.today - timedelta(days=3),
+            issued_date=self.today,
             due_date=self.today + timedelta(days=5),
             status=Invoice.STATUS_OVERDUE,
             total_due=Decimal('100'),

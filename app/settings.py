@@ -56,6 +56,10 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'invoices.apps.InvoicesConfig',
     'expenses',
+    'api.apps.ApiConfig',
+    'rest_framework',
+    'django_filters',
+    'drf_spectacular',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -199,6 +203,38 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 OTP_TOTP_ISSUER = 'Invoices'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.ApiTokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.DefaultPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'api.exceptions.json_exception_handler',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Invoices API',
+    'DESCRIPTION': 'Authenticated account-scoped REST API for invoices.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'AUTHENTICATION_WHITELIST': [
+        'api.authentication.ApiTokenAuthentication',
+    ],
+}
+
+LOGIN_EXEMPT_URLS = [
+    '/api/',
+]
 
 
 # Internationalization
