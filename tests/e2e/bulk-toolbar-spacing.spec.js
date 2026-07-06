@@ -1,18 +1,18 @@
 const { test, expect } = require('@playwright/test');
 
-const { loginToDashboard } = require('./helpers/auth');
+const { gotoWithRetry, loginToDashboard } = require('./helpers/auth');
 const { captureCheckpointScreenshot } = require('./helpers/demo-evidence');
 
 const IS_BASELINE_VISUAL = process.env.OPENCODE_VISUAL_VALIDATION_TARGET === 'baseline';
 
 async function openListPage(page, path, headingName) {
   await page.setViewportSize({ width: 1600, height: 1200 });
-  await page.goto(path);
+  await gotoWithRetry(page, path);
 
   if (/\/accounts\/login\/?$/.test(new URL(page.url()).pathname)
     || /\/accounts\/login\/verify\/?$/.test(new URL(page.url()).pathname)) {
     await loginToDashboard(page);
-    await page.goto(path);
+    await gotoWithRetry(page, path);
   }
 
   await expect(page.getByRole('heading', { level: 1, name: headingName })).toBeVisible();
