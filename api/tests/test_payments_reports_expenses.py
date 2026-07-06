@@ -15,8 +15,8 @@ from invoices.models import Company, Customer, Expense, Invoice, Issuer, Payment
 class ApiPaymentsReportsExpensesTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username='api-chunk-user', password='test-password')
-        self.other_user = User.objects.create_user(username='api-chunk-other', password='test-password')
+        self.user = User.objects.create_user(username='api-chunk-user')
+        self.other_user = User.objects.create_user(username='api-chunk-other')
         self.issuer = self._issuer('Alpha API Ltd', self.user)
         self.second_issuer = self._issuer('Beta API Ltd', self.user)
         self.other_issuer = self._issuer('Hidden API Ltd', self.other_user)

@@ -11,7 +11,6 @@ class ApiTokenAuthenticationTests(TestCase):
         self.user = get_user_model().objects.create_user(
             username='api-user',
             email='api@example.com',
-            password='test-password',
         )
         self.url = reverse('api:me')
 
@@ -34,7 +33,8 @@ class ApiTokenAuthenticationTests(TestCase):
         self.assertIn('error', response.json())
 
     def test_invalid_token_returns_json_401(self):
-        response = self.client.get(self.url, HTTP_AUTHORIZATION='Bearer inv_bad_not-a-token')
+        invalid_token = f'{ApiToken.TOKEN_PREFIX}_bad_not-a-token'
+        response = self.client.get(self.url, HTTP_AUTHORIZATION=f'Bearer {invalid_token}')
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response['WWW-Authenticate'], 'Bearer')

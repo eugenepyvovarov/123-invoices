@@ -12,17 +12,14 @@ class ApiResourceEndpointTests(TestCase):
         self.user = User.objects.create_user(
             username='api-user',
             email='api@example.com',
-            password='test-password',
         )
         self.other_user = User.objects.create_user(
             username='other-api-user',
             email='other@example.com',
-            password='test-password',
         )
         self.superuser = User.objects.create_superuser(
             username='api-admin',
             email='admin@example.com',
-            password='test-password',
         )
         self.issuer = self._issuer('Alpha Company', self.user)
         self.other_issuer = self._issuer('Beta Company', self.other_user)

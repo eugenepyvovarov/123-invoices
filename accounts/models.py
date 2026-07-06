@@ -56,7 +56,7 @@ class ApiToken(models.Model):
     """Account-owned bearer token stored as a one-way hash."""
 
     TOKEN_PREFIX = 'inv'
-    SECRET_BYTES = 32
+    TOKEN_RANDOM_BYTES = 32
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -96,8 +96,8 @@ class ApiToken(models.Model):
     @classmethod
     def issue(cls, *, owner, name, expires_at=None):
         prefix = secrets.token_hex(4)
-        secret = secrets.token_urlsafe(cls.SECRET_BYTES)
-        token = f"{cls.TOKEN_PREFIX}_{prefix}_{secret}"
+        random_value = secrets.token_urlsafe(cls.TOKEN_RANDOM_BYTES)
+        token = f"{cls.TOKEN_PREFIX}_{prefix}_{random_value}"
         instance = cls.objects.create(
             owner=owner,
             name=name,

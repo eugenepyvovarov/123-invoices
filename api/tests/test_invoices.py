@@ -16,8 +16,8 @@ from invoices.models import Company, Customer, Invoice, Issuer, IssuerBankAccoun
 class ApiInvoiceEndpointTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username='invoice-api-user', password='test-password')
-        self.other_user = User.objects.create_user(username='invoice-api-other', password='test-password')
+        self.user = User.objects.create_user(username='invoice-api-user')
+        self.other_user = User.objects.create_user(username='invoice-api-other')
         self.issuer = self._issuer('API Issuer', self.user)
         self.other_issuer = self._issuer('Other Issuer', self.other_user)
         self.bank_account = IssuerBankAccount.objects.create(
@@ -51,6 +51,53 @@ class ApiInvoiceEndpointTests(TestCase):
 
     def auth(self, token=None):
         return {'HTTP_AUTHORIZATION': f'Bearer {token or self.token}'}
+
+    def test_invoice_list_and_detail_are_account_scoped(self):
+        invoice = Invoice.objects.create(
+            issuer=self.issuer,
+            customer=self.customer,
+            project=self.project,
+            external_id='visible-invoice',
+            issued_date=date(2026, 7, 2),
+        )
+        OrderLine.objects.create(
+            invoice=invoice,
+            description='Visible line',
+            quantity=1,
+            unit_price=Decimal('42.00'),
+        )
+        hidden_invoice = Invoice.objects.create(
+            issuer=self.other_issuer,
+            customer=self.other_customer,
+            external_id='hidden-invoice',
+            issued_date=date(2026, 7, 3),
+        )
+
+        list_response = self.client.get(
+            reverse('api:invoice-list'),
+            {'external_id': 'visible-invoice'},
+            **self.auth(),
+        )
+
+        self.assertEqual(list_response.status_code, 200)
+        results = list_response.json()['results']
+        self.assertEqual([item['id'] for item in results], [invoice.pk])
+        self.assertEqual(results[0]['issuer_id'], self.issuer.pk)
+        self.assertEqual(results[0]['customer_name'], self.customer.company.name)
+
+        detail_response = self.client.get(reverse('api:invoice-detail', args=[invoice.pk]), **self.auth())
+
+        self.assertEqual(detail_response.status_code, 200)
+        detail = detail_response.json()
+        self.assertEqual(detail['id'], invoice.pk)
+        self.assertEqual(detail['external_id'], 'visible-invoice')
+        self.assertEqual(detail['order_lines'][0]['description'], 'Visible line')
+
+        hidden_detail_response = self.client.get(
+            reverse('api:invoice-detail', args=[hidden_invoice.pk]),
+            **self.auth(),
+        )
+        self.assertEqual(hidden_detail_response.status_code, 404)
 
     def test_create_update_finalize_invoice_with_nested_order_lines(self):
         create_response = self.client.post(
