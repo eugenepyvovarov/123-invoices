@@ -56,11 +56,11 @@ Assumption: “this block” refers to the `.sticky-toolbar` / `.bulk-toolbar` s
 
 ## Task List
 
-- [ ] Normalize shared bulk-toolbar spacing
-  - [ ] Audit current select/download toolbar instances in invoice and expense templates.
-  - [ ] Add or reuse a shared stack/spacing class for toolbar-adjacent content.
-  - [ ] Update affected toolbar containers so nested fragments and direct page children use the same gap.
-  - [ ] Consolidate conflicting `.sticky-toolbar` styling if needed while preserving existing sticky behavior.
+- [x] Normalize shared bulk-toolbar spacing
+  - [x] Audit current select/download toolbar instances in invoice and expense templates.
+  - [x] Add or reuse a shared stack/spacing class for toolbar-adjacent content.
+  - [x] Update affected toolbar containers so nested fragments and direct page children use the same gap.
+  - [x] Consolidate conflicting `.sticky-toolbar` styling if needed while preserving existing sticky behavior.
 
 - [ ] Preserve behavior and responsive layout
   - [ ] Keep invoice and expense bulk action form targets, checkbox names, and download buttons unchanged.
