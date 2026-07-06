@@ -199,6 +199,7 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
     pdf_url = serializers.SerializerMethodField()
     is_finalized = serializers.SerializerMethodField()
     totals = serializers.SerializerMethodField()
+    payment_applications = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -212,13 +213,13 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
             'secondary_tax_name', 'uses_secondary_tax', 'sub_total', 'total_due',
             'base_currency_total', 'amount_paid', 'amount_due', 'amount_overdue',
             'last_payment_date', 'created_at', 'updated_at', 'has_pdf', 'pdf_url',
-            'is_finalized', 'totals', 'order_lines',
+            'is_finalized', 'totals', 'payment_applications', 'order_lines',
         ]
         read_only_fields = [
             'status', 'number', 'discount_amount', 'tax_base', 'tax_amount', 'sub_total',
             'total_due', 'base_currency_total', 'amount_paid', 'amount_due', 'amount_overdue',
             'last_payment_date', 'created_at', 'updated_at', 'has_pdf', 'pdf_url',
-            'is_finalized', 'totals',
+            'is_finalized', 'totals', 'payment_applications',
         ]
 
     def get_has_pdf(self, obj):
@@ -246,6 +247,20 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
             'amount_paid': money(obj.amount_paid),
             'amount_overdue': money(obj.amount_overdue),
         }
+
+    def get_payment_applications(self, obj):
+        applications = obj.payment_applications.select_related('payment').all()
+        return [
+            {
+                'id': application.pk,
+                'payment': application.payment_id,
+                'amount_applied': str((application.amount_applied or Decimal('0')).quantize(Decimal('0.01'))),
+                'applied_at': application.applied_at,
+                'payment_status': application.payment.status if application.payment_id else None,
+                'payment_received_at': application.payment.received_at if application.payment_id else None,
+            }
+            for application in applications
+        ]
 
     def get_fields(self):
         fields = super().get_fields()

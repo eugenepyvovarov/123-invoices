@@ -65,8 +65,24 @@ class MCPToolSchemaTests(TestCase):
         )
 
     def test_register_tools_adds_each_schema_tool(self):
+        class FakeTool:
+            def __init__(self, name, description):
+                self.name = name
+                self.description = description
+                self.parameters = None
+
+        class FakeToolManager:
+            def __init__(self):
+                self.tools = []
+
+            def add_tool(self, fn, *, name=None, description=None):
+                tool = FakeTool(name or fn.__name__, description)
+                self.tools.append(tool)
+                return tool
+
         class FakeMCP:
             def __init__(self):
+                self._tool_manager = FakeToolManager()
                 self.names = []
 
             def tool(self, *, name=None, description=None):
@@ -78,7 +94,11 @@ class MCPToolSchemaTests(TestCase):
 
         fake = register_tools(FakeMCP(), api_client_factory=lambda: FakeAPIClient())
 
-        self.assertEqual({name for name, _description in fake.names}, set(TOOL_SCHEMAS))
+        self.assertEqual({tool.name for tool in fake._tool_manager.tools}, set(TOOL_SCHEMAS))
+        self.assertEqual(
+            fake._tool_manager.tools[0].parameters,
+            TOOL_SCHEMAS[fake._tool_manager.tools[0].name]["input_schema"],
+        )
 
 
 class MCPToolCallTests(IsolatedAsyncioTestCase):
@@ -155,6 +175,31 @@ class MCPToolCallTests(IsolatedAsyncioTestCase):
         self.assertEqual(client.requests[0][0:2], ("POST", "invoices/4/generate-pdf/"))
         self.assertEqual(artifact["data"]["content_base64"], "JVBERg==")
         self.assertEqual(client.requests[1], ("DOWNLOAD", "invoices/4/pdf/", None, {"max_bytes": 10}))
+
+    async def test_artifact_metadata_omits_storage_paths_and_api_urls(self):
+        client = FakeAPIClient(
+            responses=[
+                {
+                    "invoice_id": 4,
+                    "pdf": {
+                        "available": True,
+                        "filename": "invoice.pdf",
+                        "name": "invoices_pdf/private/invoice.pdf",
+                        "url": "https://api.example.test/media/invoices_pdf/private/invoice.pdf",
+                        "content_type": "application/pdf",
+                        "size": 123,
+                    },
+                }
+            ]
+        )
+
+        result = await self.make_tools(client).get_invoice_artifact(4, mode="metadata")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["data"]["pdf"]["filename"], "invoice.pdf")
+        self.assertNotIn("name", result["data"]["pdf"])
+        self.assertNotIn("url", result["data"]["pdf"])
+        self.assertFalse(result["data"]["retrieval"]["requires_api_credentials"])
 
     async def test_artifact_limit_error_is_mcp_safe(self):
         client = FakeAPIClient(downloads=[(b"too-large", {})])

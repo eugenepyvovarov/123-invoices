@@ -40,6 +40,15 @@ runtime_name_suffix="${runtime_name_suffix//[^A-Za-z0-9_.-]/-}"
 web_container_name="invoices-runtime-web-ci-${runtime_name_suffix}"
 scheduler_container_name="invoices-runtime-scheduler-ci-${runtime_name_suffix}"
 mcp_container_name="invoices-runtime-mcp-ci-${runtime_name_suffix}"
+make_probe_bearer() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    python3 -c "import uuid; print(uuid.uuid4().hex + uuid.uuid4().hex)"
+  fi
+}
+mcp_api_bearer="$(make_probe_bearer)"
+mcp_client_bearer="$(make_probe_bearer)"
 cleanup() {
   "${DOCKER_BIN}" rm -f "${web_container_name}" >/dev/null 2>&1 || true
   "${DOCKER_BIN}" rm -f "${scheduler_container_name}" >/dev/null 2>&1 || true
@@ -85,8 +94,8 @@ mkdir -p "${runtime_tmpdir}/db" "${runtime_tmpdir}/media"
   -e RUN_MIGRATIONS="0" \
   -e ALLOWED_HOSTS="${ALLOWED_HOSTS:-127.0.0.1,localhost}" \
   -e INVOICES_MCP_API_BASE_URL="http://127.0.0.1:8000/api/" \
-  -e INVOICES_MCP_API_TOKEN="ci-upstream-token" \
-  -e INVOICES_MCP_CLIENT_TOKENS="ci-client-token" \
+  -e INVOICES_MCP_API_TOKEN="${mcp_api_bearer}" \
+  -e INVOICES_MCP_CLIENT_TOKENS="${mcp_client_bearer}" \
   -e INVOICES_MCP_HOST="0.0.0.0" \
   -e INVOICES_MCP_PORT="8765" \
   -v "${runtime_tmpdir}/db:/app/db" \
@@ -124,7 +133,7 @@ fi
 
 mcp_probe_passed=0
 for _ in 1 2 3 4 5; do
-  if "${DOCKER_BIN}" exec "${mcp_container_name}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "ci-client-token"; then
+  if "${DOCKER_BIN}" exec "${mcp_container_name}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "${mcp_client_bearer}"; then
     mcp_probe_passed=1
     break
   fi

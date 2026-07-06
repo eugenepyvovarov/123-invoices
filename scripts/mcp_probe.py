@@ -13,18 +13,21 @@ import asyncio
 import sys
 import urllib.error
 import urllib.request
+import uuid
 
 
-def assert_unauthenticated_rejected(url: str, timeout: float) -> None:
+def assert_bearer_rejected(url: str, timeout: float, *, token: str | None = None, label: str = "request") -> None:
     request = urllib.request.Request(url, data=b"{}", method="POST")
     request.add_header("Content-Type", "application/json")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            raise RuntimeError(f"Unauthenticated MCP probe unexpectedly returned HTTP {response.status}.")
+            raise RuntimeError(f"{label} MCP probe unexpectedly returned HTTP {response.status}.")
     except urllib.error.HTTPError as exc:
         if exc.code != 401:
-            raise RuntimeError(f"Unauthenticated MCP probe returned HTTP {exc.code}, expected 401.") from exc
+            raise RuntimeError(f"{label} MCP probe returned HTTP {exc.code}, expected 401.") from exc
 
 
 async def assert_authenticated_tool_list(url: str, token: str) -> int:
@@ -53,10 +56,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip the unauthenticated 401 probe when an external gateway handles auth before the MCP service.",
     )
+    parser.add_argument(
+        "--skip-invalid-token",
+        action="store_true",
+        help="Skip the invalid bearer-token 401 probe when an external gateway handles auth before the MCP service.",
+    )
     args = parser.parse_args(argv)
 
     if not args.skip_unauthenticated:
-        assert_unauthenticated_rejected(args.url, args.timeout)
+        assert_bearer_rejected(args.url, args.timeout, label="Unauthenticated")
+    if not args.skip_invalid_token:
+        assert_bearer_rejected(args.url, args.timeout, token=f"invalid-{uuid.uuid4().hex}", label="Invalid-token")
 
     tool_count = asyncio.run(assert_authenticated_tool_list(args.url, args.token))
     if tool_count < 1:

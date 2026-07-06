@@ -238,7 +238,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Invoice.objects.select_related(
             'issuer', 'customer', 'customer__company', 'project', 'bank_account', 'currency'
-        ).prefetch_related('orderline_set').filter(
+        ).prefetch_related('orderline_set', 'payment_applications__payment').filter(
             issuer_id__in=accessible_issuer_ids_for_user(self.request.user)
         )
 
@@ -350,10 +350,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 'pdf': {
                     'available': has_pdf,
                     'filename': invoice.pdf_document.name.rsplit('/', 1)[-1] if has_pdf else None,
-                    'name': invoice.pdf_document.name if has_pdf else None,
-                    'url': request.build_absolute_uri(invoice.pdf_document.url) if has_pdf else None,
                     'content_type': 'application/pdf' if has_pdf else None,
                     'size': invoice.pdf_document.size if has_pdf else None,
+                    'retrieval': 'Use the authenticated invoice PDF endpoint or MCP artifact content mode.',
                 },
             })
         return self.download_pdf(request, pk=pk)

@@ -143,6 +143,39 @@ class MCPAPIClientTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(context.exception.code, "upstream_timeout")
 
+    async def test_request_json_maps_not_found_conflict_and_server_errors(self):
+        cases = [
+            (404, {"detail": "Missing"}, "upstream_not_found", 404),
+            (409, {"message": "Invoice already finalized"}, "upstream_conflict", 409),
+            (500, {"detail": "Server error"}, "upstream_api_error", 502),
+        ]
+
+        for status_code, payload, expected_code, expected_status in cases:
+            with self.subTest(status_code=status_code):
+                def handler(request):
+                    return httpx.Response(status_code, json=payload)
+
+                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+                    client = InvoicesAPIClient(build_config(), client=http_client)
+                    with self.assertRaises(UpstreamAPIError) as context:
+                        await client.request_json("GET", "invoices/1/")
+
+                self.assertEqual(context.exception.code, expected_code)
+                self.assertEqual(context.exception.status_code, expected_status)
+                self.assertEqual(context.exception.upstream_status_code, status_code)
+
+    async def test_request_json_maps_request_error_to_upstream_outage(self):
+        def handler(request):
+            raise httpx.ConnectError("connection refused", request=request)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            client = InvoicesAPIClient(build_config(), client=http_client)
+            with self.assertRaises(UpstreamAPIError) as context:
+                await client.request_json("GET", "invoices/")
+
+        self.assertEqual(context.exception.code, "upstream_unavailable")
+        self.assertEqual(context.exception.status_code, 502)
+
     async def test_download_enforces_artifact_size_limit(self):
         def handler(request):
             return httpx.Response(200, content=b"abcdef")

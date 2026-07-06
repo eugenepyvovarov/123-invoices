@@ -1,5 +1,6 @@
 import base64
 from collections.abc import Awaitable, Callable, Mapping
+from copy import deepcopy
 from typing import Any
 
 from .api_client import InvoicesAPIClient
@@ -15,13 +16,14 @@ FINAL_STATES = {"final", "finalized", "sent", "invoiced", "overdue", "paid", "vo
 def register_tools(mcp_server, config: MCPConfig | None = None, api_client_factory: APIClientFactory | None = None):
     tools = InvoiceMCPTools(config=config, api_client_factory=api_client_factory)
 
-    for name in TOOL_SCHEMAS:
+    for name, schema in TOOL_SCHEMAS.items():
         method = getattr(tools, name)
-        description = TOOL_SCHEMAS[name]["description"]
-        try:
-            mcp_server.tool(name=name, description=description)(method)
-        except TypeError:
-            mcp_server.tool(description=description)(method)
+        description = schema["description"]
+        input_schema = deepcopy(schema["input_schema"])
+        registered_tool = _register_tool(mcp_server, method, name=name, description=description)
+        if registered_tool is not None and hasattr(registered_tool, "parameters"):
+            registered_tool.parameters = input_schema
+        _set_tool_input_schema(method, input_schema)
     return mcp_server
 
 
@@ -170,7 +172,10 @@ class InvoiceMCPTools:
         if max_bytes is not None and max_bytes < 1:
             return _error_payload(MCPServiceError("invalid_artifact_limit", "max_bytes must be a positive integer.", status_code=400))
         if mode == "metadata":
-            return await self._call(lambda client: client.request_json("GET", f"invoices/{invoice_id}/pdf/", params={"mode": "metadata"}))
+            result = await self._call(lambda client: client.request_json("GET", f"invoices/{invoice_id}/pdf/", params={"mode": "metadata"}))
+            if result.get("ok"):
+                result["data"] = _safe_artifact_metadata(invoice_id, result.get("data"))
+            return result
 
         async def operation(client: InvoicesAPIClient):
             content, headers = await client.download(f"invoices/{invoice_id}/pdf/", max_bytes=max_bytes)
@@ -225,6 +230,45 @@ def _clean_params(params: Mapping[str, Any]) -> dict[str, Any]:
 
 def _error_payload(error: MCPServiceError) -> dict[str, Any]:
     return {"ok": False, "error": error.to_payload()}
+
+
+def _register_tool(mcp_server, method, *, name: str, description: str):
+    tool_manager = getattr(mcp_server, "_tool_manager", None)
+    add_tool = getattr(tool_manager, "add_tool", None)
+    if callable(add_tool):
+        return add_tool(method, name=name, description=description)
+
+    try:
+        return mcp_server.tool(name=name, description=description)(method)
+    except TypeError:
+        return mcp_server.tool(description=description)(method)
+
+
+def _set_tool_input_schema(method, input_schema: Mapping[str, Any]) -> None:
+    target = getattr(method, "__func__", method)
+    try:
+        setattr(target, "__mcp_input_schema__", deepcopy(dict(input_schema)))
+    except (AttributeError, TypeError):
+        pass
+
+
+def _safe_artifact_metadata(invoice_id: int, payload: Any) -> dict[str, Any]:
+    data = payload if isinstance(payload, Mapping) else {}
+    pdf = data.get("pdf") if isinstance(data.get("pdf"), Mapping) else {}
+    return {
+        "invoice_id": data.get("invoice_id") or invoice_id,
+        "pdf": {
+            "available": bool(pdf.get("available")),
+            "filename": pdf.get("filename"),
+            "content_type": pdf.get("content_type"),
+            "size": pdf.get("size"),
+        },
+        "retrieval": {
+            "tool": "get_invoice_artifact",
+            "mode": "content",
+            "requires_api_credentials": False,
+        },
+    }
 
 
 def _is_finalized(invoice: Mapping[str, Any] | None) -> bool:

@@ -26,6 +26,16 @@ MCP_CONTAINER_NAME="${RUNTIME_SMOKE_MCP_NAME:-invoices-runtime-smoke-mcp}"
 RUNTIME_TMPDIR="${RUNTIME_SMOKE_TMPDIR:-$(mktemp -d)}"
 KEEP_RUNTIME_SMOKE_DIR="${KEEP_RUNTIME_SMOKE_DIR:-0}"
 
+make_probe_bearer() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    python3 -c "import uuid; print(uuid.uuid4().hex + uuid.uuid4().hex)"
+  fi
+}
+mcp_api_bearer="$(make_probe_bearer)"
+mcp_client_bearer="$(make_probe_bearer)"
+
 cleanup() {
   "${DOCKER_BIN}" rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
   "${DOCKER_BIN}" rm -f "${SCHEDULER_CONTAINER_NAME}" >/dev/null 2>&1 || true
@@ -100,8 +110,8 @@ assert_container_db_path "${CONTAINER_NAME}"
   -e RUN_MIGRATIONS="0" \
   -e ALLOWED_HOSTS="${ALLOWED_HOSTS:-127.0.0.1,localhost}" \
   -e INVOICES_MCP_API_BASE_URL="http://127.0.0.1:8000/api/" \
-  -e INVOICES_MCP_API_TOKEN="runtime-smoke-upstream-token" \
-  -e INVOICES_MCP_CLIENT_TOKENS="runtime-smoke-client-token" \
+  -e INVOICES_MCP_API_TOKEN="${mcp_api_bearer}" \
+  -e INVOICES_MCP_CLIENT_TOKENS="${mcp_client_bearer}" \
   -e INVOICES_MCP_HOST="0.0.0.0" \
   -e INVOICES_MCP_PORT="8765" \
   -v "${RUNTIME_TMPDIR}/db:/app/db" \
@@ -127,7 +137,7 @@ fi
 
 mcp_probe_passed=0
 for _ in 1 2 3 4 5; do
-  if "${DOCKER_BIN}" exec "${MCP_CONTAINER_NAME}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "runtime-smoke-client-token"; then
+  if "${DOCKER_BIN}" exec "${MCP_CONTAINER_NAME}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "${mcp_client_bearer}"; then
     mcp_probe_passed=1
     break
   fi

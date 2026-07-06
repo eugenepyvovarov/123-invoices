@@ -7,7 +7,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import ApiToken
-from invoices.models import Company, Customer, Invoice, Issuer, IssuerBankAccount, OrderLine, Project
+from invoices.models import Company, Customer, Invoice, Issuer, IssuerBankAccount, OrderLine, Payment, PaymentApplication, Project
 from tests.support import IssuerUserTestMixin
 
 
@@ -119,6 +119,14 @@ class InvoicesMCPAPITests(IssuerUserTestMixin, TestCase):
             total_due=Decimal('100.00'),
         )
         OrderLine.objects.create(invoice=invoice, description='Consulting', quantity=1, unit_price=100)
+        payment = Payment.objects.create(
+            issuer=self.issuer,
+            customer=self.customer,
+            project=self.project,
+            amount=Decimal('25.00'),
+            received_at=date(2026, 7, 7),
+        )
+        PaymentApplication.objects.create(payment=payment, invoice=invoice, amount_applied=Decimal('25.00'))
 
         search = self.client.get('/api/invoices/', {'search': 'Acme'})
         detail = self.client.get(f'/api/invoices/{invoice.id}/')
@@ -128,10 +136,14 @@ class InvoicesMCPAPITests(IssuerUserTestMixin, TestCase):
         self.assertEqual(search.status_code, 200)
         self.assertEqual(search.json()['results'][0]['id'], invoice.id)
         self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()['payment_applications'][0]['payment'], payment.id)
+        self.assertEqual(detail.json()['payment_applications'][0]['amount_applied'], '25.00')
         self.assertEqual(suggestions.status_code, 200)
         self.assertEqual(suggestions.json()['results'][0]['description'], 'Consulting')
         self.assertEqual(pdf_metadata.status_code, 200)
         self.assertFalse(pdf_metadata.json()['pdf']['available'])
+        self.assertNotIn('name', pdf_metadata.json()['pdf'])
+        self.assertNotIn('url', pdf_metadata.json()['pdf'])
 
     def test_generate_pdf_uses_api_checked_invoice_scope(self):
         invoice = Invoice.objects.create(
