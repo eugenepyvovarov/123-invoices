@@ -35,9 +35,11 @@ cd "${REPO_ROOT}"
   python manage.py test
 
 runtime_tmpdir="$(mktemp -d)"
-web_container_name="invoices-runtime-web-ci-$$"
-scheduler_container_name="invoices-runtime-scheduler-ci-$$"
-mcp_container_name="invoices-runtime-mcp-ci-$$"
+runtime_name_suffix="${OPENCODE_CI_CONTAINER_SUFFIX:-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-${GITHUB_JOB:-job}-$$-${RANDOM}}"
+runtime_name_suffix="${runtime_name_suffix//[^A-Za-z0-9_.-]/-}"
+web_container_name="invoices-runtime-web-ci-${runtime_name_suffix}"
+scheduler_container_name="invoices-runtime-scheduler-ci-${runtime_name_suffix}"
+mcp_container_name="invoices-runtime-mcp-ci-${runtime_name_suffix}"
 cleanup() {
   "${DOCKER_BIN}" rm -f "${web_container_name}" >/dev/null 2>&1 || true
   "${DOCKER_BIN}" rm -f "${scheduler_container_name}" >/dev/null 2>&1 || true
