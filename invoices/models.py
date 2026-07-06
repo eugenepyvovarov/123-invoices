@@ -132,6 +132,126 @@ class Issuer(models.Model):
         return pattern
 
 
+class IssuerSifSettings(models.Model):
+    class TaxCountry(models.TextChoices):
+        UNSPECIFIED = '', 'Unspecified'
+        SPAIN = 'ES', 'Spain'
+        OTHER = 'OTHER', 'Other country'
+
+    class SifMode(models.TextChoices):
+        VERI_FACTU = 'VERI_FACTU', 'VERI*FACTU'
+        NO_VERI_FACTU = 'NO_VERI_FACTU', 'No VERI*FACTU'
+
+    class AeatEnvironment(models.TextChoices):
+        TEST = 'TEST', 'AEAT test'
+        PRODUCTION = 'PRODUCTION', 'AEAT production'
+
+    class TaxpayerRole(models.TextChoices):
+        CORPORATE = 'CORPORATE', 'SL / corporate taxpayer'
+        AUTONOMO = 'AUTONOMO', 'Autónomo / individual taxpayer'
+        OTHER = 'OTHER', 'Other covered taxpayer'
+
+    class DeadlineCategory(models.TextChoices):
+        CORPORATE = 'CORPORATE', 'Corporate Tax deadline'
+        AUTONOMO_OTHER = 'AUTONOMO_OTHER', 'Autónomo / other taxpayer deadline'
+
+    class OperationalStatus(models.TextChoices):
+        NOT_READY = 'NOT_READY', 'Not ready'
+        READY = 'READY', 'Ready'
+        SUSPENDED = 'SUSPENDED', 'Suspended'
+
+    CORPORATE_DEADLINE = date(2027, 1, 1)
+    AUTONOMO_OTHER_DEADLINE = date(2027, 7, 1)
+
+    issuer = models.OneToOneField(
+        Issuer,
+        on_delete=models.CASCADE,
+        related_name='sif_settings',
+    )
+    tax_country = models.CharField(
+        max_length=16,
+        choices=TaxCountry.choices,
+        default=TaxCountry.UNSPECIFIED,
+        blank=True,
+        help_text='Explicit issuer/establishment tax country. Spain (ES) makes SIF applicable.',
+    )
+    enabled = models.BooleanField(default=False)
+    mode = models.CharField(
+        max_length=16,
+        choices=SifMode.choices,
+        default=SifMode.VERI_FACTU,
+    )
+    aeat_environment = models.CharField(
+        max_length=16,
+        choices=AeatEnvironment.choices,
+        default=AeatEnvironment.TEST,
+    )
+    taxpayer_role = models.CharField(
+        max_length=16,
+        choices=TaxpayerRole.choices,
+        default=TaxpayerRole.OTHER,
+    )
+    deadline_category = models.CharField(
+        max_length=16,
+        choices=DeadlineCategory.choices,
+        default=DeadlineCategory.AUTONOMO_OTHER,
+    )
+    software_name = models.CharField(max_length=128, blank=True, default='')
+    software_version = models.CharField(max_length=64, blank=True, default='')
+    software_code = models.CharField(max_length=64, blank=True, default='')
+    certificate_reference = models.CharField(
+        max_length=128,
+        blank=True,
+        default='',
+        help_text='Non-secret certificate label or external reference only.',
+    )
+    operational_status = models.CharField(
+        max_length=16,
+        choices=OperationalStatus.choices,
+        default=OperationalStatus.NOT_READY,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Issuer SIF settings'
+        verbose_name_plural = 'Issuer SIF settings'
+        ordering = ['issuer']
+
+    def __str__(self):
+        return f'SIF settings for {self.issuer}'
+
+    @property
+    def is_spanish_issuer(self):
+        return self.tax_country == self.TaxCountry.SPAIN
+
+    @property
+    def informational_deadline(self):
+        if self.deadline_category == self.DeadlineCategory.CORPORATE:
+            return self.CORPORATE_DEADLINE
+        return self.AUTONOMO_OTHER_DEADLINE
+
+    def clean(self):
+        super().clean()
+        if not self.enabled:
+            return
+
+        errors = {}
+        if not self.is_spanish_issuer:
+            errors['enabled'] = 'SIF can only be enabled for Spanish issuers.'
+
+        from invoices.services.sif import is_valid_spanish_tax_id
+
+        tax_id = ''
+        if self.issuer_id and self.issuer and self.issuer.company:
+            tax_id = self.issuer.company.customer_information_file_number
+        if not is_valid_spanish_tax_id(tax_id):
+            errors['enabled'] = 'SIF requires a valid Spanish NIF, NIE, or CIF for the issuer.'
+
+        if errors:
+            raise ValidationError(errors)
+
+
 class IssuerBankAccount(models.Model):
     issuer = models.ForeignKey(
         Issuer, on_delete=models.CASCADE, related_name='bank_accounts')
