@@ -85,12 +85,12 @@ Add the SIF / VERI*FACTU foundation for Spanish issuers in the multi-issuer invo
   - [x] Add a SIF service for settings lookup, Spanish tax ID normalization/validation, readiness, and effective activation.
   - [x] Add model and service tests for defaults, both modes, deadlines, invalid identities, and issuer isolation.
 
-- [ ] Integrate SIF settings into company and admin UI
-  - [ ] Add an `IssuerSifSettingsForm` with Spanish-only enablement validation.
-  - [ ] Update `edit_company` to create/load SIF settings for the target issuer and save them inside the existing transaction.
-  - [ ] Add the company settings tax/SIF section with Spanish-only warnings and dual-mode controls.
-  - [ ] Update Django admin list/detail surfaces for issuer SIF applicability and readiness.
-  - [ ] Add view/form/template tests for permitted users, cross-issuer access prevention, Spanish enablement, and non-Spanish behavior.
+- [x] Integrate SIF settings into company and admin UI
+  - [x] Add an `IssuerSifSettingsForm` with Spanish-only enablement validation.
+  - [x] Update `edit_company` to create/load SIF settings for the target issuer and save them inside the existing transaction.
+  - [x] Add the company settings tax/SIF section with Spanish-only warnings and dual-mode controls.
+  - [x] Update Django admin list/detail surfaces for issuer SIF applicability and readiness.
+  - [x] Add view/form/template tests for permitted users, cross-issuer access prevention, Spanish enablement, and non-Spanish behavior.
 
 - [ ] Add reviewer evidence and documentation hooks
   - [ ] Add a Playwright spec or extend an existing company-settings spec for Spanish SIF settings and non-Spanish guardrails.
