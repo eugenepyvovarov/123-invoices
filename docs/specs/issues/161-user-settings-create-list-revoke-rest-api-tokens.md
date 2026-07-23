@@ -168,6 +168,11 @@ api-token-settings
 - The `user-settings-api-tokens` baseline/current pair should show a new dedicated Invoices API token management section.
 - The Expense import AI provider settings should remain visually separate and not appear repurposed as REST API token management.
 
+### Baseline SHA
+
+`f03999e02aa4ba9fea9cc1a56e71343058ac9d5a`
+
+
 ## Open Questions
 
 None.
