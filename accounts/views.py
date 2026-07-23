@@ -9,13 +9,14 @@ from django.views import View
 from django_otp import login as otp_login, user_has_device
 
 from accounts.forms import (
+    ApiTokenCreateForm,
     EmailAuthenticationForm,
     ExpenseAIProviderSettingsForm,
     OTPTokenForm,
     RecoveryCodeForm,
     UserProfileForm,
 )
-from accounts.models import Profile
+from accounts.models import ApiToken, Profile
 from accounts.utils import otp as otp_utils
 from invoices.models import Issuer
 
@@ -133,6 +134,9 @@ def user_settings(request):
     _style_password_form(password_form)
     profile_form = UserProfileForm(instance=request.user)
     expense_ai_form = ExpenseAIProviderSettingsForm(instance=profile)
+    api_token_form = ApiTokenCreateForm()
+    new_api_token = None
+    new_api_token_plaintext = None
     otp_form = OTPTokenForm()
     _style_otp_form(otp_form)
     pending_device = otp_utils.get_pending_device(request.user)
@@ -192,6 +196,27 @@ def user_settings(request):
                 messages.success(request, "Expense import AI provider settings updated.")
                 return redirect('accounts:user_settings')
             messages.error(request, "Please fix the highlighted AI provider settings errors and try again.")
+        elif form_action == 'create_api_token':
+            api_token_form = ApiTokenCreateForm(request.POST)
+            if api_token_form.is_valid():
+                new_api_token, new_api_token_plaintext = ApiToken.issue(
+                    owner=request.user,
+                    name=api_token_form.cleaned_data['name'],
+                    expires_at=api_token_form.cleaned_data['expires_at'],
+                )
+                api_token_form = ApiTokenCreateForm()
+                messages.success(request, "Invoices API token created. Copy it now; it will not be shown again.")
+            else:
+                messages.error(request, "Please fix the highlighted API token errors and try again.")
+        elif form_action == 'revoke_api_token':
+            token_id = request.POST.get('token_id')
+            api_token = request.user.api_tokens.filter(pk=token_id).first()
+            if api_token:
+                api_token.revoke()
+                messages.success(request, "Invoices API token revoked.")
+            else:
+                messages.error(request, "API token not found.")
+            return redirect('accounts:user_settings')
         elif form_action == 'start_totp':
             if confirmed_device:
                 messages.info(request, "Two-factor authentication is already enabled.")
@@ -248,6 +273,10 @@ def user_settings(request):
         'password_form': password_form,
         'profile_form': profile_form,
         'expense_ai_form': expense_ai_form,
+        'api_token_form': api_token_form,
+        'api_tokens': request.user.api_tokens.order_by('-created_at', '-id'),
+        'new_api_token': new_api_token,
+        'new_api_token_plaintext': new_api_token_plaintext,
         'expense_ai_has_key': profile.has_expense_ai_api_key,
         'expense_ai_masked_key': profile.masked_expense_ai_api_key,
         'user_issuers': issuers,

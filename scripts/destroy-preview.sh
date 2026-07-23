@@ -10,7 +10,7 @@ COMPOSE_PROJECT="$(preview_compose_project)"
 COMPOSE_FILE="$(preview_compose_file)"
 
 if [ -f "${COMPOSE_FILE}" ]; then
-  docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" down --remove-orphans || true
+  docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" down --volumes --remove-orphans || true
 fi
 
 remove_preview_source_root

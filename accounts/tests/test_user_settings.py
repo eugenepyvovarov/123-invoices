@@ -1,9 +1,12 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.urls import reverse
+from django.utils import timezone
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from accounts.models import ApiToken
 from tests.support import AuthenticatedCompanyTestCase
 
 
@@ -116,6 +119,132 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertContains(response, 'API key is required to enable AI mapping inference.')
         self.user.profile.refresh_from_db()
         self.assertEqual(self.user.profile.expense_ai_provider_base_url, '')
+
+    def test_get_lists_only_owned_api_tokens(self):
+        owned_token, _ = ApiToken.issue(owner=self.user, name='Owned token')
+        other_user = self.create_user_with_issuers(username='other-api-user', email='other-api@example.com')
+        other_token, _ = ApiToken.issue(owner=other_user, name='Other token')
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('api_token_form', response.context)
+        self.assertEqual(list(response.context['api_tokens']), [owned_token])
+        self.assertNotIn(other_token, list(response.context['api_tokens']))
+        self.assertContains(response, 'Invoices API tokens')
+        self.assertContains(response, 'Owned token')
+        self.assertContains(response, owned_token.prefix)
+        self.assertContains(response, 'Active')
+        self.assertNotContains(response, 'Other token')
+
+    def test_get_renders_api_token_status_badges_and_expense_ai_label(self):
+        active_token, _ = ApiToken.issue(owner=self.user, name='Active token')
+        expired_token, _ = ApiToken.issue(
+            owner=self.user,
+            name='Expired token',
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        revoked_token, _ = ApiToken.issue(owner=self.user, name='Revoked token')
+        revoked_token.revoke()
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Invoices API tokens')
+        self.assertContains(response, 'Expense import AI provider')
+        self.assertContains(response, 'This provider API key is not an Invoices REST API token.')
+        self.assertContains(response, active_token.prefix)
+        self.assertContains(response, expired_token.prefix)
+        self.assertContains(response, revoked_token.prefix)
+        self.assertContains(response, 'Active')
+        self.assertContains(response, 'Expired')
+        self.assertContains(response, 'Revoked')
+
+    def test_create_api_token_uses_form_and_reveals_plaintext_once(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.post(self.settings_url, {
+            'action': 'create_api_token',
+            'name': 'Reporting integration',
+            'expires_at': '2026-12-31 17:00',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        api_token = ApiToken.objects.get(owner=self.user, name='Reporting integration')
+        plaintext = response.context['new_api_token_plaintext']
+        self.assertEqual(response.context['new_api_token'], api_token)
+        self.assertTrue(plaintext.startswith(f'{ApiToken.TOKEN_PREFIX}_{api_token.prefix}_'))
+        self.assertNotEqual(api_token.secret_hash, plaintext)
+        self.assertEqual(api_token.secret_hash, ApiToken.make_secret_hash(plaintext))
+        self.assertEqual(api_token.expires_at.date().isoformat(), '2026-12-31')
+        self.assertIn(api_token, list(response.context['api_tokens']))
+        self.assertContains(response, 'Copy your new token now')
+        self.assertContains(response, plaintext)
+        self.assertContains(response, api_token.prefix)
+
+        follow_up = self.client.get(self.settings_url)
+        self.assertIsNone(follow_up.context['new_api_token_plaintext'])
+        self.assertNotContains(follow_up, plaintext)
+
+    def test_create_api_token_requires_name(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.post(self.settings_url, {
+            'action': 'create_api_token',
+            'name': '   ',
+            'expires_at': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ApiToken.objects.filter(owner=self.user).exists())
+        self.assertFormError(response.context['api_token_form'], 'name', 'This field is required.')
+
+    def test_revoke_api_token_scopes_lookup_to_owner(self):
+        owned_token, _ = ApiToken.issue(owner=self.user, name='Owned token')
+        other_user = self.create_user_with_issuers(username='other-revoke-user', email='other-revoke@example.com')
+        other_token, _ = ApiToken.issue(owner=other_user, name='Other token')
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.post(self.settings_url, {
+            'action': 'revoke_api_token',
+            'token_id': other_token.pk,
+        })
+
+        self.assertRedirects(response, self.settings_url)
+        owned_token.refresh_from_db()
+        other_token.refresh_from_db()
+        self.assertIsNone(owned_token.revoked_at)
+        self.assertIsNone(other_token.revoked_at)
+
+        response = self.client.post(self.settings_url, {
+            'action': 'revoke_api_token',
+            'token_id': owned_token.pk,
+        })
+
+        self.assertRedirects(response, self.settings_url)
+        owned_token.refresh_from_db()
+        self.assertIsNotNone(owned_token.revoked_at)
+
+    def test_ui_created_revoked_token_cannot_authenticate_to_api(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+        create_response = self.client.post(self.settings_url, {
+            'action': 'create_api_token',
+            'name': 'Temporary API client',
+            'expires_at': '',
+        })
+        plaintext = create_response.context['new_api_token_plaintext']
+        api_token = create_response.context['new_api_token']
+
+        self.client.logout()
+        api_response = self.client.get(reverse('api:me'), HTTP_AUTHORIZATION=f'Bearer {plaintext}')
+        self.assertEqual(api_response.status_code, 200)
+
+        api_token.revoke()
+        revoked_response = self.client.get(reverse('api:me'), HTTP_AUTHORIZATION=f'Bearer {plaintext}')
+        self.assertEqual(revoked_response.status_code, 401)
+        self.assertIn('revoked', revoked_response.json()['error']['message'])
 
     def test_toggle_default_company_sets_profile_and_active_company_session(self):
         self.login_with_active_company(self.user, issuer=self.issuer_a)
