@@ -1,6 +1,9 @@
 from datetime import timedelta
+from contextlib import contextmanager
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -150,6 +153,154 @@ class MCPOAuthProtocolTests(TestCase):
         if client_type == Application.CLIENT_CONFIDENTIAL:
             kwargs['client_secret'] = 'secret'
         return Application.objects.create(**kwargs)
+
+
+@override_settings(
+    MCP_OAUTH_ISSUER_URL=MCP_ISSUER,
+    MCP_OAUTH_RESOURCE_URL=MCP_RESOURCE,
+    MCP_OAUTH_CIMD_CACHE_SECONDS=60,
+    MCP_OAUTH_CIMD_TIMEOUT_SECONDS=1,
+    MCP_OAUTH_CIMD_MAX_BYTES=512,
+)
+class MCPOAuthCIMDTests(TestCase):
+    client_id = 'https://client.example.test/oauth/client-metadata.json'
+    redirect_uri = 'https://client.example.test/callback'
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_authorize_fetches_valid_cimd_metadata_and_registers_public_client(self):
+        with self._mock_fetch(
+            {
+                'client_id': self.client_id,
+                'client_name': '  Example\nMCP Client  ',
+                'redirect_uris': [self.redirect_uri],
+            }
+        ) as mocks:
+            response = self._authorize(self.client_id, self.redirect_uri)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response['Location'])
+        mocks.assert_called_once()
+        app = get_application_model().objects.get(client_id=self.client_id)
+        self.assertEqual(app.name, 'Example MCP Client')
+        self.assertEqual(app.client_type, get_application_model().CLIENT_PUBLIC)
+        self.assertEqual(app.redirect_uris, self.redirect_uri)
+
+    def test_invalid_cimd_metadata_is_rejected(self):
+        with self._mock_fetch({'client_id': 'https://other.example.test/client.json', 'redirect_uris': [self.redirect_uri]}):
+            response = self._authorize(self.client_id, self.redirect_uri)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_client_metadata')
+        self.assertFalse(get_application_model().objects.filter(client_id=self.client_id).exists())
+
+    def test_redirect_uri_must_match_metadata(self):
+        with self._mock_fetch({'client_id': self.client_id, 'redirect_uris': [self.redirect_uri]}):
+            response = self._authorize(self.client_id, 'https://client.example.test/other-callback')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_request')
+
+    def test_caches_valid_metadata(self):
+        with self._mock_fetch({'client_id': self.client_id, 'redirect_uris': [self.redirect_uri]}) as mocks:
+            first = self._authorize(self.client_id, self.redirect_uri)
+            get_application_model().objects.filter(client_id=self.client_id).delete()
+            second = self._authorize(self.client_id, self.redirect_uri)
+
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(second.status_code, 302)
+        mocks.assert_called_once()
+
+    def test_rejects_unsafe_metadata_and_redirect_hosts(self):
+        cases = [
+            ('http://client.example.test/metadata.json', self.redirect_uri),
+            ('file:///tmp/client.json', self.redirect_uri),
+            ('https://localhost/client.json', self.redirect_uri),
+            (self.client_id, 'https://127.0.0.1/callback'),
+        ]
+        for client_id, redirect_uri in cases:
+            with self.subTest(client_id=client_id, redirect_uri=redirect_uri):
+                if client_id == self.client_id:
+                    context = self._mock_fetch({'client_id': client_id, 'redirect_uris': [redirect_uri]})
+                else:
+                    context = self._mock_fetch({'client_id': client_id, 'redirect_uris': [redirect_uri]})
+                with context:
+                    response = self._authorize(client_id, redirect_uri)
+                self.assertEqual(response.status_code, 400)
+
+    def test_rejects_oversized_metadata_document(self):
+        with self._mock_fetch(
+            {'client_id': self.client_id, 'redirect_uris': [self.redirect_uri], 'padding': 'x' * 600}
+        ):
+            response = self._authorize(self.client_id, self.redirect_uri)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_client_metadata')
+
+    def test_preregistered_client_takes_priority_over_cimd(self):
+        user = get_user_model().objects.create_user(username='owner')
+        get_application_model().objects.create(
+            name='Pre-registered Hermes',
+            user=user,
+            client_id=self.client_id,
+            client_type=get_application_model().CLIENT_PUBLIC,
+            authorization_grant_type=get_application_model().GRANT_AUTHORIZATION_CODE,
+            redirect_uris=self.redirect_uri,
+        )
+        with patch('mcp_oauth.cimd.urlopen') as urlopen_mock:
+            response = self._authorize(self.client_id, self.redirect_uri)
+
+        self.assertEqual(response.status_code, 302)
+        urlopen_mock.assert_not_called()
+        self.assertEqual(get_application_model().objects.get(client_id=self.client_id).name, 'Pre-registered Hermes')
+
+    def _authorize(self, client_id, redirect_uri):
+        return self.client.get(
+            reverse('oauth2_provider:authorize'),
+            {
+                'response_type': 'code',
+                'client_id': client_id,
+                'redirect_uri': redirect_uri,
+                'scope': 'invoices:mcp:read',
+                'code_challenge': 'x' * 43,
+                'code_challenge_method': 'S256',
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+    def _mock_fetch(self, payload, *, content_type='application/json'):
+        response = _CIMDResponse(payload, content_type=content_type)
+        return _mock_cimd_fetch(response)
+
+
+@contextmanager
+def _mock_cimd_fetch(response):
+    with patch('mcp_oauth.cimd.urlopen', Mock(return_value=response)) as urlopen_mock:
+        with patch('mcp_oauth.cimd._resolve_host_addresses', Mock(return_value=['93.184.216.34'])):
+            yield urlopen_mock
+
+
+class _CIMDResponse:
+    def __init__(self, payload, *, content_type='application/json'):
+        import json
+
+        self._body = json.dumps(payload).encode()
+        self.headers = {'Content-Type': content_type}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self, size=-1):
+        if size == -1:
+            return self._body
+        return self._body[:size]
 
 
 @override_settings(
