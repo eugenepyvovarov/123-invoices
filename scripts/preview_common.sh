@@ -227,7 +227,7 @@ public_preview_url() {
 }
 
 health_url() {
-  printf '%s/accounts/login/\n' "$(backend_url)"
+  printf '%s/accounts/login/\n' "$(public_preview_url)"
 }
 
 wait_for_http() {
