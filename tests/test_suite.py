@@ -950,7 +950,7 @@ class ChunkValidationTests(unittest.TestCase):
         preview_text = (ROOT / 'scripts' / 'preview.sh').read_text()
         destroy_text = (ROOT / 'scripts' / 'destroy-preview.sh').read_text()
 
-        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-127.0.0.1', preview_common_text)
+        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal', preview_common_text)
         self.assertIn('preview_backend_host() {', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_ROLE:-current', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_REF', preview_common_text)
