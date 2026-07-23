@@ -17,6 +17,7 @@ ENV_FILE="$(preview_env_file)"
 IMAGE_TAG="$(preview_image)"
 
 mkdir -p "${RUNTIME_DIR}/db" "${RUNTIME_DIR}/media"
+chmod -R a+rwX "${RUNTIME_DIR}/db" "${RUNTIME_DIR}/media"
 
 cat > "${ENV_FILE}" <<EOF
 SECRET_KEY=preview-pr-$(preview_pr_number)-$(preview_git_sha)
