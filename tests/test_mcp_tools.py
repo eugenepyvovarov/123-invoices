@@ -1,4 +1,5 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, mock
+from uuid import uuid4
 
 from invoices_mcp.config import MCPConfig
 from invoices_mcp.errors import UpstreamAPIError
@@ -109,7 +110,7 @@ class MCPToolCallTests(IsolatedAsyncioTestCase):
     def make_configured_tools(self, client):
         config = MCPConfig(
             api_base_url="https://api.example.test/api/",
-            api_token="upstream-secret",
+            api_token=str(uuid4()),
             oauth_issuer_url="https://auth.example.test/",
             oauth_resource_url="https://mcp.example.test/mcp/",
         )

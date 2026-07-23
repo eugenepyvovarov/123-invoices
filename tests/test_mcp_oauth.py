@@ -1,13 +1,17 @@
 from datetime import timedelta
+import base64
+import hashlib
 from contextlib import contextmanager
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.utils.crypto import get_random_string
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from oauth2_provider.models import get_access_token_model, get_application_model
+from oauth2_provider.models import get_access_token_model, get_application_model, get_grant_model
 
 from mcp_oauth.models import AccessTokenResource
 
@@ -53,7 +57,6 @@ class MCPOAuthProtocolTests(TestCase):
         self.user = get_user_model().objects.create_user(
             username='oauth-user',
             email='oauth-user@example.test',
-            password='password',
         )
         self.application = self._create_application(
             client_id='mcp-client',
@@ -131,6 +134,126 @@ class MCPOAuthProtocolTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['error'], 'invalid_target')
 
+    def test_authorization_code_pkce_success_binds_token_to_mcp_resource(self):
+        verifier = _pkce_verifier()
+        grant = self._create_authorization_code_grant(
+            code=get_random_string(48),
+            code_challenge=_s256_challenge(verifier),
+            scope='invoices:mcp:read invoices:mcp:artifact:read',
+        )
+
+        response = self.client.post(
+            reverse('oauth2_provider:token'),
+            {
+                'grant_type': 'authorization_code',
+                'code': grant.code,
+                'client_id': self.application.client_id,
+                'redirect_uri': 'https://client.example.test/callback',
+                'code_verifier': verifier,
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['token_type'], 'Bearer')
+        access_token = get_access_token_model().objects.get(token=payload['access_token'])
+        self.assertEqual(access_token.scope, 'invoices:mcp:read invoices:mcp:artifact:read')
+        self.assertEqual(access_token.mcp_resource_binding.resource, MCP_RESOURCE)
+
+    def test_authorization_code_pkce_failure_rejects_wrong_verifier(self):
+        verifier = _pkce_verifier()
+        grant = self._create_authorization_code_grant(
+            code=get_random_string(48),
+            code_challenge=_s256_challenge(verifier),
+            scope='invoices:mcp:read',
+        )
+
+        response = self.client.post(
+            reverse('oauth2_provider:token'),
+            {
+                'grant_type': 'authorization_code',
+                'code': grant.code,
+                'client_id': self.application.client_id,
+                'redirect_uri': 'https://client.example.test/callback',
+                'code_verifier': _pkce_verifier(),
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_grant')
+
+    def test_authorization_code_rejects_invalid_redirect_uri(self):
+        verifier = _pkce_verifier()
+        grant = self._create_authorization_code_grant(
+            code=get_random_string(48),
+            code_challenge=_s256_challenge(verifier),
+            scope='invoices:mcp:read',
+        )
+
+        response = self.client.post(
+            reverse('oauth2_provider:token'),
+            {
+                'grant_type': 'authorization_code',
+                'code': grant.code,
+                'client_id': self.application.client_id,
+                'redirect_uri': 'https://client.example.test/other-callback',
+                'code_verifier': verifier,
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_request')
+
+    def test_authorization_code_rejects_expired_code(self):
+        verifier = _pkce_verifier()
+        grant = self._create_authorization_code_grant(
+            code=get_random_string(48),
+            code_challenge=_s256_challenge(verifier),
+            scope='invoices:mcp:read',
+            expires=timezone.now() - timedelta(seconds=1),
+        )
+
+        response = self.client.post(
+            reverse('oauth2_provider:token'),
+            {
+                'grant_type': 'authorization_code',
+                'code': grant.code,
+                'client_id': self.application.client_id,
+                'redirect_uri': 'https://client.example.test/callback',
+                'code_verifier': verifier,
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], 'invalid_grant')
+
+    def test_authorize_rejects_invalid_scope(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('oauth2_provider:authorize'),
+            {
+                'response_type': 'code',
+                'client_id': self.application.client_id,
+                'redirect_uri': 'https://client.example.test/callback',
+                'scope': 'invoices:mcp:read invoices:mcp:admin',
+                'code_challenge': _s256_challenge(_pkce_verifier()),
+                'code_challenge_method': 'S256',
+                'resource': MCP_RESOURCE,
+            },
+        )
+
+        if response.status_code == 302:
+            query = parse_qs(urlparse(response['Location']).query)
+            self.assertEqual(query.get('error'), ['invalid_scope'])
+        else:
+            self.assertEqual(response.status_code, 400)
+            self.assertIn(b'invalid_scope', response.content)
+
     def test_confidential_clients_can_be_preregistered(self):
         confidential = self._create_application(
             client_id='hermes-confidential',
@@ -151,8 +274,21 @@ class MCPOAuthProtocolTests(TestCase):
             'redirect_uris': 'https://client.example.test/callback',
         }
         if client_type == Application.CLIENT_CONFIDENTIAL:
-            kwargs['client_secret'] = 'secret'
+            kwargs['client_secret'] = get_random_string(48)
         return Application.objects.create(**kwargs)
+
+    def _create_authorization_code_grant(self, *, code, code_challenge, scope, expires=None):
+        Grant = get_grant_model()
+        return Grant.objects.create(
+            user=self.user,
+            application=self.application,
+            code=code,
+            expires=expires or timezone.now() + timedelta(minutes=5),
+            redirect_uri='https://client.example.test/callback',
+            scope=scope,
+            code_challenge=code_challenge,
+            code_challenge_method='S256',
+        )
 
 
 @override_settings(
@@ -324,14 +460,15 @@ class MCPOAuthIntrospectionTests(TestCase):
         )
 
     def test_introspection_shapes_active_token_for_mcp_token_verifier(self):
+        token_value = get_random_string(48)
         access_token = self._create_access_token(
-            token='active-token',
+            token=token_value,
             expires=timezone.now() + timedelta(minutes=10),
             scope='invoices:mcp:read invoices:mcp:artifact:read',
         )
         AccessTokenResource.objects.create(access_token=access_token, resource=MCP_RESOURCE)
 
-        response = self.client.post('/oauth/introspect/', {'token': 'active-token', 'resource': MCP_RESOURCE})
+        response = self.client.post('/oauth/introspect/', {'token': token_value, 'resource': MCP_RESOURCE})
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -343,13 +480,15 @@ class MCPOAuthIntrospectionTests(TestCase):
         self.assertEqual(payload['scope'], 'invoices:mcp:read invoices:mcp:artifact:read')
 
     def test_introspection_rejects_expired_unknown_and_wrong_resource_tokens(self):
+        expired_token = get_random_string(48)
         self._create_access_token(
-            token='expired-token',
+            token=expired_token,
             expires=timezone.now() - timedelta(seconds=1),
             scope='invoices:mcp:read',
         )
+        wrong_resource_token_value = get_random_string(48)
         wrong_resource_token = self._create_access_token(
-            token='wrong-resource-token',
+            token=wrong_resource_token_value,
             expires=timezone.now() + timedelta(minutes=10),
             scope='invoices:mcp:read',
         )
@@ -358,24 +497,26 @@ class MCPOAuthIntrospectionTests(TestCase):
             resource='https://other.example.test/mcp/',
         )
 
-        cases = ['missing-token', 'expired-token', 'wrong-resource-token']
+        cases = [get_random_string(48), expired_token, wrong_resource_token_value]
         for token in cases:
             with self.subTest(token=token):
                 response = self.client.post('/oauth/introspect/', {'token': token, 'resource': MCP_RESOURCE})
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json(), {'active': False})
 
-    @override_settings(MCP_OAUTH_INTROSPECTION_TOKEN='probe-secret')
     def test_introspection_can_require_service_authentication(self):
-        response = self.client.post('/oauth/introspect/', {'token': 'anything', 'resource': MCP_RESOURCE})
-        self.assertEqual(response.status_code, 401)
+        service_token = get_random_string(48)
+        token_under_test = get_random_string(48)
+        with override_settings(MCP_OAUTH_INTROSPECTION_TOKEN=service_token):
+            response = self.client.post('/oauth/introspect/', {'token': token_under_test, 'resource': MCP_RESOURCE})
+            self.assertEqual(response.status_code, 401)
 
-        response = self.client.post(
-            '/oauth/introspect/',
-            {'token': 'anything', 'resource': MCP_RESOURCE},
-            HTTP_AUTHORIZATION='Bearer probe-secret',
-        )
-        self.assertEqual(response.status_code, 200)
+            response = self.client.post(
+                '/oauth/introspect/',
+                {'token': token_under_test, 'resource': MCP_RESOURCE},
+                HTTP_AUTHORIZATION=f'Bearer {service_token}',
+            )
+            self.assertEqual(response.status_code, 200)
 
     def _create_access_token(self, *, token, expires, scope):
         return get_access_token_model().objects.create(
@@ -385,3 +526,12 @@ class MCPOAuthIntrospectionTests(TestCase):
             expires=expires,
             scope=scope,
         )
+
+
+def _pkce_verifier():
+    return get_random_string(64, allowed_chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~')
+
+
+def _s256_challenge(verifier):
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
