@@ -67,7 +67,11 @@ services:
 EOF
 
 docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --force-recreate web >&2
-wait_for_http "http://127.0.0.1:${PREVIEW_PORT}/accounts/login/"
+if ! wait_for_http "http://127.0.0.1:${PREVIEW_PORT}/accounts/login/" 120 2; then
+  docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps >&2 || true
+  docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 web >&2 || true
+  exit 1
+fi
 
 docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" exec -T web python manage.py seed_e2e_smoke >&2
 docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" exec -T web python manage.py shell -c "from django.contrib.auth import get_user_model; from accounts.utils import otp as otp_utils; User = get_user_model(); user = User.objects.get(email='e2e-smoke@example.com'); otp_utils.disable_two_factor(user); user.is_staff = True; user.is_superuser = True; user.save(update_fields=['is_staff', 'is_superuser'])" >&2
