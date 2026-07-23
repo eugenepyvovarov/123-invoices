@@ -109,11 +109,11 @@ The MCP server must also preserve the DRF API as the invoice domain boundary: MC
   - [x] Add per-tool scope enforcement for read, draft write, finalize, and artifact read actions.
   - [x] Add tests for SDK auth wiring, 401 challenge behavior, invalid tokens, insufficient scope, and valid tool discovery.
 
-- [ ] Add the Django OAuth authorization server
-  - [ ] Add `django-oauth-toolkit` and register provider settings, URLs, migrations, admin/client management, and scopes.
-  - [ ] Add `mcp_oauth` helpers for MCP resource indicators, AS metadata extensions, token validation/introspection shaping, and consent flow integration.
-  - [ ] Implement authorization code + PKCE with `S256`, exact redirect URI validation, resource validation, short-lived tokens, and confidential-client support where configured.
-  - [ ] Add tests for metadata, PKCE, redirect/resource validation, scope grants, token expiry, and invalid-client behavior.
+- [x] Add the Django OAuth authorization server
+  - [x] Add `django-oauth-toolkit` and register provider settings, URLs, migrations, admin/client management, and scopes.
+  - [x] Add `mcp_oauth` helpers for MCP resource indicators, AS metadata extensions, token validation/introspection shaping, and consent flow integration.
+  - [x] Implement authorization code + PKCE with `S256`, exact redirect URI validation, resource validation, short-lived tokens, and confidential-client support where configured.
+  - [x] Add tests for metadata, PKCE, redirect/resource validation, scope grants, token expiry, and invalid-client behavior.
 
 - [ ] Add CIMD support
   - [ ] Fetch HTTPS URL client metadata with timeout, size, content-type, JSON schema, and exact `client_id` validation.
