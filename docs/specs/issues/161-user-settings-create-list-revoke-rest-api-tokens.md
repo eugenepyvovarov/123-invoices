@@ -85,11 +85,11 @@ Users can manage “Invoices API tokens” from `/accounts/user-settings/` in a 
   - [x] Render the one-time plaintext token reveal in a copy-friendly state.
   - [x] Keep Expense import AI provider settings functional and clearly labeled.
 
-- [ ] Update docs and evidence harness
-  - [ ] Update `docs/api.md` with the User settings token workflow and retained CLI/admin options.
-  - [ ] Add Playwright coverage for the visible create/list/revoke flow.
-  - [ ] Add `api-token-settings-management` to `scripts/demo-evidence.sh`.
-  - [ ] Add `api-token-settings` to `scripts/visual-validation.sh`.
+- [x] Update docs and evidence harness
+  - [x] Update `docs/api.md` with the User settings token workflow and retained CLI/admin options.
+  - [x] Add Playwright coverage for the visible create/list/revoke flow.
+  - [x] Add `api-token-settings-management` to `scripts/demo-evidence.sh`.
+  - [x] Add `api-token-settings` to `scripts/visual-validation.sh`.
 
 ## Deployment / Rollout
 
