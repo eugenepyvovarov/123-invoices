@@ -25,7 +25,7 @@ def build_auth_settings(config: MCPConfig):
     return AuthSettings(
         issuer_url=config.oauth_issuer_url,
         resource_server_url=config.oauth_resource_url,
-        required_scopes=[],
+        required_scopes=[config.read_scope],
     )
 
 

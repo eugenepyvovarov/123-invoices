@@ -80,7 +80,7 @@ class MCPAuthTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(str(settings.issuer_url), "https://auth.example.test/")
         self.assertEqual(str(settings.resource_server_url), "https://mcp.example.test/mcp/")
-        self.assertEqual(settings.required_scopes, [])
+        self.assertEqual(settings.required_scopes, ["invoices:mcp:read"])
 
     async def test_token_verifier_accepts_active_resource_bound_introspection(self):
         def handler(request):

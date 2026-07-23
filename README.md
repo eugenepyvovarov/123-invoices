@@ -14,7 +14,7 @@ service, backup scheduler, and Streamable HTTP MCP service.
 - SQLite-friendly production deployment with persistent `db/` and `media/`
   mounts.
 - Manual and scheduled backup support for S3-compatible object storage.
-- Authenticated Streamable HTTP MCP endpoint for approved AI invoice clients.
+- OAuth-protected Streamable HTTP MCP endpoint for approved AI invoice clients.
 - Playwright smoke tests and automation evidence hooks for UI-visible changes.
 
 ## Requirements
@@ -81,7 +81,8 @@ Post-deploy verification checks that all services are running under the same
 `http://127.0.0.1:8000/` responds successfully, and fails if scheduler startup
 logs contain `Traceback (most recent call last):` or
 `Backup scheduler run failed:`. It also probes the MCP Streamable HTTP endpoint
-for missing/invalid auth rejection and authenticated tool discovery. Operators
+for OAuth challenge/metadata, missing/invalid auth rejection, and authenticated
+tool discovery when a valid probe credential is supplied. Operators
 can inspect the same stack with `COMPOSE_PROJECT_NAME=03-invoices docker compose
 ps web scheduler mcp`, a `python3 -c` health probe, `docker compose logs
 --no-color --tail 50 scheduler`, and `docker compose logs --no-color --tail 50
@@ -108,7 +109,7 @@ Deployment rollout verification summary:
 - confirms the expected `03-invoices-web-1` and `03-invoices-scheduler-1` container names
 - confirms the expected `03-invoices-web-1`, `03-invoices-scheduler-1`, and `03-invoices-mcp-1` container names
 - verifies `http://127.0.0.1:8000/` responds successfully
-- verifies authenticated MCP protocol reachability and invalid-auth rejection
+- verifies OAuth MCP protocol reachability, metadata, invalid-auth rejection, and optional authenticated tool discovery
 - fails if scheduler startup logs contain `Traceback (most recent call last):` or `Backup scheduler run failed:`
 - COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler mcp
 - python3 -c
@@ -167,8 +168,9 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
   environment values, generated files, and tests.
 - [Deployment](docs/deployment.md) covers Docker/Compose rollout and
   verification.
-- [MCP server](docs/mcp-server.md) covers Streamable HTTP operation, token
-  setup, endpoint configuration, artifact limits, client examples, and checks.
+- [MCP server](docs/mcp-server.md) covers OAuth-protected Streamable HTTP
+  operation, CIMD/pre-registration, scopes, endpoint configuration, upstream API
+  credential setup, artifact limits, client examples, and checks.
 - [Backups](docs/backups.md) covers backup configuration, scheduler behavior,
   locking, object keys, and operator checks.
 - [Incoming invoice inbox](docs/incoming-invoice-inbox.md) covers IMAP setup,

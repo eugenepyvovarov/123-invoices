@@ -20,9 +20,9 @@ For the SQLite deployment path, the Django containers should resolve the
 database to `/app/db/db.sqlite3`. The MCP service does not run migrations and
 uses the web/API service through `INVOICES_MCP_API_BASE_URL`.
 
-See [MCP server](mcp-server.md) for MCP environment variables, token setup,
-endpoint URL shape, artifact limits, Streamable HTTP client examples, and
-operational checks.
+See [MCP server](mcp-server.md) for MCP and OAuth environment variables,
+pre-registration/CIMD setup, scopes, endpoint URL shape, artifact limits,
+Streamable HTTP client examples, and operational checks.
 
 ## Local Docker Commands
 
@@ -81,11 +81,14 @@ Useful inputs:
 - `PHASE_APP`, default `lifeisgoodlabs-invoices`.
 - `PHASE_ENV`, default `Development`.
 
-`SECRET_KEY` and `RENDER_EXTERNAL_HOSTNAME` are required before rollout.
-MCP rollout also requires runtime values for `INVOICES_MCP_API_TOKEN` and
-`INVOICES_MCP_CLIENT_TOKENS`; deploy does not create or rotate these tokens.
-Explicit shell exports and repo-root `.deploy.env` values win first; Phase can
-fill missing managed values when the Phase CLI is available and authenticated.
+`SECRET_KEY` and `RENDER_EXTERNAL_HOSTNAME` are required before rollout. MCP
+rollout also requires runtime values for `INVOICES_MCP_API_TOKEN`,
+`INVOICES_MCP_OAUTH_ISSUER_URL`, `INVOICES_MCP_OAUTH_RESOURCE_URL`, and matching
+web-side `MCP_OAUTH_ISSUER_URL`/`MCP_OAUTH_RESOURCE_URL`. Use public HTTPS URLs
+for those issuer/resource values in production. Deploy does not create or rotate
+DRF API tokens, OAuth clients, client secrets, or refresh tokens. Explicit shell
+exports and repo-root `.deploy.env` values win first; Phase can fill missing
+managed values when the Phase CLI is available and authenticated.
 
 The deploy script writes the managed host values into `.env` while preserving
 unrelated entries. Do not manually hotfix `.env` after deployment for values
@@ -105,7 +108,7 @@ Equivalent manual checks:
 COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler mcp
 curl -H "Host: invoices.ultramac.work" http://127.0.0.1:8000/
 COMPOSE_PROJECT_NAME=03-invoices docker compose logs --no-color --tail 50 scheduler
-COMPOSE_PROJECT_NAME=03-invoices docker compose exec -T mcp python scripts/mcp_probe.py --url http://127.0.0.1:8765/mcp/ --token "<INVOICES_MCP_CLIENT_TOKEN>"
+COMPOSE_PROJECT_NAME=03-invoices docker compose exec -T mcp python scripts/mcp_probe.py --url http://127.0.0.1:8765/mcp/ --token "<OPTIONAL_VALID_MCP_ACCESS_TOKEN>"
 ```
 
 Use the host-header probe when verifying production behavior. It catches host
@@ -116,8 +119,11 @@ login.
 Scheduler logs should not contain Python tracebacks or
 `Backup scheduler run failed:`.
 
-The MCP probe should reject missing/invalid bearer auth and succeed with a
-configured inbound client token. Public clients should use the HTTPS URL from
+The MCP probe should reject missing/invalid bearer auth, verify OAuth resource
+metadata, and succeed with authenticated tool discovery when an explicit valid
+MCP access token or test probe token is supplied. If a wrong-audience probe token
+is available, set `INVOICES_MCP_WRONG_AUDIENCE_TEST_TOKEN` so verification checks
+resource/audience rejection. Public clients should use the HTTPS URL from
 `INVOICES_MCP_PUBLIC_URL`, not the internal Compose URL.
 
 ## Runtime Smoke

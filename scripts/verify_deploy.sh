@@ -130,16 +130,15 @@ normalize_mcp_path() {
 verify_mcp_protocol() {
   local token_csv
   local token
+  local wrong_audience_token
   local mcp_port
   local mcp_path
   local mcp_url
+  local probe_args=()
 
   token_csv="${INVOICES_MCP_AUTH_TEST_TOKENS:-$(runtime_env_value INVOICES_MCP_AUTH_TEST_TOKENS)}"
   token="$(first_csv_value "${token_csv}")"
-  if [ -z "${token}" ]; then
-    echo "INVOICES_MCP_AUTH_TEST_TOKENS is required to verify authenticated MCP tool discovery before OAuth probe credentials exist." >&2
-    exit 1
-  fi
+  wrong_audience_token="${INVOICES_MCP_WRONG_AUDIENCE_TEST_TOKEN:-$(runtime_env_value INVOICES_MCP_WRONG_AUDIENCE_TEST_TOKEN)}"
 
   mcp_port="${INVOICES_MCP_PORT:-$(runtime_env_value INVOICES_MCP_PORT)}"
   mcp_port="${mcp_port:-8765}"
@@ -147,7 +146,15 @@ verify_mcp_protocol() {
   mcp_path="$(normalize_mcp_path "${mcp_path:-/mcp/}")"
   mcp_url="http://127.0.0.1:${mcp_port}${mcp_path}"
 
-  ${DOCKER_BIN} compose exec -T mcp python scripts/mcp_probe.py --url "${mcp_url}" --token "${token}"
+  probe_args=(--url "${mcp_url}")
+  if [ -n "${token}" ]; then
+    probe_args+=(--token "${token}")
+  fi
+  if [ -n "${wrong_audience_token}" ]; then
+    probe_args+=(--wrong-audience-token "${wrong_audience_token}")
+  fi
+
+  ${DOCKER_BIN} compose exec -T mcp python scripts/mcp_probe.py "${probe_args[@]}"
 }
 
 for service in "${EXPECTED_SERVICES[@]}"; do
