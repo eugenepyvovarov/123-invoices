@@ -97,6 +97,42 @@ class UserProfileForm(forms.ModelForm):
         return email
 
 
+class ApiTokenCreateForm(forms.Form):
+    name = forms.CharField(
+        label='Token name',
+        max_length=120,
+        required=True,
+        help_text='Use a descriptive name so you can identify this API token later.',
+    )
+    expires_at = forms.DateTimeField(
+        label='Expires at',
+        required=False,
+        input_formats=[
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%dT%H:%M',
+            '%Y-%m-%d',
+        ],
+        help_text='Optional. Enter a date/time such as 2026-12-31 17:00.',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        placeholders = {
+            'name': 'Integration name',
+            'expires_at': 'YYYY-MM-DD HH:MM',
+        }
+        for name, field in self.fields.items():
+            css = field.widget.attrs.get('class', '')
+            field.widget.attrs['class'] = f"{css} form-control".strip()
+            field.widget.attrs.setdefault('placeholder', placeholders.get(name, ''))
+
+    def clean_name(self):
+        name = self.cleaned_data['name'].strip()
+        if not name:
+            raise forms.ValidationError('Enter a token name.')
+        return name
+
+
 class ExpenseAIProviderSettingsForm(forms.ModelForm):
     expense_ai_api_key = forms.CharField(
         label='API key',
