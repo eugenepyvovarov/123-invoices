@@ -10,6 +10,7 @@ cd "${SOURCE_ROOT}"
 
 PREVIEW_HOST="$(preview_host)"
 PREVIEW_PORT="$(preview_port)"
+PREVIEW_BACKEND_HOST="$(preview_backend_host)"
 RUNTIME_DIR="$(preview_runtime_dir)"
 COMPOSE_PROJECT="$(preview_compose_project)"
 COMPOSE_FILE="$(preview_compose_file)"
@@ -24,7 +25,7 @@ DEBUG=1
 DB_PATH=/app/db/db.sqlite3
 MEDIA_ROOT=/app/media
 RENDER_EXTERNAL_HOSTNAME=${PREVIEW_HOST}
-ALLOWED_HOSTS=127.0.0.1,localhost,${PREVIEW_HOST}
+ALLOWED_HOSTS=127.0.0.1,localhost,${PREVIEW_HOST},${PREVIEW_BACKEND_HOST},.preview.ultramac.work
 CSRF_TRUSTED_ORIGINS=https://${PREVIEW_HOST}
 SENTRY_DSN=
 EOF

@@ -215,8 +215,11 @@ preview_env_file() {
 }
 
 backend_url() {
-  local backend_host="${OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal}"
-  printf 'http://%s:%s\n' "${backend_host}" "$(preview_port)"
+  printf 'http://%s:%s\n' "$(preview_backend_host)" "$(preview_port)"
+}
+
+preview_backend_host() {
+  printf '%s\n' "${OPENCODE_PREVIEW_BACKEND_HOST:-127.0.0.1}"
 }
 
 public_preview_url() {
