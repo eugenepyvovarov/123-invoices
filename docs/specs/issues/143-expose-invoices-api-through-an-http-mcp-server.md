@@ -122,11 +122,11 @@ The MCP server must also preserve the DRF API as the invoice domain boundary: MC
   - [x] Advertise `client_id_metadata_document_supported: true`.
   - [x] Add tests for success, invalid metadata, redirect mismatch, caching, unsafe hosts, and pre-registration priority.
 
-- [ ] Complete API-backed invoice MCP tools
-  - [ ] Register invoice search/detail/reference/suggestion/draft/finalize/artifact/status tools with clear schemas.
-  - [ ] Implement all tool handlers through DRF API calls using the dedicated upstream credential.
-  - [ ] Ensure finalized-invoice mutation safety, explicit finalize confirmation, bounded pagination, artifact size limits, and safe error payloads.
-  - [ ] Add tests for success paths, upstream auth failures, validation failures, finalized safety, artifact limits, suggestions, and derived status inspection.
+- [x] Complete API-backed invoice MCP tools
+  - [x] Register invoice search/detail/reference/suggestion/draft/finalize/artifact/status tools with clear schemas.
+  - [x] Implement all tool handlers through DRF API calls using the dedicated upstream credential.
+  - [x] Ensure finalized-invoice mutation safety, explicit finalize confirmation, bounded pagination, artifact size limits, and safe error payloads.
+  - [x] Add tests for success paths, upstream auth failures, validation failures, finalized safety, artifact limits, suggestions, and derived status inspection.
 
 - [ ] Wire runtime, probes, and docs
   - [ ] Update Compose/Docker/runtime command support for the OAuth-protected MCP service.
