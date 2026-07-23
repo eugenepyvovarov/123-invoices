@@ -115,12 +115,12 @@ The MCP server must also preserve the DRF API as the invoice domain boundary: MC
   - [x] Implement authorization code + PKCE with `S256`, exact redirect URI validation, resource validation, short-lived tokens, and confidential-client support where configured.
   - [x] Add tests for metadata, PKCE, redirect/resource validation, scope grants, token expiry, and invalid-client behavior.
 
-- [ ] Add CIMD support
-  - [ ] Fetch HTTPS URL client metadata with timeout, size, content-type, JSON schema, and exact `client_id` validation.
-  - [ ] Validate redirect URIs and display safe client identity information during consent.
-  - [ ] Reject localhost, private network, link-local, file URL, unsafe redirect, and oversized metadata targets.
-  - [ ] Advertise `client_id_metadata_document_supported: true`.
-  - [ ] Add tests for success, invalid metadata, redirect mismatch, caching, unsafe hosts, and pre-registration priority.
+- [x] Add CIMD support
+  - [x] Fetch HTTPS URL client metadata with timeout, size, content-type, JSON schema, and exact `client_id` validation.
+  - [x] Validate redirect URIs and display safe client identity information during consent.
+  - [x] Reject localhost, private network, link-local, file URL, unsafe redirect, and oversized metadata targets.
+  - [x] Advertise `client_id_metadata_document_supported: true`.
+  - [x] Add tests for success, invalid metadata, redirect mismatch, caching, unsafe hosts, and pre-registration priority.
 
 - [ ] Complete API-backed invoice MCP tools
   - [ ] Register invoice search/detail/reference/suggestion/draft/finalize/artifact/status tools with clear schemas.
