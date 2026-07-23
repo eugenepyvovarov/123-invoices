@@ -128,11 +128,11 @@ The MCP server must also preserve the DRF API as the invoice domain boundary: MC
   - [x] Ensure finalized-invoice mutation safety, explicit finalize confirmation, bounded pagination, artifact size limits, and safe error payloads.
   - [x] Add tests for success paths, upstream auth failures, validation failures, finalized safety, artifact limits, suggestions, and derived status inspection.
 
-- [ ] Wire runtime, probes, and docs
-  - [ ] Update Compose/Docker/runtime command support for the OAuth-protected MCP service.
-  - [ ] Update deploy/verify/CI/runtime smoke helpers for OAuth challenge, metadata, token rejection, and authenticated tool discovery when a valid probe credential is available.
-  - [ ] Document OAuth/CIMD/pre-registration setup, scopes, env vars, HTTPS URLs, upstream API credential setup, and Hermes/Codex/generic MCP client examples.
-  - [ ] Update README, docs index, deployment docs, and placeholder-only environment examples.
+- [x] Wire runtime, probes, and docs
+  - [x] Update Compose/Docker/runtime command support for the OAuth-protected MCP service.
+  - [x] Update deploy/verify/CI/runtime smoke helpers for OAuth challenge, metadata, token rejection, and authenticated tool discovery when a valid probe credential is available.
+  - [x] Document OAuth/CIMD/pre-registration setup, scopes, env vars, HTTPS URLs, upstream API credential setup, and Hermes/Codex/generic MCP client examples.
+  - [x] Update README, docs index, deployment docs, and placeholder-only environment examples.
 
 ## Deployment / Rollout
 
