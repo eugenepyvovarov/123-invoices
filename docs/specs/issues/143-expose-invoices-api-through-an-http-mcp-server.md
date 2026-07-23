@@ -103,11 +103,11 @@ The MCP server must also preserve the DRF API as the invoice domain boundary: MC
 
 ## Task List
 
-- [ ] Adopt MCP SDK resource-server auth
-  - [ ] Pin a stable `mcp` SDK version that supports `mcp.server.auth` and Streamable HTTP auth.
-  - [ ] Replace static inbound bearer middleware with SDK `AuthSettings` and a project `TokenVerifier`.
-  - [ ] Add per-tool scope enforcement for read, draft write, finalize, and artifact read actions.
-  - [ ] Add tests for SDK auth wiring, 401 challenge behavior, invalid tokens, insufficient scope, and valid tool discovery.
+- [x] Adopt MCP SDK resource-server auth
+  - [x] Pin a stable `mcp` SDK version that supports `mcp.server.auth` and Streamable HTTP auth.
+  - [x] Replace static inbound bearer middleware with SDK `AuthSettings` and a project `TokenVerifier`.
+  - [x] Add per-tool scope enforcement for read, draft write, finalize, and artifact read actions.
+  - [x] Add tests for SDK auth wiring, 401 challenge behavior, invalid tokens, insufficient scope, and valid tool discovery.
 
 - [ ] Add the Django OAuth authorization server
   - [ ] Add `django-oauth-toolkit` and register provider settings, URLs, migrations, admin/client management, and scopes.
