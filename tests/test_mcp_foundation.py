@@ -1,10 +1,11 @@
 import asyncio
-from unittest import IsolatedAsyncioTestCase, TestCase, mock
+import time
+from unittest import IsolatedAsyncioTestCase, TestCase
 
 import httpx
 
 from invoices_mcp.api_client import InvoicesAPIClient
-from invoices_mcp.auth import BearerAuthASGIMiddleware, extract_bearer_token, is_authorized, token_matches
+from invoices_mcp.auth import InvoicesTokenVerifier, build_auth_settings
 from invoices_mcp.config import MCPConfig, load_config
 from invoices_mcp.errors import MCPConfigurationError, UpstreamAPIError
 from invoices_mcp.redaction import redact_mapping
@@ -15,7 +16,9 @@ def build_config(**overrides):
     values = {
         "api_base_url": "https://api.example.test/api/",
         "api_token": "upstream-secret",
-        "client_tokens": ("client-secret",),
+        "oauth_issuer_url": "https://auth.example.test/",
+        "oauth_resource_url": "https://mcp.example.test/mcp/",
+        "oauth_introspection_url": "https://auth.example.test/oauth/introspect/",
     }
     values.update(overrides)
     return MCPConfig(**values)
@@ -27,7 +30,10 @@ class MCPConfigTests(TestCase):
             {
                 "INVOICES_MCP_API_BASE_URL": "https://api.example.test/api",
                 "INVOICES_MCP_API_TOKEN": "upstream-token",
-                "INVOICES_MCP_CLIENT_TOKENS": "first-token, second-token ",
+                "INVOICES_MCP_OAUTH_ISSUER_URL": "https://auth.example.test/",
+                "INVOICES_MCP_OAUTH_RESOURCE_URL": "https://mcp.example.test/mcp/",
+                "INVOICES_MCP_OAUTH_INTROSPECTION_URL": "https://auth.example.test/oauth/introspect/",
+                "INVOICES_MCP_AUTH_TEST_TOKENS": "first-token, second-token ",
                 "INVOICES_MCP_HOST": "0.0.0.0",
                 "INVOICES_MCP_PORT": "9001",
                 "INVOICES_MCP_ENDPOINT_PATH": "mcp",
@@ -38,7 +44,9 @@ class MCPConfigTests(TestCase):
         )
 
         self.assertEqual(config.normalized_api_base_url, "https://api.example.test/api/")
-        self.assertEqual(config.client_tokens, ("first-token", "second-token"))
+        self.assertEqual(config.auth_test_tokens, ("first-token", "second-token"))
+        self.assertEqual(config.oauth_issuer_url, "https://auth.example.test/")
+        self.assertEqual(config.oauth_resource_url, "https://mcp.example.test/mcp/")
         self.assertEqual(config.host, "0.0.0.0")
         self.assertEqual(config.port, 9001)
         self.assertEqual(config.endpoint_path, "/mcp/")
@@ -59,46 +67,56 @@ class MCPConfigTests(TestCase):
                 {
                     "INVOICES_MCP_API_BASE_URL": "https://api.example.test/api/",
                     "INVOICES_MCP_API_TOKEN": "upstream-token",
-                    "INVOICES_MCP_CLIENT_TOKENS": "client-token",
+                    "INVOICES_MCP_OAUTH_ISSUER_URL": "https://auth.example.test/",
+                    "INVOICES_MCP_OAUTH_RESOURCE_URL": "https://mcp.example.test/mcp/",
                     "INVOICES_MCP_PORT": "70000",
                 }
             )
 
 
 class MCPAuthTests(IsolatedAsyncioTestCase):
-    def test_extract_bearer_token_accepts_only_bearer_scheme(self):
-        self.assertEqual(extract_bearer_token("Bearer abc123"), "abc123")
-        self.assertEqual(extract_bearer_token("bearer abc123"), "abc123")
-        self.assertIsNone(extract_bearer_token("Basic abc123"))
-        self.assertIsNone(extract_bearer_token(None))
+    def test_build_auth_settings_wires_resource_server_metadata(self):
+        settings = build_auth_settings(build_config())
 
-    def test_token_matching_uses_constant_time_compare_for_each_configured_token(self):
-        with mock.patch("invoices_mcp.auth.hmac.compare_digest", wraps=__import__("hmac").compare_digest) as compare:
-            self.assertTrue(token_matches("second", ("first", "second")))
+        self.assertEqual(str(settings.issuer_url), "https://auth.example.test/")
+        self.assertEqual(str(settings.resource_server_url), "https://mcp.example.test/mcp/")
+        self.assertEqual(settings.required_scopes, [])
 
-        self.assertEqual(compare.call_count, 2)
-        compare.assert_any_call("second", "first")
-        compare.assert_any_call("second", "second")
+    async def test_token_verifier_accepts_active_resource_bound_introspection(self):
+        def handler(request):
+            self.assertEqual(request.url, "https://auth.example.test/oauth/introspect/")
+            self.assertIn(b"resource=https%3A%2F%2Fmcp.example.test%2Fmcp%2F", request.content)
+            return httpx.Response(
+                200,
+                json={
+                    "active": True,
+                    "client_id": "client-1",
+                    "scope": "invoices:mcp:read invoices:mcp:draft:write",
+                    "exp": int(time.time()) + 60,
+                    "iss": "https://auth.example.test/",
+                    "aud": "https://mcp.example.test/mcp/",
+                    "sub": "user-1",
+                },
+            )
 
-    def test_auth_fails_when_no_client_tokens_are_configured(self):
-        with self.assertRaises(MCPConfigurationError):
-            is_authorized("Bearer anything", ())
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            access_token = await InvoicesTokenVerifier(build_config(), client=http_client).verify_token("oauth-token")
 
-    async def test_auth_middleware_rejects_missing_or_invalid_bearer_token(self):
-        async def app(scope, receive, send):
-            response = httpx.Response(200, json={"ok": True})
-            await send({"type": "http.response.start", "status": response.status_code, "headers": []})
-            await send({"type": "http.response.body", "body": response.content})
+        self.assertIsNotNone(access_token)
+        self.assertEqual(access_token.client_id, "client-1")
+        self.assertIn("invoices:mcp:read", access_token.scopes)
 
-        transport = httpx.ASGITransport(app=BearerAuthASGIMiddleware(app, ("valid-token",)))
-        async with httpx.AsyncClient(transport=transport, base_url="http://mcp.test") as client:
-            missing = await client.post("/mcp/")
-            invalid = await client.post("/mcp/", headers={"Authorization": "Bearer invalid"})
-            valid = await client.post("/mcp/", headers={"Authorization": "Bearer valid-token"})
+    async def test_token_verifier_rejects_invalid_expired_or_wrong_audience_tokens(self):
+        config = build_config()
+        cases = [
+            {"active": False, "aud": config.oauth_resource_url},
+            {"active": True, "exp": int(time.time()) - 1, "aud": config.oauth_resource_url},
+            {"active": True, "exp": int(time.time()) + 60, "aud": "https://wrong.example.test/mcp/"},
+        ]
 
-        self.assertEqual(missing.status_code, 401)
-        self.assertEqual(invalid.status_code, 401)
-        self.assertEqual(valid.status_code, 200)
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertIsNone(InvoicesTokenVerifier.access_token_from_introspection("token", payload, config))
 
 
 class MCPAPIClientTests(IsolatedAsyncioTestCase):
@@ -189,7 +207,7 @@ class MCPAPIClientTests(IsolatedAsyncioTestCase):
 
 
 class MCPServerAndRedactionTests(TestCase):
-    def test_create_app_mounts_configured_streamable_http_endpoint_with_auth(self):
+    def test_create_app_mounts_configured_streamable_http_endpoint(self):
         class FakeMCPServer:
             def streamable_http_app(self):
                 async def app(scope, receive, send):
@@ -203,11 +221,10 @@ class MCPServerAndRedactionTests(TestCase):
         async def probe():
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(transport=transport, base_url="http://mcp.test") as client:
-                rejected = await client.post("/custom-mcp/")
-                accepted = await client.post("/custom-mcp/", headers={"Authorization": "Bearer client-secret"})
-            return rejected.status_code, accepted.status_code, accepted.content
+                accepted = await client.post("/custom-mcp/")
+            return accepted.status_code, accepted.content
 
-        self.assertEqual(asyncio.run(probe()), (401, 202, b"mcp"))
+        self.assertEqual(asyncio.run(probe()), (202, b"mcp"))
 
     def test_redact_mapping_removes_tokens_and_authorization_headers(self):
         redacted = redact_mapping(

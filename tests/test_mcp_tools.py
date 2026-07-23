@@ -1,5 +1,6 @@
-from unittest import IsolatedAsyncioTestCase, TestCase
+from unittest import IsolatedAsyncioTestCase, TestCase, mock
 
+from invoices_mcp.config import MCPConfig
 from invoices_mcp.errors import UpstreamAPIError
 from invoices_mcp.schemas import TOOL_SCHEMAS
 from invoices_mcp.tools import InvoiceMCPTools, register_tools
@@ -104,6 +105,15 @@ class MCPToolSchemaTests(TestCase):
 class MCPToolCallTests(IsolatedAsyncioTestCase):
     def make_tools(self, client):
         return InvoiceMCPTools(api_client_factory=lambda: client)
+
+    def make_configured_tools(self, client):
+        config = MCPConfig(
+            api_base_url="https://api.example.test/api/",
+            api_token="upstream-secret",
+            oauth_issuer_url="https://auth.example.test/",
+            oauth_resource_url="https://mcp.example.test/mcp/",
+        )
+        return InvoiceMCPTools(config=config, api_client_factory=lambda: client)
 
     async def test_search_invoices_maps_filters_and_bounded_pagination(self):
         client = FakeAPIClient(responses=[{"results": [{"id": 1}]}])
@@ -237,3 +247,14 @@ class MCPToolCallTests(IsolatedAsyncioTestCase):
 
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"]["code"], "upstream_authentication_failed")
+
+    async def test_tool_scope_failure_returns_safe_error_without_calling_upstream(self):
+        client = FakeAPIClient(responses=[{"id": 1}])
+
+        with mock.patch("invoices_mcp.tools.has_required_scope", return_value=False):
+            result = await self.make_configured_tools(client).create_draft_invoice({"customer": 2, "lines": []})
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"]["code"], "insufficient_scope")
+        self.assertIn("invoices:mcp:draft:write", result["error"]["message"])
+        self.assertEqual(client.requests, [])

@@ -28,6 +28,9 @@ def assert_bearer_rejected(url: str, timeout: float, *, token: str | None = None
     except urllib.error.HTTPError as exc:
         if exc.code != 401:
             raise RuntimeError(f"{label} MCP probe returned HTTP {exc.code}, expected 401.") from exc
+        challenge = exc.headers.get("WWW-Authenticate", "")
+        if "Bearer" not in challenge or "resource_metadata=" not in challenge:
+            raise RuntimeError(f"{label} MCP probe did not return an OAuth resource_metadata challenge.") from exc
 
 
 async def assert_authenticated_tool_list(url: str, token: str) -> int:

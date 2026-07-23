@@ -7,7 +7,7 @@ from starlette.applications import Starlette
 from starlette.responses import RedirectResponse
 from starlette.routing import Mount, Route
 
-from .auth import BearerAuthASGIMiddleware
+from .auth import InvoicesTokenVerifier, build_auth_settings
 from .config import MCPConfig, load_config
 from .errors import MCPConfigurationError
 from .tools import register_tools
@@ -29,6 +29,8 @@ def create_mcp_server(config: MCPConfig | None = None):
         host=config.host,
         port=config.port,
         streamable_http_path=config.endpoint_path,
+        auth=build_auth_settings(config),
+        token_verifier=InvoicesTokenVerifier(config),
     )
     return register_tools(server, config)
 
@@ -47,12 +49,11 @@ async def redirect_to_mcp(request):
 def create_app(config: MCPConfig | None = None, mcp_server=None) -> Starlette:
     config = config or load_config()
     raw_mcp_app = create_mcp_asgi_app(config, mcp_server)
-    mcp_app = BearerAuthASGIMiddleware(raw_mcp_app, config.client_tokens)
     lifespan = getattr(getattr(raw_mcp_app, "router", None), "lifespan_context", None)
     return Starlette(
         routes=[
             Route("/", redirect_to_mcp, methods=["GET"]),
-            Mount("/", app=mcp_app, name="mcp"),
+            Mount("/", app=raw_mcp_app, name="mcp"),
         ],
         lifespan=lifespan,
     )

@@ -134,10 +134,10 @@ verify_mcp_protocol() {
   local mcp_path
   local mcp_url
 
-  token_csv="${INVOICES_MCP_CLIENT_TOKENS:-$(runtime_env_value INVOICES_MCP_CLIENT_TOKENS)}"
+  token_csv="${INVOICES_MCP_AUTH_TEST_TOKENS:-$(runtime_env_value INVOICES_MCP_AUTH_TEST_TOKENS)}"
   token="$(first_csv_value "${token_csv}")"
   if [ -z "${token}" ]; then
-    echo "INVOICES_MCP_CLIENT_TOKENS is required to verify the MCP service." >&2
+    echo "INVOICES_MCP_AUTH_TEST_TOKENS is required to verify authenticated MCP tool discovery before OAuth probe credentials exist." >&2
     exit 1
   fi
 

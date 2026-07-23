@@ -564,7 +564,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'SHA_TAG': 'abc1234',
                     'WEB_VERIFY_ATTEMPTS': '1',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
-                    'INVOICES_MCP_CLIENT_TOKENS': 'deploy-client-token',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'deploy-client-token',
                 }
             )
 
@@ -702,7 +702,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'PYTHON_LOG': str(python_log),
                     'PYTHON_ATTEMPTS': str(python_attempts),
                     'RENDER_EXTERNAL_HOSTNAME': 'invoices.ultramac.work',
-                    'INVOICES_MCP_CLIENT_TOKENS': 'verify-client-token',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'verify-client-token',
                     'WEB_VERIFY_ATTEMPTS': '2',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
                 }
@@ -758,7 +758,7 @@ class ChunkValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             runtime_env_file = temp_path / '.env'
-            runtime_env_file.write_text('DEBUG=0\nRENDER_EXTERNAL_HOSTNAME=invoices.ultramac.work\nINVOICES_MCP_CLIENT_TOKENS=runtime-env-client-token\n')
+            runtime_env_file.write_text('DEBUG=0\nRENDER_EXTERNAL_HOSTNAME=invoices.ultramac.work\nINVOICES_MCP_AUTH_TEST_TOKENS=runtime-env-client-token\n')
             docker_log = temp_path / 'docker.log'
             python_log = temp_path / 'python.log'
             fake_docker = temp_path / 'docker'
@@ -851,7 +851,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'DOCKER_BIN': str(fake_docker),
                     'PYTHON_BIN': str(fake_python),
                     'WEB_VERIFY_HOST': 'invoices.ultramac.work',
-                    'INVOICES_MCP_CLIENT_TOKENS': 'verify-client-token',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'verify-client-token',
                     'WEB_VERIFY_ATTEMPTS': '1',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
                 }

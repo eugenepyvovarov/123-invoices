@@ -95,7 +95,9 @@ mkdir -p "${runtime_tmpdir}/db" "${runtime_tmpdir}/media"
   -e ALLOWED_HOSTS="${ALLOWED_HOSTS:-127.0.0.1,localhost}" \
   -e INVOICES_MCP_API_BASE_URL="http://127.0.0.1:8000/api/" \
   -e INVOICES_MCP_API_TOKEN="${mcp_api_bearer}" \
-  -e INVOICES_MCP_CLIENT_TOKENS="${mcp_client_bearer}" \
+  -e INVOICES_MCP_OAUTH_ISSUER_URL="http://127.0.0.1:8000/oauth/" \
+  -e INVOICES_MCP_OAUTH_RESOURCE_URL="http://127.0.0.1:8765/mcp/" \
+  -e INVOICES_MCP_AUTH_TEST_TOKENS="${mcp_client_bearer}" \
   -e INVOICES_MCP_HOST="0.0.0.0" \
   -e INVOICES_MCP_PORT="8765" \
   -v "${runtime_tmpdir}/db:/app/db" \

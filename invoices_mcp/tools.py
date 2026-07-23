@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from .api_client import InvoicesAPIClient
+from .auth import has_required_scope, required_scope_for_tool
 from .config import MCPConfig, load_config
 from .errors import MCPServiceError, UpstreamAPIError
 from .schemas import TOOL_SCHEMAS, bounded_page, bounded_page_size, positive_id
@@ -42,6 +43,8 @@ class InvoiceMCPTools:
         page: int = 1,
         page_size: int = 25,
     ) -> dict[str, Any]:
+        if error := self._scope_error("search_invoices"):
+            return error
         try:
             params = _clean_params(
                 {
@@ -59,6 +62,8 @@ class InvoiceMCPTools:
         return await self._call(lambda client: client.request_json("GET", "invoices/", params=params))
 
     async def get_invoice(self, invoice_id: int) -> dict[str, Any]:
+        if error := self._scope_error("get_invoice"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -66,9 +71,13 @@ class InvoiceMCPTools:
         return await self._call(lambda client: client.request_json("GET", f"invoices/{invoice_id}/"))
 
     async def list_issuers(self, page: int = 1, page_size: int = 25) -> dict[str, Any]:
+        if error := self._scope_error("list_issuers"):
+            return error
         return await self._list_reference("issuers/", page=page, page_size=page_size)
 
     async def list_bank_accounts(self, issuer_id: int | None = None, page: int = 1, page_size: int = 25) -> dict[str, Any]:
+        if error := self._scope_error("list_bank_accounts"):
+            return error
         try:
             params = {"issuer": issuer_id, "page": bounded_page(page), "page_size": bounded_page_size(page_size)}
         except ValueError as exc:
@@ -76,6 +85,8 @@ class InvoiceMCPTools:
         return await self._call(lambda client: client.request_json("GET", "bank-accounts/", params=_clean_params(params)))
 
     async def list_customers(self, query: str | None = None, page: int = 1, page_size: int = 25) -> dict[str, Any]:
+        if error := self._scope_error("list_customers"):
+            return error
         return await self._list_reference("customers/", query=query, page=page, page_size=page_size)
 
     async def list_projects(
@@ -85,6 +96,8 @@ class InvoiceMCPTools:
         page: int = 1,
         page_size: int = 25,
     ) -> dict[str, Any]:
+        if error := self._scope_error("list_projects"):
+            return error
         try:
             params = {"customer": customer_id, "search": query, "page": bounded_page(page), "page_size": bounded_page_size(page_size)}
         except ValueError as exc:
@@ -99,6 +112,8 @@ class InvoiceMCPTools:
         page: int = 1,
         page_size: int = 25,
     ) -> dict[str, Any]:
+        if error := self._scope_error("list_products"):
+            return error
         try:
             params = _clean_params(
                 {
@@ -117,10 +132,14 @@ class InvoiceMCPTools:
         return result
 
     async def create_draft_invoice(self, invoice: Mapping[str, Any]) -> dict[str, Any]:
+        if error := self._scope_error("create_draft_invoice"):
+            return error
         payload = {**dict(invoice), "status": "draft"}
         return await self._call(lambda client: client.request_json("POST", "invoices/", json=payload))
 
     async def update_draft_invoice(self, invoice_id: int, invoice: Mapping[str, Any]) -> dict[str, Any]:
+        if error := self._scope_error("update_draft_invoice"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -140,6 +159,8 @@ class InvoiceMCPTools:
         return await self._call(operation)
 
     async def finalize_invoice(self, invoice_id: int, confirm: bool = False) -> dict[str, Any]:
+        if error := self._scope_error("finalize_invoice"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -156,6 +177,8 @@ class InvoiceMCPTools:
         return await self._call(lambda client: client.request_json("POST", f"invoices/{invoice_id}/finalize/", json={"confirm": True}))
 
     async def generate_invoice_pdf(self, invoice_id: int) -> dict[str, Any]:
+        if error := self._scope_error("generate_invoice_pdf"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -163,6 +186,8 @@ class InvoiceMCPTools:
         return await self._call(lambda client: client.request_json("POST", f"invoices/{invoice_id}/generate-pdf/"))
 
     async def get_invoice_artifact(self, invoice_id: int, mode: str = "metadata", max_bytes: int | None = None) -> dict[str, Any]:
+        if error := self._scope_error("get_invoice_artifact"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -189,6 +214,8 @@ class InvoiceMCPTools:
         return await self._call(operation)
 
     async def inspect_invoice_status_history(self, invoice_id: int) -> dict[str, Any]:
+        if error := self._scope_error("inspect_invoice_status_history"):
+            return error
         try:
             positive_id(invoice_id, "invoice_id")
         except ValueError as exc:
@@ -222,6 +249,21 @@ class InvoiceMCPTools:
         if self.api_client_factory is not None:
             return self.api_client_factory()
         return InvoicesAPIClient(self.config or load_config())
+
+    def _scope_error(self, tool_name: str) -> dict[str, Any] | None:
+        if self.config is None:
+            return None
+        if has_required_scope(tool_name, self.config):
+            return None
+        required_scope = required_scope_for_tool(tool_name, self.config)
+        return _error_payload(
+            MCPServiceError(
+                code="insufficient_scope",
+                message=f"The MCP access token is missing the required scope: {required_scope}.",
+                status_code=403,
+                next_action="Re-authorize the MCP client with the required invoice scope.",
+            )
+        )
 
 
 def _clean_params(params: Mapping[str, Any]) -> dict[str, Any]:
