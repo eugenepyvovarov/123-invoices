@@ -950,7 +950,7 @@ class ChunkValidationTests(unittest.TestCase):
         preview_text = (ROOT / 'scripts' / 'preview.sh').read_text()
         destroy_text = (ROOT / 'scripts' / 'destroy-preview.sh').read_text()
 
-        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-127.0.0.1', preview_common_text)
+        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal', preview_common_text)
         self.assertIn('preview_backend_host() {', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_ROLE:-current', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_REF', preview_common_text)
@@ -961,7 +961,7 @@ class ChunkValidationTests(unittest.TestCase):
         self.assertIn('local port=$((20000 + pr_number + port_offset))', preview_common_text)
         self.assertIn("printf 'http://%s:%s\\n' \"$(preview_backend_host)\" \"$(preview_port)\"", preview_common_text)
         self.assertIn("printf 'https://%s\\n' \"$(preview_host)\"", preview_common_text)
-        self.assertIn("printf '%s/accounts/login/\\n' \"$(public_preview_url)\"", preview_common_text)
+        self.assertIn("printf '%s/accounts/login/\\n' \"$(backend_url)\"", preview_common_text)
         self.assertIn('git -C "${REPO_ROOT}" worktree add --force --detach "${source_root}" "${resolved_ref}"', preview_common_text)
         self.assertIn('git -C "${REPO_ROOT}" worktree remove --force "${source_root}"', preview_common_text)
         self.assertIn('SOURCE_ROOT="$(ensure_preview_source_root)"', artifact_text)

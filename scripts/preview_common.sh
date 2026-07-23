@@ -219,7 +219,7 @@ backend_url() {
 }
 
 preview_backend_host() {
-  printf '%s\n' "${OPENCODE_PREVIEW_BACKEND_HOST:-127.0.0.1}"
+  printf '%s\n' "${OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal}"
 }
 
 public_preview_url() {
@@ -227,7 +227,7 @@ public_preview_url() {
 }
 
 health_url() {
-  printf '%s/accounts/login/\n' "$(public_preview_url)"
+  printf '%s/accounts/login/\n' "$(backend_url)"
 }
 
 wait_for_http() {
