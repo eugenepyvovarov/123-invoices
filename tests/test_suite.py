@@ -950,7 +950,7 @@ class ChunkValidationTests(unittest.TestCase):
         preview_text = (ROOT / 'scripts' / 'preview.sh').read_text()
         destroy_text = (ROOT / 'scripts' / 'destroy-preview.sh').read_text()
 
-        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-127.0.0.1', preview_common_text)
+        self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_ROLE:-current', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_REF', preview_common_text)
         self.assertIn("echo \"OPENCODE_PREVIEW_ROLE must be either 'current' or 'baseline'.\"", preview_common_text)
@@ -967,6 +967,7 @@ class ChunkValidationTests(unittest.TestCase):
         self.assertIn('cd "${SOURCE_ROOT}"', artifact_text)
         self.assertIn('SOURCE_ROOT="$(ensure_preview_source_root)"', preview_text)
         self.assertIn('cd "${SOURCE_ROOT}"', preview_text)
+        self.assertIn('- "${PREVIEW_PORT}:8000"', preview_text)
         self.assertIn('remove_preview_source_root', destroy_text)
 
     def test_e2e_script_uses_resolved_python_for_preview_port_selection(self):

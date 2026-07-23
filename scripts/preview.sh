@@ -46,7 +46,7 @@ services:
       - preview_media:/app/media
       - ${ENV_FILE}:/app/.env:ro
     ports:
-      - "127.0.0.1:${PREVIEW_PORT}:8000"
+      - "${PREVIEW_PORT}:8000"
 
   scheduler:
     image: ${IMAGE_TAG}
