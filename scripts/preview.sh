@@ -16,8 +16,7 @@ COMPOSE_FILE="$(preview_compose_file)"
 ENV_FILE="$(preview_env_file)"
 IMAGE_TAG="$(preview_image)"
 
-mkdir -p "${RUNTIME_DIR}/db" "${RUNTIME_DIR}/media"
-chmod -R a+rwX "${RUNTIME_DIR}/db" "${RUNTIME_DIR}/media"
+mkdir -p "${RUNTIME_DIR}"
 
 cat > "${ENV_FILE}" <<EOF
 SECRET_KEY=preview-pr-$(preview_pr_number)-$(preview_git_sha)
@@ -43,8 +42,8 @@ services:
     command: gunicorn app.wsgi:application --bind 0.0.0.0:8000
     restart: unless-stopped
     volumes:
-      - ${RUNTIME_DIR}/db:/app/db
-      - ${RUNTIME_DIR}/media:/app/media
+      - preview_db:/app/db
+      - preview_media:/app/media
       - ${ENV_FILE}:/app/.env:ro
     ports:
       - "127.0.0.1:${PREVIEW_PORT}:8000"
@@ -62,9 +61,13 @@ services:
     depends_on:
       - web
     volumes:
-      - ${RUNTIME_DIR}/db:/app/db
-      - ${RUNTIME_DIR}/media:/app/media
+      - preview_db:/app/db
+      - preview_media:/app/media
       - ${ENV_FILE}:/app/.env:ro
+
+volumes:
+  preview_db:
+  preview_media:
 EOF
 
 docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --force-recreate web >&2
