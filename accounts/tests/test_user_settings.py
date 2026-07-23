@@ -1,6 +1,8 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.urls import reverse
+from django.utils import timezone
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -130,6 +132,35 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertIn('api_token_form', response.context)
         self.assertEqual(list(response.context['api_tokens']), [owned_token])
         self.assertNotIn(other_token, list(response.context['api_tokens']))
+        self.assertContains(response, 'Invoices API tokens')
+        self.assertContains(response, 'Owned token')
+        self.assertContains(response, owned_token.prefix)
+        self.assertContains(response, 'Active')
+        self.assertNotContains(response, 'Other token')
+
+    def test_get_renders_api_token_status_badges_and_expense_ai_label(self):
+        active_token, _ = ApiToken.issue(owner=self.user, name='Active token')
+        expired_token, _ = ApiToken.issue(
+            owner=self.user,
+            name='Expired token',
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        revoked_token, _ = ApiToken.issue(owner=self.user, name='Revoked token')
+        revoked_token.revoke()
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Invoices API tokens')
+        self.assertContains(response, 'Expense import AI provider')
+        self.assertContains(response, 'This provider API key is not an Invoices REST API token.')
+        self.assertContains(response, active_token.prefix)
+        self.assertContains(response, expired_token.prefix)
+        self.assertContains(response, revoked_token.prefix)
+        self.assertContains(response, 'Active')
+        self.assertContains(response, 'Expired')
+        self.assertContains(response, 'Revoked')
 
     def test_create_api_token_uses_form_and_reveals_plaintext_once(self):
         self.login_with_active_company(self.user, issuer=self.issuer_a)
@@ -149,6 +180,9 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertEqual(api_token.secret_hash, ApiToken.make_secret_hash(plaintext))
         self.assertEqual(api_token.expires_at.date().isoformat(), '2026-12-31')
         self.assertIn(api_token, list(response.context['api_tokens']))
+        self.assertContains(response, 'Copy your new token now')
+        self.assertContains(response, plaintext)
+        self.assertContains(response, api_token.prefix)
 
         follow_up = self.client.get(self.settings_url)
         self.assertIsNone(follow_up.context['new_api_token_plaintext'])
