@@ -23,6 +23,9 @@ def serve_media(request, path, **kwargs):
         return non_streaming_response
     return response
 urlpatterns = [
+    path('.well-known/', include('mcp_oauth.well_known_urls')),
+    path('oauth/', include('mcp_oauth.urls')),
+    path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     path('api/', include('api.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
