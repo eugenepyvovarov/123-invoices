@@ -1,10 +1,10 @@
 ## Overview
 
-Add a network-accessible MCP server for the invoices project so approved AI clients can search, inspect, draft, update, finalize, and retrieve invoice artifacts through controlled tools.
+Add a network-accessible Streamable HTTP MCP server for the invoices project so approved AI clients can search, inspect, draft, update, finalize, and retrieve invoice artifacts through controlled tools.
 
-This issue should build on #142’s authenticated DRF API. MCP tool handlers should call the API, not import Django models or read invoice/media files directly.
+This issue depends on #142’s authenticated DRF API. MCP tool handlers should call the DRF API rather than importing Django invoice models or reading invoice/media files directly.
 
-Inbound HTTP MCP authentication should use OAuth 2.1 for Streamable HTTP, not static MCP bearer tokens. Recommended Ultramac default: implement an in-app Django authorization server so the project can support OAuth discovery, code + PKCE, MCP-bound access tokens, pre-registered clients, and Client ID Metadata Documents (CIMD) without depending on an external IdP feature gap.
+Inbound HTTP MCP authentication should use OAuth 2.1, not static MCP bearer tokens. Recommended Ultramac default: use `django-oauth-toolkit` as the in-app Django authorization server foundation, with a small project-owned `mcp_oauth` layer for MCP-specific Protected Resource Metadata, resource/audience enforcement, and CIMD support.
 
 ## Problem
 
@@ -15,15 +15,16 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 ## Proposed Outcome
 
 - Add a Streamable HTTP MCP service with a stable `/mcp/` endpoint and discoverable invoice tools.
-- Replace inbound static MCP bearer authentication with OAuth 2.1 protected-resource behavior:
+- Use `django-oauth-toolkit` as the core in-app OAuth server library for client records, authorization code grants, PKCE, token issuance, scopes, revocation/introspection, admin integration, and migrations.
+- Add project-owned extensions around `django-oauth-toolkit` for:
+  - OAuth 2.0 Protected Resource Metadata for the MCP resource;
+  - RFC 8707-style `resource` / audience validation for MCP-bound tokens;
+  - CIMD client metadata fetching and validation;
+  - MCP-specific `WWW-Authenticate` challenge behavior.
+- Protect inbound MCP HTTP with OAuth 2.1 behavior:
   - unauthenticated MCP requests return `401` with `WWW-Authenticate: Bearer resource_metadata="..."` and appropriate scope guidance;
-  - the MCP resource serves OAuth 2.0 Protected Resource Metadata;
-  - inbound access tokens are validated for issuer, expiry, scope, and MCP resource/audience.
-- Add an in-app Django OAuth authorization server as the default Ultramac deployment choice:
-  - authorization code + PKCE for public clients;
-  - documented confidential-client path for trusted automation where needed;
-  - RFC 8414/OIDC-style authorization server metadata;
-  - `client_id_metadata_document_supported: true` for CIMD-capable clients.
+  - inbound access tokens are validated for active state, expiry, issuer/introspection authority, scope, and MCP resource/audience;
+  - insufficient tool scope returns a standards-compatible `insufficient_scope` challenge.
 - Support client registration in this priority order:
   1. pre-registered clients for known clients such as Hermes when configured;
   2. CIMD using HTTPS URL client IDs;
@@ -40,6 +41,7 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 
 ## Constraints / Non-Goals
 
+- Do not hand-roll the OAuth core grant/token machinery when `django-oauth-toolkit` can provide it.
 - Do not ship stdio-only MCP or legacy SSE compatibility; HTTP Streamable MCP is the target.
 - Do not accept static inbound MCP bearer tokens as production remote-HTTP authorization.
 - Do not forward MCP OAuth access tokens to the DRF API.
@@ -68,23 +70,24 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 ### Technical Behavior
 
 1. Unauthenticated MCP requests return `401` with a standards-compatible `WWW-Authenticate` Bearer challenge containing `resource_metadata`.
-2. Protected Resource Metadata includes the MCP resource identifier, authorization server URL(s), and supported scopes.
+2. Protected Resource Metadata includes the MCP resource identifier, authorization server URL, and supported scopes.
 3. Authorization server metadata includes authorization/token endpoints, supported code challenge methods including `S256`, supported scopes, and `client_id_metadata_document_supported: true`.
 4. OAuth authorization requests require `resource` targeting the canonical MCP resource and reject mismatched redirect URIs, unsupported clients, missing PKCE, or invalid scopes.
-5. CIMD support fetches HTTPS client metadata documents, validates exact `client_id` match, validates redirect URIs, applies timeouts/size limits, and blocks private-network/SSRF targets.
-6. Pre-registered client configuration takes precedence over CIMD when both are available.
-7. Access-token validation rejects expired tokens, invalid issuer tokens, invalid audience/resource tokens, and tokens missing required scopes.
-8. Insufficient tool scope returns `403` with an OAuth Bearer `insufficient_scope` challenge and required scope guidance.
-9. MCP tool handlers call the DRF API through a shared HTTP client using only the dedicated upstream API credential.
-10. MCP logs and errors redact inbound tokens, upstream API tokens, authorization headers, OAuth codes, refresh tokens, and artifact bodies.
-11. Upstream API failures, validation errors, conflicts, timeouts, and outages map to stable MCP-safe errors without secret leakage.
+5. `django-oauth-toolkit` backs core client, grant, token, scope, revocation, and introspection behavior.
+6. CIMD support fetches HTTPS client metadata documents, validates exact `client_id` match, validates redirect URIs, applies timeouts/size limits, and blocks private-network/SSRF targets.
+7. Pre-registered client configuration takes precedence over CIMD when both are available.
+8. Access-token validation rejects expired tokens, invalid issuer/introspection authority, invalid audience/resource tokens, and tokens missing required scopes.
+9. Insufficient tool scope returns `403` with an OAuth Bearer `insufficient_scope` challenge and required scope guidance.
+10. MCP tool handlers call the DRF API through a shared HTTP client using only the dedicated upstream API credential.
+11. MCP logs and errors redact inbound tokens, upstream API tokens, authorization headers, OAuth codes, refresh tokens, and artifact bodies.
+12. Upstream API failures, validation errors, conflicts, timeouts, and outages map to stable MCP-safe errors without secret leakage.
 
 ### Operations / Deployment
 
 1. Docker/Compose includes an `mcp` service using the same release image as `web` and `scheduler`.
 2. OAuth authorization-server endpoints run with the Django web service and are available over approved HTTPS URLs.
-3. Deployment applies any OAuth migrations through the web service; the MCP service runs with `RUN_MIGRATIONS=0`.
-4. Runtime configuration documents the MCP public resource URL, AS issuer URL, PRM URL, upstream API URL/token, OAuth signing or introspection settings, scopes, bind host/port, timeout, and artifact size limit.
+3. Deployment applies OAuth-related migrations through the web service; the MCP service runs with `RUN_MIGRATIONS=0`.
+4. Runtime configuration documents the MCP public resource URL, AS issuer URL, PRM URL, upstream API URL/token, OAuth introspection or validation settings, scopes, bind host/port, timeout, and artifact size limit.
 5. No production OAuth clients, API tokens, or client secrets are automatically created by deploy.
 6. Known clients can be pre-registered by an operator, while CIMD is enabled for open clients that publish valid HTTPS metadata.
 7. Deployment verification confirms OAuth challenge/metadata behavior, rejects invalid/expired/wrong-audience tokens, and accepts a valid MCP-bound token for tool discovery.
@@ -95,7 +98,7 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 2. Tests cover Protected Resource Metadata, `WWW-Authenticate` challenge shape, authorization-server metadata, and scope advertisement.
 3. Tests cover OAuth code + PKCE success and failure cases, including missing PKCE, invalid redirect URI, invalid resource, expired authorization code, and invalid scope.
 4. Tests cover CIMD success, invalid metadata, redirect mismatch, unavailable metadata, metadata caching, and SSRF/private-network rejection.
-5. Tests cover token validation for invalid audience/resource, expired token, invalid issuer, insufficient scope, and successful tool call with a valid token.
+5. Tests cover token validation for invalid audience/resource, expired token, invalid issuer/introspection authority, insufficient scope, and successful tool call with a valid token.
 6. Tests prove the MCP service does not forward the MCP client access token to DRF.
 7. Tests cover upstream API request construction, bearer-token forwarding for the dedicated API credential, pagination/filter mapping, and response normalization.
 8. Tests cover invoice search/detail, reference data, reusable line suggestions, draft create/update, finalization confirmation, finalized-invoice rejection, artifact retrieval, and status inspection.
@@ -104,21 +107,23 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 ## Implementation Plan
 
 1. Rebase on the #142 DRF API contract and treat `/api/` as the source of invoice domain rules.
-2. Add an in-app OAuth authorization-server layer for MCP with code + PKCE, scopes, client records, grants/tokens, metadata, and optional trusted confidential-client support.
-3. Add CIMD support to the authorization server, including safe metadata fetching, validation, caching, and SSRF protections.
-4. Add Protected Resource Metadata and OAuth Bearer challenge handling to the MCP HTTP service.
-5. Replace static inbound MCP bearer middleware with OAuth resource-server validation that enforces issuer, expiry, audience/resource, and tool scopes.
-6. Keep MCP-to-DRF calls behind a dedicated minimum-privilege API token/app credential and ensure inbound MCP tokens are never forwarded upstream.
-7. Implement invoice MCP tools by proxying DRF endpoints, with additive read-only API support only if reusable order-line suggestions are missing.
-8. Update deployment scripts, runtime smoke/probe helpers, docs, and tests for OAuth-protected Streamable HTTP MCP.
+2. Add `django-oauth-toolkit` as the in-app OAuth server foundation and register its Django app, settings, URLs, migrations, and admin/client management path.
+3. Add a project-owned `mcp_oauth` layer for MCP scopes, resource indicators, authorization-server metadata, Protected Resource Metadata, token validation/introspection helpers, and consent templates.
+4. Add CIMD support to the authorization server, including safe metadata fetching, validation, caching, and SSRF protections.
+5. Add Protected Resource Metadata and OAuth Bearer challenge handling to the MCP HTTP service.
+6. Replace static inbound MCP bearer middleware with OAuth resource-server validation that enforces active token state, expiry, issuer/introspection authority, MCP resource/audience, and tool scopes.
+7. Keep MCP-to-DRF calls behind a dedicated minimum-privilege API token/app credential and ensure inbound MCP tokens are never forwarded upstream.
+8. Implement invoice MCP tools by proxying DRF endpoints, with additive read-only API support only if reusable order-line suggestions are missing.
+9. Update deployment scripts, runtime smoke/probe helpers, docs, and tests for OAuth-protected Streamable HTTP MCP.
 
 ## Task List
 
-- [ ] Add the in-app MCP OAuth authorization server
-  - [ ] Add OAuth server dependencies, models/migrations, settings, and URL routes for clients, grants, tokens, scopes, and resource indicators.
-  - [ ] Implement authorization, token, metadata, and token validation/introspection support using existing Django login/OTP sessions.
-  - [ ] Enforce authorization code + PKCE with `S256`, exact redirect URI validation, `resource` validation, short-lived access tokens, and refresh-token safety where supported.
-  - [ ] Add pre-registered client management through admin or management commands.
+- [ ] Add the `django-oauth-toolkit` backed MCP OAuth authorization server
+  - [ ] Add and pin `django-oauth-toolkit` at the latest stable version compatible with Django 5.2.
+  - [ ] Register OAuth provider settings, URL routes, migrations, admin/client management, and scope configuration.
+  - [ ] Add `mcp_oauth` helpers for MCP resource indicators, scope definitions, metadata, and token validation/introspection response shaping.
+  - [ ] Implement authorization code + PKCE with `S256`, exact redirect URI validation, `resource` validation, short-lived access tokens, and refresh-token safety where supported.
+  - [ ] Add minimal authorization/consent templates that reuse the existing Django login/OTP session boundary.
   - [ ] Add focused tests for metadata, PKCE, redirect/resource validation, scope grants, token expiry, and confidential-client behavior.
 
 - [ ] Add CIMD client registration support
@@ -131,7 +136,7 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 - [ ] Replace inbound MCP auth with OAuth resource-server enforcement
   - [ ] Add Protected Resource Metadata routes for the MCP resource, including path-specific and root well-known behavior as appropriate.
   - [ ] Return OAuth Bearer `WWW-Authenticate` challenges for missing/invalid auth and insufficient-scope responses for tool-level scope failures.
-  - [ ] Validate inbound access tokens for issuer, expiry, resource/audience, active status, and scopes before MCP tool execution.
+  - [ ] Validate inbound access tokens for active state, expiry, issuer/introspection authority, resource/audience, and scopes before MCP tool execution.
   - [ ] Remove production reliance on `INVOICES_MCP_CLIENT_TOKENS`; keep any test-only bypass unavailable to remote production HTTP.
   - [ ] Add tests for 401/PRM discovery, invalid audience, expired token, insufficient scope, valid token tool discovery, and redaction.
 
@@ -154,7 +159,7 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 ## Deployment / Rollout
 
 - Roll out only after the authenticated DRF API dependency from #142 is present.
-- Apply OAuth-related migrations through the `web` service before starting the `mcp` service.
+- Apply `django-oauth-toolkit` and `mcp_oauth` migrations through the `web` service before starting the `mcp` service.
 - Configure the Django web service as the default Ultramac authorization server and expose its OAuth metadata/authorization/token endpoints over HTTPS.
 - Configure the MCP service with the canonical public MCP resource URL, PRM URL, AS issuer URL, upstream API base URL, dedicated upstream API credential, bind host/port, timeout, and artifact size limit.
 - Create a dedicated minimum-privilege DRF API token or app credential for MCP-to-DRF calls after deploy; do not use broad admin credentials.
@@ -168,9 +173,9 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 
 ### Add
 
-- `mcp_oauth/` Django app for OAuth clients, grants/tokens, metadata, CIMD, and tests.
-- `mcp_oauth/migrations/` for OAuth server persistence.
-- `mcp_oauth/templates/` only for minimal authorization/consent screens required by the OAuth flow.
+- `mcp_oauth/` Django app for MCP OAuth metadata, resource indicators, CIMD, token validation helpers, and tests.
+- `mcp_oauth/migrations/` for project-owned OAuth extension persistence if needed beyond `django-oauth-toolkit` models.
+- `mcp_oauth/templates/` for minimal authorization/consent screens required by the OAuth flow.
 - `invoices_mcp/oauth.py` or equivalent resource-server token validation module.
 - `invoices_mcp/protected_resource.py` or equivalent Protected Resource Metadata/challenge helpers.
 - `tests/test_mcp_oauth_*.py` and/or app-level OAuth tests.
@@ -179,8 +184,8 @@ Static inbound MCP bearer tokens are not sufficient for a network-accessible MCP
 
 ### Modify
 
-- `requirements.txt` — add OAuth/JWT/crypto dependencies as needed.
-- `app/settings.py` and `app/urls.py` — register OAuth app, metadata routes, and login-exempt behavior where appropriate.
+- `requirements.txt` — add `django-oauth-toolkit` and only narrowly needed JWT/crypto dependencies.
+- `app/settings.py` and `app/urls.py` — register OAuth provider app, MCP OAuth app, metadata routes, and login-exempt behavior where appropriate.
 - `invoices_mcp/config.py`, `invoices_mcp/auth.py`, `invoices_mcp/server.py`, `invoices_mcp/api_client.py`, `invoices_mcp/tools.py`, `invoices_mcp/schemas.py`, and `invoices_mcp/errors.py`.
 - `docker-compose.yml`, `Dockerfile`, `scripts/deploy.sh`, `scripts/verify_deploy.sh`, `scripts/runtime_smoke.sh`, and `scripts/ci.sh`.
 - `README.md`, `docs/README.md`, and `docs/deployment.md`.
