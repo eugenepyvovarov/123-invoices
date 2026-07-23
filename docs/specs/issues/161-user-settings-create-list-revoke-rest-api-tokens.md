@@ -79,11 +79,11 @@ Users can manage “Invoices API tokens” from `/accounts/user-settings/` in a 
   - [x] Add `revoke_api_token` POST handling using owner-scoped lookup and `ApiToken.revoke()`.
   - [x] Add focused Django tests for create/list/revoke, ownership, plaintext handling, and revoked auth.
 
-- [ ] Update the User settings UI
-  - [ ] Add a dedicated “Invoices API tokens” section separate from Expense import AI provider settings.
-  - [ ] Render the create form, token metadata, status badges, and revoke controls with existing design patterns.
-  - [ ] Render the one-time plaintext token reveal in a copy-friendly state.
-  - [ ] Keep Expense import AI provider settings functional and clearly labeled.
+- [x] Update the User settings UI
+  - [x] Add a dedicated “Invoices API tokens” section separate from Expense import AI provider settings.
+  - [x] Render the create form, token metadata, status badges, and revoke controls with existing design patterns.
+  - [x] Render the one-time plaintext token reveal in a copy-friendly state.
+  - [x] Keep Expense import AI provider settings functional and clearly labeled.
 
 - [ ] Update docs and evidence harness
   - [ ] Update `docs/api.md` with the User settings token workflow and retained CLI/admin options.
