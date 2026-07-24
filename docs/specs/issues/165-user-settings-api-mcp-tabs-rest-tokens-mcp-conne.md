@@ -93,10 +93,10 @@ User settings already exposes Invoices REST API token lifecycle controls, but MC
   - [x] Add copy-button handling for public MCP values without interfering with the API token one-time copy action.
   - [x] Add Playwright coverage for desktop and narrow/mobile tab switching.
 
-- [ ] Update docs and reviewer evidence harness
-  - [ ] Update `docs/api.md` and `docs/mcp-server.md` to point users to the new User settings integration hub where appropriate.
-  - [ ] Add a Playwright evidence spec for the API/MCP tab flow.
-  - [ ] Add `user-settings-api-mcp-tabs` routes to demo and visual-validation scripts.
+- [x] Update docs and reviewer evidence harness
+  - [x] Update `docs/api.md` and `docs/mcp-server.md` to point users to the new User settings integration hub where appropriate.
+  - [x] Add a Playwright evidence spec for the API/MCP tab flow.
+  - [x] Add `user-settings-api-mcp-tabs` routes to demo and visual-validation scripts.
 
 ## Deployment / Rollout
 
