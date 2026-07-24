@@ -87,11 +87,11 @@ User settings already exposes Invoices REST API token lifecycle controls, but MC
   - [x] Ensure the Expense import AI provider section remains separate and not framed as REST or MCP credential management.
   - [x] Add/update template tests for tab labels, panels, MCP status, and existing API token controls.
 
-- [ ] Harden tab and copy interactions
-  - [ ] Replace the single-container tab initializer with a reusable initializer for all settings tab groups.
-  - [ ] Update active classes and ARIA attributes on tab switch.
-  - [ ] Add copy-button handling for public MCP values without interfering with the API token one-time copy action.
-  - [ ] Add Playwright coverage for desktop and narrow/mobile tab switching.
+- [x] Harden tab and copy interactions
+  - [x] Replace the single-container tab initializer with a reusable initializer for all settings tab groups.
+  - [x] Update active classes and ARIA attributes on tab switch.
+  - [x] Add copy-button handling for public MCP values without interfering with the API token one-time copy action.
+  - [x] Add Playwright coverage for desktop and narrow/mobile tab switching.
 
 - [ ] Update docs and reviewer evidence harness
   - [ ] Update `docs/api.md` and `docs/mcp-server.md` to point users to the new User settings integration hub where appropriate.
