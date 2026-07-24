@@ -78,10 +78,10 @@ Assumption: keep the existing owned-token list with status rows rather than addi
   - [x] Ensure desktop layout avoids cramped columns and narrow layout stacks form above list.
   - [x] Keep destructive revoke actions visually distinct without overpowering routine settings actions.
 
-- [ ] Preserve behavior with tests
-  - [ ] Update `accounts/tests/test_user_settings.py` assertions for the polished empty state and token metadata presentation.
-  - [ ] Keep coverage for owner-scoped listing, create, one-time plaintext reveal, revoke, and revoked-token auth failure.
-  - [ ] Avoid changing `accounts.models.ApiToken` or authentication tests unless an existing regression is discovered.
+- [x] Preserve behavior with tests
+  - [x] Update `accounts/tests/test_user_settings.py` assertions for the polished empty state and token metadata presentation.
+  - [x] Keep coverage for owner-scoped listing, create, one-time plaintext reveal, revoke, and revoked-token auth failure.
+  - [x] Avoid changing `accounts.models.ApiToken` or authentication tests unless an existing regression is discovered.
 
 - [ ] Update reviewer evidence harness
   - [ ] Reuse/update the existing `api-token-settings-management` demo scenario for empty/create/revoke evidence.
