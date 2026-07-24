@@ -81,11 +81,11 @@ User settings already exposes Invoices REST API token lifecycle controls, but MC
   - [x] Add Django tests for configured and not-publicly-configured MCP display states.
   - [x] Add tests proving secret-like settings are not rendered in the settings response.
 
-- [ ] Build the API/MCP integration tabs
-  - [ ] Wrap the existing Invoices API token UI in the **API** tab without changing POST actions or token lifecycle behavior.
-  - [ ] Add the **MCP** tab content with copyable endpoint and concise client onboarding guidance.
-  - [ ] Ensure the Expense import AI provider section remains separate and not framed as REST or MCP credential management.
-  - [ ] Add/update template tests for tab labels, panels, MCP status, and existing API token controls.
+- [x] Build the API/MCP integration tabs
+  - [x] Wrap the existing Invoices API token UI in the **API** tab without changing POST actions or token lifecycle behavior.
+  - [x] Add the **MCP** tab content with copyable endpoint and concise client onboarding guidance.
+  - [x] Ensure the Expense import AI provider section remains separate and not framed as REST or MCP credential management.
+  - [x] Add/update template tests for tab labels, panels, MCP status, and existing API token controls.
 
 - [ ] Harden tab and copy interactions
   - [ ] Replace the single-container tab initializer with a reusable initializer for all settings tab groups.
