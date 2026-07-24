@@ -82,6 +82,20 @@ class MCPAuthTests(IsolatedAsyncioTestCase):
         self.assertEqual(str(settings.resource_server_url), "https://mcp.example.test/mcp/")
         self.assertEqual(settings.required_scopes, ["invoices:mcp:read"])
 
+    async def test_streamable_http_rejects_unauthenticated_requests_with_oauth_challenge(self):
+        app = create_app(build_config())
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://mcp.test",
+        ) as client:
+            response = await client.post("/mcp/", json={})
+
+        self.assertEqual(response.status_code, 401)
+        challenge = response.headers.get("WWW-Authenticate", "")
+        self.assertIn("Bearer", challenge)
+        self.assertIn("resource_metadata=", challenge)
+
     async def test_token_verifier_accepts_active_resource_bound_introspection(self):
         def handler(request):
             self.assertEqual(request.url, "https://auth.example.test/oauth/introspect/")
