@@ -16,6 +16,7 @@ from accounts.forms import (
     RecoveryCodeForm,
     UserProfileForm,
 )
+from accounts.mcp_settings import mcp_connection_context
 from accounts.models import ApiToken, Profile
 from accounts.utils import otp as otp_utils
 from invoices.models import Issuer
@@ -275,6 +276,7 @@ def user_settings(request):
         'expense_ai_form': expense_ai_form,
         'api_token_form': api_token_form,
         'api_tokens': request.user.api_tokens.order_by('-created_at', '-id'),
+        'mcp_connection': mcp_connection_context(),
         'new_api_token': new_api_token,
         'new_api_token_plaintext': new_api_token_plaintext,
         'expense_ai_has_key': profile.has_expense_ai_api_key,

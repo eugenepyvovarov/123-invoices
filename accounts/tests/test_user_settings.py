@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django_otp.plugins.otp_static.models import StaticDevice
@@ -137,6 +138,147 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertContains(response, owned_token.prefix)
         self.assertContains(response, 'Active')
         self.assertNotContains(response, 'Other token')
+
+    @override_settings(
+        DEBUG=False,
+        MCP_OAUTH_RESOURCE_URL='https://mcp.example.test/mcp',
+        MCP_OAUTH_ISSUER_URL='https://invoices.example.test/',
+        MCP_OAUTH_CIMD_ENABLED=False,
+        OAUTH2_PROVIDER={
+            'SCOPES': {
+                'invoices:mcp:read': 'Read invoice data through MCP tools',
+                'invoices:mcp:draft:write': 'Create and update draft invoices through MCP tools',
+            },
+        },
+    )
+    def test_get_includes_configured_mcp_connection_context(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        mcp_connection = response.context['mcp_connection']
+        self.assertEqual(mcp_connection['resource_url'], 'https://mcp.example.test/mcp/')
+        self.assertEqual(mcp_connection['endpoint_url'], 'https://mcp.example.test/mcp/')
+        self.assertEqual(mcp_connection['issuer_url'], 'https://invoices.example.test')
+        self.assertEqual(
+            mcp_connection['authorization_server_metadata_url'],
+            'https://invoices.example.test/.well-known/oauth-authorization-server',
+        )
+        self.assertEqual(
+            mcp_connection['protected_resource_metadata_url'],
+            'https://invoices.example.test/.well-known/oauth-protected-resource',
+        )
+        self.assertEqual(mcp_connection['authorization_url'], 'https://invoices.example.test/o/authorize/')
+        self.assertEqual(mcp_connection['token_url'], 'https://invoices.example.test/o/token/')
+        self.assertFalse(mcp_connection['cimd_enabled'])
+        self.assertEqual(mcp_connection['status']['key'], 'configured')
+        self.assertEqual(
+            mcp_connection['scopes'],
+            [
+                {'name': 'invoices:mcp:read', 'description': 'Read invoice data through MCP tools'},
+                {'name': 'invoices:mcp:draft:write', 'description': 'Create and update draft invoices through MCP tools'},
+            ],
+        )
+
+    @override_settings(
+        DEBUG=False,
+        MCP_OAUTH_RESOURCE_URL='https://mcp.example.test/mcp',
+        MCP_OAUTH_ISSUER_URL='https://invoices.example.test/',
+        MCP_OAUTH_CIMD_ENABLED=True,
+        OAUTH2_PROVIDER={
+            'SCOPES': {
+                'invoices:mcp:read': 'Read invoice data through MCP tools',
+            },
+        },
+    )
+    def test_get_renders_api_mcp_integration_tabs_and_controls(self):
+        api_token, _ = ApiToken.issue(owner=self.user, name='Reviewer token')
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-testid="integrations-settings"')
+        self.assertContains(response, 'href="#integrations-api-panel"')
+        self.assertContains(response, 'aria-controls="integrations-api-panel"')
+        self.assertContains(response, '>API</a>', html=False)
+        self.assertContains(response, 'href="#integrations-mcp-panel"')
+        self.assertContains(response, 'aria-controls="integrations-mcp-panel"')
+        self.assertContains(response, '>MCP</a>', html=False)
+        self.assertContains(response, 'id="integrations-api-panel"')
+        self.assertContains(response, 'data-testid="invoices-api-token-settings"')
+        self.assertContains(response, 'name="action" value="create_api_token"')
+        self.assertContains(response, 'name="action" value="revoke_api_token"')
+        self.assertContains(response, api_token.prefix)
+        self.assertContains(response, 'id="integrations-mcp-panel"')
+        self.assertContains(response, 'data-testid="mcp-connection-settings"')
+        self.assertContains(response, 'data-testid="mcp-status-badge"')
+        self.assertContains(response, 'Configured')
+        self.assertContains(response, 'value="https://mcp.example.test/mcp/"')
+        self.assertContains(response, 'data-copy-public-value-button')
+        self.assertContains(response, 'OAuth 2.1 + PKCE')
+        self.assertContains(response, 'Hermes, Codex')
+        self.assertContains(response, 'CIMD')
+        self.assertContains(response, 'invoices:mcp:read')
+        self.assertContains(response, 'Expense import AI provider')
+        self.assertContains(response, 'data-testid="expense-ai-provider-settings"')
+
+    @override_settings(
+        DEBUG=False,
+        MCP_OAUTH_RESOURCE_URL='http://localhost:8765/mcp/',
+        MCP_OAUTH_ISSUER_URL='http://localhost:8000',
+    )
+    def test_get_marks_local_mcp_urls_not_publicly_configured_outside_debug(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        mcp_connection = response.context['mcp_connection']
+        self.assertEqual(mcp_connection['status']['key'], 'not_configured')
+        self.assertEqual(mcp_connection['status']['label'], 'Not publicly configured')
+
+    @override_settings(
+        DEBUG=True,
+        MCP_OAUTH_RESOURCE_URL='http://localhost:8765/mcp/',
+        MCP_OAUTH_ISSUER_URL='http://localhost:8000',
+    )
+    def test_get_marks_local_mcp_urls_as_local_development_in_debug(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['mcp_connection']['status']['key'], 'local_development')
+
+    @override_settings(
+        DEBUG=False,
+        MCP_OAUTH_RESOURCE_URL='https://mcp.example.test/mcp/',
+        MCP_OAUTH_ISSUER_URL='https://invoices.example.test',
+        MCP_OAUTH_INTROSPECTION_TOKEN='introspection-secret-token',
+        INVOICES_MCP_API_TOKEN='upstream-secret-token',
+        OAUTH_ACCESS_TOKEN='oauth-access-secret',
+        OAUTH_REFRESH_TOKEN='oauth-refresh-secret',
+        CLIENT_SECRET='client-secret-value',
+    )
+    def test_get_does_not_render_secret_like_mcp_settings(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        rendered = response.content.decode()
+        context_repr = repr(response.context['mcp_connection'])
+        for secret in [
+            'introspection-secret-token',
+            'upstream-secret-token',
+            'oauth-access-secret',
+            'oauth-refresh-secret',
+            'client-secret-value',
+        ]:
+            self.assertNotIn(secret, rendered)
+            self.assertNotIn(secret, context_repr)
 
     def test_get_renders_api_token_status_badges_and_expense_ai_label(self):
         active_token, _ = ApiToken.issue(owner=self.user, name='Active token')

@@ -19,6 +19,14 @@ directly.
 Expose the service only through the approved HTTPS reverse-proxy route. Direct
 container access should remain host/internal-network scoped where possible.
 
+Authenticated users can also find the deployment-specific MCP resource URL in
+**User settings** at `/accounts/user-settings/` under **Integrations → MCP**.
+That tab shows the web-side MCP configuration status, copyable endpoint, public
+OAuth discovery URLs, and short client setup guidance. Keep
+`INVOICES_MCP_PUBLIC_URL`, `MCP_OAUTH_RESOURCE_URL`, and
+`MCP_OAUTH_ISSUER_URL` aligned so the settings page and the MCP service
+advertise the same public HTTPS routes.
+
 ## Environment Variables
 
 | Variable | Purpose | Default |
@@ -88,6 +96,9 @@ URLs are:
 
 External IdPs such as Keycloak/Auth0 are a future integration option, but the
 default deployment for this issue is the in-app Django authorization server.
+The same non-secret metadata links and supported scopes are summarized for
+end-users in **User settings → Integrations → MCP** so client setup does not
+require reading this operator document.
 
 ## Client Registration
 
@@ -167,7 +178,8 @@ Important safety behavior:
 ## Client Examples
 
 All examples use placeholders only. Replace URLs/client IDs with approved
-deployment values. OAuth clients should start from the MCP endpoint, follow the
+deployment values. Users can copy the deployment's endpoint from **User settings
+→ Integrations → MCP**. OAuth clients should start from the MCP endpoint, follow the
 `WWW-Authenticate` challenge to Protected Resource Metadata, discover the AS
 metadata, then complete authorization code + PKCE. Pre-registered clients use
 their assigned `client_id`; CIMD clients use their HTTPS metadata URL as
