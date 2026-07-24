@@ -129,14 +129,14 @@
         <h2 class="section-title mb-0">Integrations</h2>
         <p class="text-muted small mb-0">Connect REST API clients or MCP clients without mixing their credential models.</p>
       </div>
-      <nav class="tab-nav" data-tab-group aria-label="Integration settings">
-        <a href="#integrations-api-panel" class="tab-nav__link is-active" data-tab-target role="tab" aria-selected="true" aria-controls="integrations-api-panel">API</a>
-        <a href="#integrations-mcp-panel" class="tab-nav__link" data-tab-target role="tab" aria-selected="false" aria-controls="integrations-mcp-panel">MCP</a>
+      <nav class="tab-nav" data-tab-group role="tablist" aria-label="Integration settings">
+        <a href="#integrations-api-panel" id="integrations-api-tab" class="tab-nav__link is-active" data-tab-target role="tab" aria-selected="true" aria-controls="integrations-api-panel" tabindex="0">API</a>
+        <a href="#integrations-mcp-panel" id="integrations-mcp-tab" class="tab-nav__link" data-tab-target role="tab" aria-selected="false" aria-controls="integrations-mcp-panel" tabindex="-1">MCP</a>
       </nav>
     </div>
 
     <div class="tab-panels stack-gap-lg">
-      <section class="tab-panel is-active" id="integrations-api-panel" data-user-settings-panel role="tabpanel" aria-label="API" data-testid="invoices-api-token-settings">
+      <section class="tab-panel is-active" id="integrations-api-panel" data-user-settings-panel role="tabpanel" aria-labelledby="integrations-api-tab" data-testid="invoices-api-token-settings">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
           <div>
             <h3 class="section-title mb-0">Invoices API tokens</h3>
@@ -244,7 +244,7 @@
         </div>
       </section>
 
-      <section class="tab-panel" id="integrations-mcp-panel" data-user-settings-panel role="tabpanel" aria-label="MCP" data-testid="mcp-connection-settings">
+      <section class="tab-panel" id="integrations-mcp-panel" data-user-settings-panel role="tabpanel" aria-labelledby="integrations-mcp-tab" data-testid="mcp-connection-settings" hidden>
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
           <div>
             <h3 class="section-title mb-0">MCP connection</h3>
@@ -378,13 +378,13 @@
         <p class="text-muted small mb-0">Manage your password and two-factor authentication preferences.</p>
       </div>
       {% with security_tab=active_security_tab|default:'password' %}
-      <nav class="tab-nav" data-tab-group aria-label="Security settings">
-        <a href="#password-panel" class="tab-nav__link{% if security_tab == 'password' %} is-active{% endif %}" data-tab-target role="tab" aria-selected="{% if security_tab == 'password' %}true{% else %}false{% endif %}" aria-controls="password-panel">Password</a>
-        <a href="#otp-panel" class="tab-nav__link{% if security_tab == 'otp' %} is-active{% endif %}" data-tab-target role="tab" aria-selected="{% if security_tab == 'otp' %}true{% else %}false{% endif %}" aria-controls="otp-panel">Two-factor</a>
+      <nav class="tab-nav" data-tab-group role="tablist" aria-label="Security settings">
+        <a href="#password-panel" id="password-tab" class="tab-nav__link{% if security_tab == 'password' %} is-active{% endif %}" data-tab-target role="tab" aria-selected="{% if security_tab == 'password' %}true{% else %}false{% endif %}" aria-controls="password-panel" tabindex="{% if security_tab == 'password' %}0{% else %}-1{% endif %}">Password</a>
+        <a href="#otp-panel" id="otp-tab" class="tab-nav__link{% if security_tab == 'otp' %} is-active{% endif %}" data-tab-target role="tab" aria-selected="{% if security_tab == 'otp' %}true{% else %}false{% endif %}" aria-controls="otp-panel" tabindex="{% if security_tab == 'otp' %}0{% else %}-1{% endif %}">Two-factor</a>
       </nav>
     </div>
     <div class="tab-panels stack-gap-lg">
-      <section class="tab-panel{% if security_tab == 'password' %} is-active{% endif %}" id="password-panel" data-user-settings-panel role="tabpanel" aria-label="Password">
+      <section class="tab-panel{% if security_tab == 'password' %} is-active{% endif %}" id="password-panel" data-user-settings-panel role="tabpanel" aria-labelledby="password-tab" {% if security_tab != 'password' %}hidden{% endif %}>
         <form method="post" class="stack-gap-sm">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_password" />
@@ -421,7 +421,7 @@
           </footer>
         </form>
       </section>
-      <section class="tab-panel{% if security_tab == 'otp' %} is-active{% endif %}" id="otp-panel" data-user-settings-panel role="tabpanel" aria-label="Two-factor">
+      <section class="tab-panel{% if security_tab == 'otp' %} is-active{% endif %}" id="otp-panel" data-user-settings-panel role="tabpanel" aria-labelledby="otp-tab" {% if security_tab != 'otp' %}hidden{% endif %}>
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div>
             <h3 class="section-title mb-0">Two-factor authentication</h3>
@@ -527,27 +527,58 @@
 {{ block.super }}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-user-settings-tabs]').forEach((container) => {
-      const tabs = container.querySelectorAll('[data-tab-target]');
-      const panels = container.querySelectorAll('[data-user-settings-panel]');
-      const activate = (id) => {
+    const initializeTabGroup = (container) => {
+      const tabs = Array.from(container.querySelectorAll('[data-tab-target]'));
+      const panels = Array.from(container.querySelectorAll('[data-user-settings-panel]'));
+
+      if (!tabs.length || !panels.length) return;
+
+      const activate = (id, options = {}) => {
         tabs.forEach((tab) => {
           const isActive = tab.getAttribute('href') === `#${id}`;
           tab.classList.toggle('is-active', isActive);
           tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          tab.setAttribute('tabindex', isActive ? '0' : '-1');
+          if (isActive && options.focus) tab.focus();
         });
         panels.forEach((panel) => {
-          panel.classList.toggle('is-active', panel.id === id);
+          const isActive = panel.id === id;
+          panel.classList.toggle('is-active', isActive);
+          panel.toggleAttribute('hidden', !isActive);
         });
       };
-      tabs.forEach((tab) => {
+
+      tabs.forEach((tab, index) => {
+        if (tab.dataset.userSettingsTabBound === 'true') return;
+        tab.dataset.userSettingsTabBound = 'true';
         tab.addEventListener('click', (event) => {
           event.preventDefault();
-          const target = tab.getAttribute('href').substring(1);
-          activate(target);
+          const target = tab.getAttribute('href')?.substring(1);
+          if (target) activate(target);
+        });
+        tab.addEventListener('keydown', (event) => {
+          const nextKeys = ['ArrowRight', 'ArrowDown'];
+          const previousKeys = ['ArrowLeft', 'ArrowUp'];
+          if (![...nextKeys, ...previousKeys, 'Home', 'End'].includes(event.key)) return;
+
+          event.preventDefault();
+          let nextIndex = index;
+          if (nextKeys.includes(event.key)) nextIndex = (index + 1) % tabs.length;
+          if (previousKeys.includes(event.key)) nextIndex = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'Home') nextIndex = 0;
+          if (event.key === 'End') nextIndex = tabs.length - 1;
+
+          const target = tabs[nextIndex].getAttribute('href')?.substring(1);
+          if (target) activate(target, { focus: true });
         });
       });
-    });
+
+      const activeTab = tabs.find((tab) => tab.classList.contains('is-active')) || tabs[0];
+      const activeTarget = activeTab.getAttribute('href')?.substring(1);
+      if (activeTarget) activate(activeTarget);
+    };
+
+    document.querySelectorAll('[data-user-settings-tabs]').forEach(initializeTabGroup);
 
     document.querySelectorAll('[data-copy-api-token]').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -558,7 +589,7 @@
           await navigator.clipboard.writeText(input.value);
           button.textContent = 'Copied';
         } catch (error) {
-          document.execCommand('copy');
+          if (document.queryCommandSupported?.('copy')) document.execCommand('copy');
           button.textContent = 'Copied';
         }
       });
@@ -572,7 +603,7 @@
         try {
           await navigator.clipboard.writeText(input.value);
         } catch (error) {
-          document.execCommand('copy');
+          if (document.queryCommandSupported?.('copy')) document.execCommand('copy');
         }
         button.textContent = 'Copied';
       });

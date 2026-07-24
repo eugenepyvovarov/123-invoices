@@ -17,7 +17,7 @@ async function openUserSettings(page) {
 async function expectApiTokenSettingsVisible(page) {
   await expect(page.getByTestId('invoices-api-token-settings')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Invoices API tokens' })).toBeVisible();
-  await expect(page.getByText('These are separate from the Expense import AI provider key below.')).toBeVisible();
+  await expect(page.getByText('These are separate from MCP OAuth and from the Expense import AI provider key below.')).toBeVisible();
   await expect(page.getByTestId('expense-ai-provider-settings')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Expense import AI provider' })).toBeVisible();
 }
