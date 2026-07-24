@@ -65,12 +65,12 @@ Assumption: keep the existing owned-token list with status rows rather than addi
 
 ## Task List
 
-- [ ] Rework the Invoices API token settings markup
-  - [ ] Align the section header, help text, and status badge treatment with sibling settings cards.
-  - [ ] Separate the create form and token list into a clearer responsive structure.
-  - [ ] Improve the one-time plaintext reveal placement and copy hierarchy without changing reveal semantics.
-  - [ ] Replace the empty table state with an intentional empty-state panel.
-  - [ ] Preserve accessible labels, form actions, CSRF handling, and existing stable test hooks where practical.
+- [x] Rework the Invoices API token settings markup
+  - [x] Align the section header, help text, and status badge treatment with sibling settings cards.
+  - [x] Separate the create form and token list into a clearer responsive structure.
+  - [x] Improve the one-time plaintext reveal placement and copy hierarchy without changing reveal semantics.
+  - [x] Replace the empty table state with an intentional empty-state panel.
+  - [x] Preserve accessible labels, form actions, CSRF handling, and existing stable test hooks where practical.
 
 - [ ] Add focused settings-page styling
   - [ ] Add scoped component classes for the token block only where utilities are not enough.
