@@ -183,6 +183,11 @@ user-settings-api-mcp-tabs
 - The `integrations-mcp-tab-desktop` baseline/current pair should show a new MCP connection block with status, endpoint, and concise onboarding guidance.
 - The `integrations-mcp-tab-mobile` baseline/current pair should show the integration tabs and MCP endpoint/copy area remain usable on a narrow viewport.
 
+### Baseline SHA
+
+`50fb6dc52087dfa6bceb7b3438303b1fd7fada6c`
+
+
 ## Open Questions
 
 None.
