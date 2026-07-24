@@ -1,14 +1,45 @@
 const { test, expect } = require('@playwright/test');
+const path = require('path');
+const { execFileSync } = require('child_process');
 
 const { loginToDashboard } = require('./helpers/auth');
 const { captureCheckpointScreenshot } = require('./helpers/demo-evidence');
 
+const E2E_EMAIL = process.env.E2E_SMOKE_EMAIL || 'e2e-smoke@example.com';
 const IS_BASELINE_VISUAL = process.env.OPENCODE_VISUAL_VALIDATION_TARGET === 'baseline';
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const PYTHON_BIN = process.env.PLAYWRIGHT_PYTHON_BIN || process.env.PYTHON_BIN || 'python3';
 
-test.use({ storageState: { cookies: [], origins: [] } });
+function clearSmokeUserApiTokens() {
+  if (process.env.OPENCODE_PREVIEW_PUBLIC_URL) {
+    return;
+  }
 
-async function openUserSettings(page) {
-  await page.setViewportSize({ width: 1600, height: 1200 });
+  execFileSync(
+    PYTHON_BIN,
+    [
+      'manage.py',
+      'shell',
+      '-c',
+      [
+        'from django.contrib.auth import get_user_model',
+        `User = get_user_model()`,
+        `user = User.objects.get(email=${JSON.stringify(E2E_EMAIL)})`,
+        'user.api_tokens.all().delete()',
+      ].join('; '),
+    ],
+    {
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: 'pipe',
+    },
+  );
+}
+
+test.use({ storageState: { cookies: [], origins: [] }, video: 'on' });
+
+async function openUserSettings(page, viewport = { width: 1600, height: 1200 }) {
+  await page.setViewportSize(viewport);
   await loginToDashboard(page);
   await page.goto('/accounts/user-settings/');
   await expect(page.getByRole('heading', { level: 1, name: 'User settings' })).toBeVisible();
@@ -22,14 +53,31 @@ async function expectApiTokenSettingsVisible(page) {
   await expect(page.getByRole('heading', { name: 'Expense import AI provider' })).toBeVisible();
 }
 
+async function expectApiTokenSettingsStacked(page) {
+  const createPanel = page.locator('.api-token-settings__create-column');
+  const listPanel = page.locator('.api-token-settings__list-column');
+  await expect(createPanel).toBeVisible();
+  await expect(listPanel).toBeVisible();
+
+  const createBox = await createPanel.boundingBox();
+  const listBox = await listPanel.boundingBox();
+  expect(createBox).not.toBeNull();
+  expect(listBox).not.toBeNull();
+  expect(listBox.y).toBeGreaterThan(createBox.y + createBox.height - 1);
+}
+
 test('api token settings management demo', async ({ page }, testInfo) => {
   test.skip(
     process.env.OPENCODE_DEMO_SCENARIO !== 'api-token-settings-management',
     'This evidence test only runs for the API token settings management demo scenario.',
   );
 
+  clearSmokeUserApiTokens();
   await openUserSettings(page);
   await expectApiTokenSettingsVisible(page);
+  await expect(page.getByTestId('api-token-empty-state')).toBeVisible();
+  await expect(page.getByText('No Invoices API tokens yet')).toBeVisible();
+  await captureCheckpointScreenshot(page, testInfo, 'api-token-empty-state', { fullPage: true });
 
   const tokenName = `E2E settings token ${Date.now()}`;
   await page.getByLabel('Token name').fill(tokenName);
@@ -68,5 +116,16 @@ test('api token settings visual capture', async ({ page }, testInfo) => {
     await expectApiTokenSettingsVisible(page);
   }
 
-  await captureCheckpointScreenshot(page, testInfo, 'user-settings-api-tokens', { fullPage: true });
+  await captureCheckpointScreenshot(page, testInfo, 'user-settings-api-tokens-desktop', { fullPage: true });
+
+  await page.setViewportSize({ width: 760, height: 1200 });
+  await page.goto('/accounts/user-settings/');
+  await expect(page.getByRole('heading', { level: 1, name: 'User settings' })).toBeVisible();
+
+  if (!IS_BASELINE_VISUAL) {
+    await expectApiTokenSettingsVisible(page);
+    await expectApiTokenSettingsStacked(page);
+  }
+
+  await captureCheckpointScreenshot(page, testInfo, 'user-settings-api-tokens-narrow', { fullPage: true });
 });
