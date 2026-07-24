@@ -83,11 +83,11 @@ Assumption: keep the existing owned-token list with status rows rather than addi
   - [x] Keep coverage for owner-scoped listing, create, one-time plaintext reveal, revoke, and revoked-token auth failure.
   - [x] Avoid changing `accounts.models.ApiToken` or authentication tests unless an existing regression is discovered.
 
-- [ ] Update reviewer evidence harness
-  - [ ] Reuse/update the existing `api-token-settings-management` demo scenario for empty/create/revoke evidence.
-  - [ ] Reuse/update the existing `api-token-settings` visual validation identifier.
-  - [ ] Add desktop and narrower-width visual checkpoints to `tests/e2e/api-token-settings.spec.js`.
-  - [ ] Keep evidence setup in committed test/harness code, not product-only automation branches.
+- [x] Update reviewer evidence harness
+  - [x] Reuse/update the existing `api-token-settings-management` demo scenario for empty/create/revoke evidence.
+  - [x] Reuse/update the existing `api-token-settings` visual validation identifier.
+  - [x] Add desktop and narrower-width visual checkpoints to `tests/e2e/api-token-settings.spec.js`.
+  - [x] Keep evidence setup in committed test/harness code, not product-only automation branches.
 
 ## Deployment / Rollout
 
