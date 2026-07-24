@@ -16,6 +16,27 @@ linked to its owner through `Issuer.users`; superuser-owned tokens can access al
 issuers. Tokens are not company-bound and do not use the browser active-company
 session.
 
+### User settings workflow
+
+Authenticated users can manage their own REST API Bearer tokens from **User
+settings** at `/accounts/user-settings/` in the **Invoices API tokens** section.
+This section is separate from the **Expense import AI provider** key, which is
+only used for statement-import mapping inference and is not accepted by `/api/`.
+
+From User settings, create a token by entering a required token name and,
+optionally, an expiry date/time. The plaintext token is shown once immediately
+after creation in a copy-friendly field. Copy it into the calling system's secret
+store before leaving the page; later visits list only metadata such as name,
+prefix, created time, last-used time, expiry, and active/expired/revoked status.
+Use the same section to revoke tokens you own. Revocation is a soft revoke and
+the token record remains visible as revoked.
+
+### CLI and admin escape hatches
+
+The User settings workflow is preferred for day-to-day owner-managed tokens.
+The existing management commands and Django admin remain available for operators
+who need administrative escape hatches.
+
 Issue a token with the management command:
 
 ```bash
@@ -38,6 +59,10 @@ revealing plaintext secrets:
 python manage.py list_api_tokens
 python manage.py revoke_api_token inv_live_abcd1234
 ```
+
+Staff users can also inspect token metadata and revoke tokens from Django admin
+through the `ApiToken` admin model. Admin and CLI views never recover plaintext
+secrets after creation.
 
 Send the token as a Bearer credential on every data request:
 

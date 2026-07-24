@@ -980,6 +980,7 @@ class ChunkValidationTests(unittest.TestCase):
         destroy_text = (ROOT / 'scripts' / 'destroy-preview.sh').read_text()
 
         self.assertIn('OPENCODE_PREVIEW_BACKEND_HOST:-host.docker.internal', preview_common_text)
+        self.assertIn('preview_backend_host() {', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_ROLE:-current', preview_common_text)
         self.assertIn('OPENCODE_PREVIEW_REF', preview_common_text)
         self.assertIn("echo \"OPENCODE_PREVIEW_ROLE must be either 'current' or 'baseline'.\"", preview_common_text)
@@ -987,7 +988,7 @@ class ChunkValidationTests(unittest.TestCase):
         self.assertIn("printf 'preview-pr-%s%s-%s\\n' \"${pr_number}\" \"${role_suffix}\" \"${project_key}\"", preview_common_text)
         self.assertIn("printf '1000\\n'", preview_common_text)
         self.assertIn('local port=$((20000 + pr_number + port_offset))', preview_common_text)
-        self.assertIn("printf 'http://%s:%s\\n' \"${backend_host}\" \"$(preview_port)\"", preview_common_text)
+        self.assertIn("printf 'http://%s:%s\\n' \"$(preview_backend_host)\" \"$(preview_port)\"", preview_common_text)
         self.assertIn("printf 'https://%s\\n' \"$(preview_host)\"", preview_common_text)
         self.assertIn("printf '%s/accounts/login/\\n' \"$(public_preview_url)\"", preview_common_text)
         self.assertIn('git -C "${REPO_ROOT}" worktree add --force --detach "${source_root}" "${resolved_ref}"', preview_common_text)
@@ -996,6 +997,9 @@ class ChunkValidationTests(unittest.TestCase):
         self.assertIn('cd "${SOURCE_ROOT}"', artifact_text)
         self.assertIn('SOURCE_ROOT="$(ensure_preview_source_root)"', preview_text)
         self.assertIn('cd "${SOURCE_ROOT}"', preview_text)
+        self.assertIn('PREVIEW_BACKEND_HOST="$(preview_backend_host)"', preview_text)
+        self.assertIn('ALLOWED_HOSTS=127.0.0.1,localhost,${PREVIEW_HOST},${PREVIEW_BACKEND_HOST},.preview.ultramac.work', preview_text)
+        self.assertIn('- "${PREVIEW_PORT}:8000"', preview_text)
         self.assertIn('remove_preview_source_root', destroy_text)
 
     def test_e2e_script_uses_resolved_python_for_preview_port_selection(self):

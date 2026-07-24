@@ -123,11 +123,119 @@
     </div>
   </div>
 
+  <section class="drawer-section drawer-section--flat" data-testid="invoices-api-token-settings">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <h2 class="section-title mb-0">Invoices API tokens</h2>
+        <p class="text-muted small mb-0">Create Bearer tokens for the Invoices REST API. These are separate from the Expense import AI provider key below.</p>
+      </div>
+      <span class="badge bg-info text-uppercase">REST API</span>
+    </div>
+
+    {% if new_api_token_plaintext %}
+      <div class="alert alert-warning stack-gap-sm" data-testid="api-token-plaintext-reveal">
+        <div>
+          <p class="fw-semibold mb-1">Copy your new token now</p>
+          <p class="small mb-0">This plaintext secret is shown once. After you leave this page, only metadata and prefix <code>{{ new_api_token.prefix }}</code> remain visible.</p>
+        </div>
+        <div class="input-group">
+          <input type="text" class="form-control font-monospace" value="{{ new_api_token_plaintext }}" readonly data-api-token-secret aria-label="New Invoices API token" />
+          <button type="button" class="btn btn-outline-secondary" data-copy-api-token>Copy</button>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <form method="post" class="stack-gap-sm form-vertical" novalidate data-testid="api-token-create-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_api_token" />
+          <div class="form-field-block">
+            <label for="{{ api_token_form.name.id_for_label }}" class="form-label">{{ api_token_form.name.label }}</label>
+            {{ api_token_form.name }}
+            {% if api_token_form.name.help_text %}<small class="text-muted d-block mt-1">{{ api_token_form.name.help_text }}</small>{% endif %}
+            {% if api_token_form.name.errors %}
+              <small class="text-danger d-block mt-1">{% for error in api_token_form.name.errors %}{{ error }}{% if not forloop.last %}<br />{% endif %}{% endfor %}</small>
+            {% endif %}
+          </div>
+          <div class="form-field-block">
+            <label for="{{ api_token_form.expires_at.id_for_label }}" class="form-label">{{ api_token_form.expires_at.label }}</label>
+            {{ api_token_form.expires_at }}
+            {% if api_token_form.expires_at.help_text %}<small class="text-muted d-block mt-1">{{ api_token_form.expires_at.help_text }}</small>{% endif %}
+            {% if api_token_form.expires_at.errors %}
+              <small class="text-danger d-block mt-1">{% for error in api_token_form.expires_at.errors %}{{ error }}{% if not forloop.last %}<br />{% endif %}{% endfor %}</small>
+            {% endif %}
+          </div>
+          {% if api_token_form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in api_token_form.non_field_errors %}{{ error }}{% if not forloop.last %}<br />{% endif %}{% endfor %}
+            </div>
+          {% endif %}
+          <button type="submit" class="btn btn-primary form-button">Create API token</button>
+        </form>
+      </div>
+
+      <div class="col-lg-8">
+        {% if api_tokens %}
+          <div class="table-responsive">
+            <table class="table align-middle mb-0" data-testid="api-token-list">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Prefix</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Last used</th>
+                  <th scope="col">Expires</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for token in api_tokens %}
+                  <tr>
+                    <td class="fw-semibold">{{ token.name }}</td>
+                    <td><code>{{ token.prefix }}</code></td>
+                    <td>{{ token.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>{% if token.last_used_at %}{{ token.last_used_at|date:"Y-m-d H:i" }}{% else %}<span class="text-muted">Never</span>{% endif %}</td>
+                    <td>{% if token.expires_at %}{{ token.expires_at|date:"Y-m-d H:i" }}{% else %}<span class="text-muted">No expiry</span>{% endif %}</td>
+                    <td>
+                      {% if token.is_revoked %}
+                        <span class="badge bg-secondary text-uppercase">Revoked</span>
+                      {% elif token.is_expired %}
+                        <span class="badge bg-warning text-uppercase">Expired</span>
+                      {% else %}
+                        <span class="badge bg-success text-uppercase">Active</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      {% if not token.is_revoked %}
+                        <form method="post" class="d-inline">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="revoke_api_token" />
+                          <input type="hidden" name="token_id" value="{{ token.id }}" />
+                          <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+                        </form>
+                      {% else %}
+                        <span class="text-muted small">Revoked {{ token.revoked_at|date:"Y-m-d H:i" }}</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-info mb-0" data-testid="api-token-empty-state">No Invoices API tokens yet. Create one when an integration needs Bearer authentication for <code>/api/</code>.</div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
   <section class="drawer-section drawer-section--flat" data-testid="expense-ai-provider-settings">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
       <div>
         <h2 class="section-title mb-0">Expense import AI provider</h2>
-        <p class="text-muted small mb-0">Configure your OpenAI-compatible provider for unmatched expense statement header mapping inference.</p>
+        <p class="text-muted small mb-0">Configure your OpenAI-compatible provider for unmatched expense statement header mapping inference. This provider API key is not an Invoices REST API token.</p>
       </div>
       {% if expense_ai_has_key %}
         <span class="badge bg-success text-uppercase">API key saved</span>
@@ -354,6 +462,21 @@
         event.preventDefault();
         const target = tab.getAttribute('href').substring(1);
         activate(target);
+      });
+    });
+
+    document.querySelectorAll('[data-copy-api-token]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const input = button.closest('.input-group')?.querySelector('[data-api-token-secret]');
+        if (!input) return;
+        input.select();
+        try {
+          await navigator.clipboard.writeText(input.value);
+          button.textContent = 'Copied';
+        } catch (error) {
+          document.execCommand('copy');
+          button.textContent = 'Copied';
+        }
       });
     });
   });
