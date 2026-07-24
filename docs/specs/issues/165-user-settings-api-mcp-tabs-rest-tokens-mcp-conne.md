@@ -75,11 +75,11 @@ User settings already exposes Invoices REST API token lifecycle controls, but MC
 
 ## Task List
 
-- [ ] Add MCP connection context for User settings
-  - [ ] Build a non-secret helper that normalizes endpoint/resource, issuer, metadata URLs, CIMD availability, and scopes.
-  - [ ] Define configured/not-configured/local-development status copy without performing a live MCP probe.
-  - [ ] Add Django tests for configured and not-publicly-configured MCP display states.
-  - [ ] Add tests proving secret-like settings are not rendered in the settings response.
+- [x] Add MCP connection context for User settings
+  - [x] Build a non-secret helper that normalizes endpoint/resource, issuer, metadata URLs, CIMD availability, and scopes.
+  - [x] Define configured/not-configured/local-development status copy without performing a live MCP probe.
+  - [x] Add Django tests for configured and not-publicly-configured MCP display states.
+  - [x] Add tests proving secret-like settings are not rendered in the settings response.
 
 - [ ] Build the API/MCP integration tabs
   - [ ] Wrap the existing Invoices API token UI in the **API** tab without changing POST actions or token lifecycle behavior.
