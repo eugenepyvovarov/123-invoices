@@ -85,6 +85,15 @@ docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --force-recrea
 
 export OPENCODE_PREVIEW_RESULT_BACKEND_URL="$(backend_url)"
 export OPENCODE_PREVIEW_RESULT_HEALTH_URL="$(health_url)"
+
+if [ "${OPENCODE_PREVIEW_SKIP_PUBLIC_HEALTH_WAIT:-0}" != "1" ]; then
+  if ! wait_for_http "${OPENCODE_PREVIEW_RESULT_HEALTH_URL}" "${OPENCODE_PREVIEW_PUBLIC_HEALTH_ATTEMPTS:-120}" "${OPENCODE_PREVIEW_PUBLIC_HEALTH_DELAY_SECONDS:-2}"; then
+    docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps >&2 || true
+    docker_compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 web >&2 || true
+    exit 1
+  fi
+fi
+
 python3 - <<'PY'
 import json
 import os

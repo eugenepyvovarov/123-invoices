@@ -1000,6 +1000,8 @@ class ChunkValidationTests(unittest.TestCase):
         self.assertIn('PREVIEW_BACKEND_HOST="$(preview_backend_host)"', preview_text)
         self.assertIn('ALLOWED_HOSTS=127.0.0.1,localhost,${PREVIEW_HOST},${PREVIEW_BACKEND_HOST},.preview.ultramac.work', preview_text)
         self.assertIn('- "${PREVIEW_PORT}:8000"', preview_text)
+        self.assertIn('OPENCODE_PREVIEW_SKIP_PUBLIC_HEALTH_WAIT:-0', preview_text)
+        self.assertIn('wait_for_http "${OPENCODE_PREVIEW_RESULT_HEALTH_URL}"', preview_text)
         self.assertIn('remove_preview_source_root', destroy_text)
 
     def test_e2e_script_uses_resolved_python_for_preview_port_selection(self):
