@@ -22,12 +22,24 @@ RUNTIME_TARGET="${OPENCODE_RUNTIME_TARGET:-runtime}"
 HOST_PORT="${RUNTIME_SMOKE_PORT:-18000}"
 CONTAINER_NAME="${RUNTIME_SMOKE_NAME:-invoices-runtime-smoke-web}"
 SCHEDULER_CONTAINER_NAME="${RUNTIME_SMOKE_SCHEDULER_NAME:-invoices-runtime-smoke-scheduler}"
+MCP_CONTAINER_NAME="${RUNTIME_SMOKE_MCP_NAME:-invoices-runtime-smoke-mcp}"
 RUNTIME_TMPDIR="${RUNTIME_SMOKE_TMPDIR:-$(mktemp -d)}"
 KEEP_RUNTIME_SMOKE_DIR="${KEEP_RUNTIME_SMOKE_DIR:-0}"
+
+make_probe_bearer() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    python3 -c "import uuid; print(uuid.uuid4().hex + uuid.uuid4().hex)"
+  fi
+}
+mcp_api_bearer="$(make_probe_bearer)"
+mcp_client_bearer="$(make_probe_bearer)"
 
 cleanup() {
   "${DOCKER_BIN}" rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
   "${DOCKER_BIN}" rm -f "${SCHEDULER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  "${DOCKER_BIN}" rm -f "${MCP_CONTAINER_NAME}" >/dev/null 2>&1 || true
   if [ "${KEEP_RUNTIME_SMOKE_DIR}" != "1" ]; then
     rm -rf "${RUNTIME_TMPDIR}"
   fi
@@ -55,6 +67,7 @@ cd "${REPO_ROOT}"
 
 "${DOCKER_BIN}" rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
 "${DOCKER_BIN}" rm -f "${SCHEDULER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+"${DOCKER_BIN}" rm -f "${MCP_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
 "${DOCKER_BIN}" run -d \
   --name "${CONTAINER_NAME}" \
@@ -91,6 +104,23 @@ assert_container_db_path "${CONTAINER_NAME}"
   "${RUNTIME_IMAGE}" \
   python manage.py run_backup_scheduler --poll-interval 60 >/dev/null
 
+"${DOCKER_BIN}" run -d \
+  --name "${MCP_CONTAINER_NAME}" \
+  -e DEBUG="0" \
+  -e RUN_MIGRATIONS="0" \
+  -e ALLOWED_HOSTS="${ALLOWED_HOSTS:-127.0.0.1,localhost}" \
+  -e INVOICES_MCP_API_BASE_URL="http://127.0.0.1:8000/api/" \
+  -e INVOICES_MCP_API_TOKEN="${mcp_api_bearer}" \
+  -e INVOICES_MCP_OAUTH_ISSUER_URL="http://127.0.0.1:8000/oauth/" \
+  -e INVOICES_MCP_OAUTH_RESOURCE_URL="http://127.0.0.1:8765/mcp/" \
+  -e INVOICES_MCP_AUTH_TEST_TOKENS="${mcp_client_bearer}" \
+  -e INVOICES_MCP_HOST="0.0.0.0" \
+  -e INVOICES_MCP_PORT="8765" \
+  -v "${RUNTIME_TMPDIR}/db:/app/db" \
+  -v "${RUNTIME_TMPDIR}/media:/app/media" \
+  "${RUNTIME_IMAGE}" \
+  python -m invoices_mcp.server >/dev/null
+
 sleep 2
 
 if [ "$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${SCHEDULER_CONTAINER_NAME}")" != "true" ]; then
@@ -101,8 +131,30 @@ fi
 
 assert_container_db_path "${SCHEDULER_CONTAINER_NAME}"
 
+if [ "$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${MCP_CONTAINER_NAME}")" != "true" ]; then
+  "${DOCKER_BIN}" logs "${MCP_CONTAINER_NAME}" >&2 || true
+  echo "runtime smoke MCP container failed to stay running" >&2
+  exit 1
+fi
+
+mcp_probe_passed=0
+for _ in 1 2 3 4 5; do
+  if "${DOCKER_BIN}" exec "${MCP_CONTAINER_NAME}" python scripts/mcp_probe.py --url "http://127.0.0.1:8765/mcp/" --token "${mcp_client_bearer}"; then
+    mcp_probe_passed=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "${mcp_probe_passed}" != "1" ]; then
+  "${DOCKER_BIN}" logs "${MCP_CONTAINER_NAME}" >&2 || true
+  echo "runtime smoke MCP probe failed" >&2
+  exit 1
+fi
+
 printf 'Runtime smoke web container is serving on http://127.0.0.1:%s\n' "${HOST_PORT}"
 printf 'Runtime smoke scheduler container started with shared mounts\n'
+printf 'Runtime smoke MCP container passed authenticated protocol probe\n'
 printf 'Validated effective DB path: %s\n' "${expected_db_path}"
 printf 'Mounted db dir: %s\n' "${RUNTIME_TMPDIR}/db"
 printf 'Mounted media dir: %s\n' "${RUNTIME_TMPDIR}/media"

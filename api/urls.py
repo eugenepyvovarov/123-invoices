@@ -8,6 +8,7 @@ from api.views import (
     CustomerViewSet,
     DashboardReportView,
     ExpenseViewSet,
+    InvoiceLineSuggestionListView,
     InvoiceViewSet,
     IssuerViewSet,
     MeView,
@@ -31,6 +32,7 @@ router.register('expenses', ExpenseViewSet, basename='expense')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('invoice-line-suggestions/', InvoiceLineSuggestionListView.as_view(), name='invoice-line-suggestions'),
     path('me/', MeView.as_view(), name='me'),
     path('reports/dashboard/', DashboardReportView.as_view(), name='report-dashboard'),
     path('schema/', SpectacularAPIView.as_view(permission_classes=[AllowAny]), name='schema'),

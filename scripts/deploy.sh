@@ -194,7 +194,8 @@ fi
 
 "${REPO_ROOT}/scripts/build_and_push.sh"
 
-"${DOCKER_BIN}" compose pull web scheduler
+"${DOCKER_BIN}" compose pull web scheduler mcp
 "${DOCKER_BIN}" compose up -d web
 "${DOCKER_BIN}" compose up -d scheduler
+"${DOCKER_BIN}" compose up -d mcp
 "${REPO_ROOT}/scripts/verify_deploy.sh"

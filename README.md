@@ -3,7 +3,7 @@
 Invoices is a Django application for managing invoices, expenses, payments,
 imports, and operational backups. It is designed to run locally for development,
 inside Docker for validation, and as a small production Compose stack with a web
-service plus a backup scheduler.
+service, backup scheduler, and Streamable HTTP MCP service.
 
 ## Features
 
@@ -14,6 +14,7 @@ service plus a backup scheduler.
 - SQLite-friendly production deployment with persistent `db/` and `media/`
   mounts.
 - Manual and scheduled backup support for S3-compatible object storage.
+- OAuth-protected Streamable HTTP MCP endpoint for approved AI invoice clients.
 - Playwright smoke tests and automation evidence hooks for UI-visible changes.
 
 ## Requirements
@@ -57,7 +58,7 @@ docker run --rm -p 8000:8000 --env-file .env -e RUN_MIGRATIONS=1 \
   invoices:local
 ```
 
-Run the Compose stack with the web and scheduler services:
+Run the Compose stack with the web, scheduler, and MCP services:
 
 ```bash
 docker compose up -d
@@ -66,41 +67,54 @@ docker compose up -d
 `./scripts/deploy.sh` is the canonical live deployment entrypoint. It runs the
 tracked `docker compose` rollout for the canonical `03-invoices` stack, using
 `03-invoices` as the canonical stack name so the live containers are predictable
-as `03-invoices-web-1` and `03-invoices-scheduler-1`. The deploy path should
-not require any separate manual container recreation commands; it updates both
-services together under the same Compose project, exports
+as `03-invoices-web-1`, `03-invoices-scheduler-1`, and
+`03-invoices-mcp-1`. The deploy path should not require any separate manual
+container recreation commands; it updates all services together under the same
+Compose project, exports
 `COMPOSE_PROJECT_NAME=03-invoices`, derives one `INVOICES_IMAGE` reference for
-both services, runs `docker compose pull web scheduler`, and recreates `web`
-before `scheduler`.
+all services, runs `docker compose pull web scheduler mcp`, and recreates `web`
+before `scheduler` and `mcp`.
 
-Post-deploy verification checks that both services are running under the same
-`03-invoices` Compose project, confirms the expected `03-invoices-web-1` and
-`03-invoices-scheduler-1` container names, verifies
+Post-deploy verification checks that all services are running under the same
+`03-invoices` Compose project, confirms the expected `03-invoices-web-1`,
+`03-invoices-scheduler-1`, and `03-invoices-mcp-1` container names, verifies
 `http://127.0.0.1:8000/` responds successfully, and fails if scheduler startup
 logs contain `Traceback (most recent call last):` or
-`Backup scheduler run failed:`. Operators can inspect the same stack with
-`COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler`, a
-`python3 -c` health probe, and `docker compose logs --no-color --tail 50
-scheduler`.
+`Backup scheduler run failed:`. It also probes the MCP Streamable HTTP endpoint
+for OAuth challenge/metadata, missing/invalid auth rejection, and authenticated
+tool discovery when a valid probe credential is supplied. Operators
+can inspect the same stack with `COMPOSE_PROJECT_NAME=03-invoices docker compose
+ps web scheduler mcp`, a `python3 -c` health probe, `docker compose logs
+--no-color --tail 50 scheduler`, and `docker compose logs --no-color --tail 50
+mcp`.
 
 Deployment rollout verification summary:
 
 - runs the tracked `docker compose` rollout for the canonical `03-invoices` stack
 - `03-invoices` as the canonical stack name
 - `03-invoices-web-1` and `03-invoices-scheduler-1`
+- `03-invoices-web-1`, `03-invoices-scheduler-1`, and `03-invoices-mcp-1`
 - should not require any separate manual container recreation commands
 - updates both services together under the same Compose project
+- updates all services together under the same Compose project
 - exports `COMPOSE_PROJECT_NAME=03-invoices`
 - derives one `INVOICES_IMAGE` reference for both services
+- derives one `INVOICES_IMAGE` reference for all services
 - runs `docker compose pull web scheduler`
+- runs `docker compose pull web scheduler mcp`
 - recreates `web` before `scheduler`
+- recreates `web` before `scheduler` and `mcp`
 - checks that both services are running under the same `03-invoices` Compose project
+- checks that all services are running under the same `03-invoices` Compose project
 - confirms the expected `03-invoices-web-1` and `03-invoices-scheduler-1` container names
+- confirms the expected `03-invoices-web-1`, `03-invoices-scheduler-1`, and `03-invoices-mcp-1` container names
 - verifies `http://127.0.0.1:8000/` responds successfully
+- verifies OAuth MCP protocol reachability, metadata, invalid-auth rejection, and optional authenticated tool discovery
 - fails if scheduler startup logs contain `Traceback (most recent call last):` or `Backup scheduler run failed:`
-- COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler
+- COMPOSE_PROJECT_NAME=03-invoices docker compose ps web scheduler mcp
 - python3 -c
 - docker compose logs --no-color --tail 50 scheduler
+- docker compose logs --no-color --tail 50 mcp
 
 ## Validation
 
@@ -120,21 +134,29 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
 
 - Running the canonical deployment command updates the live invoices deployment without requiring undocumented manual container recreation commands
 - The live rollout updates both `web` and `scheduler` as one Docker Compose stack
+- The live rollout also updates `mcp` as part of the same Docker Compose stack
 - Operators have a short documented verification path that confirms both services are healthy after rollout
+- Operators can also verify the MCP service with the authenticated protocol probe
 - `scripts/deploy.sh` performs the tracked `docker compose` rollout step after image publication
 - The tracked rollout uses a stable explicit Compose project name of `03-invoices` by default on Ultramac
 - The resulting live container names are predictable under that project name, including `03-invoices-web-1` and `03-invoices-scheduler-1`
+- The MCP container name is also predictable under that project name, including `03-invoices-mcp-1`
 - The Compose configuration accepts an explicit image reference or tag so both services are recreated from the intended release image
+- The Compose configuration uses the same explicit image reference or tag for the MCP service
 - The rollout preserves the current bind-mounted `.env`, `db`, and `media` paths already used by the deployment
 - The rollout order minimizes scheduler startup racing migrations by ensuring the web service performs migration-bearing startup before the scheduler is recreated or started
 - Repository deployment docs match the actual tracked rollout behavior
 - The canonical deploy path includes verification of both services after rollout
+- The canonical deploy path includes MCP service verification after rollout
 - The production rollout no longer depends on undocumented manual container handling
 - Manual Compose inspection commands used during operations resolve to the same named stack as the tracked deploy flow
 - Validation covers the tracked rollout script behavior for the named Compose stack and both services
+- Validation covers MCP rollout behavior for the named Compose stack
 - Validation confirms the compose invocation targets `03-invoices` consistently
 - Validation confirms both services are recreated against the intended image reference during rollout logic or equivalent scripted verification
+- Validation confirms the MCP service is recreated against the intended image reference during rollout logic or equivalent scripted verification
 - Validation confirms post-deploy verification checks both web responsiveness and scheduler startup state
+- Validation confirms post-deploy verification checks MCP authenticated reachability
 
 ## Documentation
 
@@ -146,6 +168,9 @@ Issue 42 acceptance evidence is explicit in the tracked rollout and validation:
   environment values, generated files, and tests.
 - [Deployment](docs/deployment.md) covers Docker/Compose rollout and
   verification.
+- [MCP server](docs/mcp-server.md) covers OAuth-protected Streamable HTTP
+  operation, CIMD/pre-registration, scopes, endpoint configuration, upstream API
+  credential setup, artifact limits, client examples, and checks.
 - [Backups](docs/backups.md) covers backup configuration, scheduler behavior,
   locking, object keys, and operator checks.
 - [Incoming invoice inbox](docs/incoming-invoice-inbox.md) covers IMAP setup,

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.reverse import reverse
@@ -184,7 +186,7 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     issuer = serializers.PrimaryKeyRelatedField(queryset=Issuer.objects.none())
     issuer_id = serializers.IntegerField(source='issuer.pk', read_only=True)
-    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.none())
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.none(), required=False)
     customer_name = serializers.CharField(source='customer.company.name', read_only=True)
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.none(), required=False, allow_null=True)
     project_title = serializers.CharField(source='project.title', read_only=True)
@@ -195,6 +197,9 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
     order_lines = OrderLineSerializer(source='orderline_set', many=True, required=False)
     has_pdf = serializers.SerializerMethodField()
     pdf_url = serializers.SerializerMethodField()
+    is_finalized = serializers.SerializerMethodField()
+    totals = serializers.SerializerMethodField()
+    payment_applications = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -207,12 +212,14 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
             'discount_amount', 'tax_value', 'tax_base', 'tax_amount', 'secondary_tax_rate',
             'secondary_tax_name', 'uses_secondary_tax', 'sub_total', 'total_due',
             'base_currency_total', 'amount_paid', 'amount_due', 'amount_overdue',
-            'last_payment_date', 'created_at', 'updated_at', 'has_pdf', 'pdf_url', 'order_lines',
+            'last_payment_date', 'created_at', 'updated_at', 'has_pdf', 'pdf_url',
+            'is_finalized', 'totals', 'payment_applications', 'order_lines',
         ]
         read_only_fields = [
             'status', 'number', 'discount_amount', 'tax_base', 'tax_amount', 'sub_total',
             'total_due', 'base_currency_total', 'amount_paid', 'amount_due', 'amount_overdue',
             'last_payment_date', 'created_at', 'updated_at', 'has_pdf', 'pdf_url',
+            'is_finalized', 'totals', 'payment_applications',
         ]
 
     def get_has_pdf(self, obj):
@@ -224,6 +231,37 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
             return None
         return request.build_absolute_uri(reverse('api:invoice-download-pdf', args=[obj.pk]))
 
+    def get_is_finalized(self, obj):
+        return obj.status in self.FINALIZED_STATUSES
+
+    def get_totals(self, obj):
+        def money(value):
+            return str((value or Decimal('0')).quantize(Decimal('0.01')))
+
+        return {
+            'subtotal': money(obj.sub_total),
+            'tax': money(obj.tax_amount),
+            'discount': money(obj.discount_amount),
+            'total': money(obj.total_due),
+            'balance_due': money(obj.amount_due),
+            'amount_paid': money(obj.amount_paid),
+            'amount_overdue': money(obj.amount_overdue),
+        }
+
+    def get_payment_applications(self, obj):
+        applications = obj.payment_applications.select_related('payment').all()
+        return [
+            {
+                'id': application.pk,
+                'payment': application.payment_id,
+                'amount_applied': str((application.amount_applied or Decimal('0')).quantize(Decimal('0.01'))),
+                'applied_at': application.applied_at,
+                'payment_status': application.payment.status if application.payment_id else None,
+                'payment_received_at': application.payment.received_at if application.payment_id else None,
+            }
+            for application in applications
+        ]
+
     def get_fields(self):
         fields = super().get_fields()
         request = self.context.get('request')
@@ -234,6 +272,24 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
             fields['project'].queryset = Project.objects.filter(issuer_id__in=issuer_ids).select_related('customer')
             fields['bank_account'].queryset = IssuerBankAccount.objects.filter(issuer_id__in=issuer_ids)
         return fields
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            allowed_fields = set(self.fields) | {'lines'}
+            unknown_fields = sorted(set(data) - allowed_fields)
+            if unknown_fields:
+                raise serializers.ValidationError({
+                    field: 'Unsupported invoice field.'
+                    for field in unknown_fields
+                })
+            data = {**data}
+            if 'lines' in data and 'order_lines' not in data:
+                data['order_lines'] = data.pop('lines')
+            if 'customer' not in data and data.get('project'):
+                project = Project.objects.filter(pk=data['project']).only('customer_id').first()
+                if project is not None:
+                    data['customer'] = project.customer_id
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
         if self.instance and self.instance.status in self.FINALIZED_STATUSES:
@@ -247,6 +303,9 @@ class InvoiceSerializer(ApiUrlMixin, serializers.ModelSerializer):
 
         if request is not None:
             validate_writable_issuer(request.user, issuer)
+        if customer is None and project is not None:
+            attrs['customer'] = project.customer
+            customer = project.customer
         if customer is not None and issuer is not None and customer.issuer_id != issuer.pk:
             raise serializers.ValidationError({'customer': 'Customer must belong to the invoice issuer.'})
         if project is not None:

@@ -54,12 +54,14 @@ if RENDER_EXTERNAL_HOSTNAME:
 
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
+    'api.apps.ApiConfig',
     'invoices.apps.InvoicesConfig',
     'expenses',
-    'api.apps.ApiConfig',
     'rest_framework',
     'django_filters',
     'drf_spectacular',
+    'oauth2_provider',
+    'mcp_oauth',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -75,12 +77,12 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'mcp_oauth.middleware.ResourceIndicatorMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django_otp.middleware.OTPMiddleware',
     'accounts.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
@@ -234,7 +236,31 @@ SPECTACULAR_SETTINGS = {
 
 LOGIN_EXEMPT_URLS = [
     '/api/',
+    '/.well-known/',
+    '/oauth/',
+    '/o/token/',
+    '/o/revoke_token/',
 ]
+
+MCP_OAUTH_ISSUER_URL = env('MCP_OAUTH_ISSUER_URL', default='http://localhost:8000')
+MCP_OAUTH_RESOURCE_URL = env('MCP_OAUTH_RESOURCE_URL', default='http://localhost:8765/mcp/')
+MCP_OAUTH_ACCESS_TOKEN_EXPIRE_SECONDS = env.int('MCP_OAUTH_ACCESS_TOKEN_EXPIRE_SECONDS', default=3600)
+MCP_OAUTH_CIMD_ENABLED = env.bool('MCP_OAUTH_CIMD_ENABLED', default=True)
+MCP_OAUTH_CIMD_TIMEOUT_SECONDS = env.int('MCP_OAUTH_CIMD_TIMEOUT_SECONDS', default=3)
+MCP_OAUTH_CIMD_MAX_BYTES = env.int('MCP_OAUTH_CIMD_MAX_BYTES', default=32768)
+MCP_OAUTH_CIMD_CACHE_SECONDS = env.int('MCP_OAUTH_CIMD_CACHE_SECONDS', default=3600)
+
+OAUTH2_PROVIDER = {
+    'SCOPES': {
+        'invoices:mcp:read': 'Read invoice data through MCP tools',
+        'invoices:mcp:draft:write': 'Create and update draft invoices through MCP tools',
+        'invoices:mcp:finalize': 'Finalize draft invoices through MCP tools',
+        'invoices:mcp:artifact:read': 'Read generated invoice artifacts through MCP tools',
+    },
+    'ACCESS_TOKEN_EXPIRE_SECONDS': MCP_OAUTH_ACCESS_TOKEN_EXPIRE_SECONDS,
+    'PKCE_REQUIRED': True,
+    'OAUTH2_VALIDATOR_CLASS': 'mcp_oauth.validators.MCPOAuth2Validator',
+}
 
 
 # Internationalization

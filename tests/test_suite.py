@@ -120,9 +120,10 @@ class ChunkValidationTests(unittest.TestCase):
             self.assertEqual(
                 docker_log.read_text().splitlines(),
                 [
-                    'project=03-invoices command=compose pull web scheduler',
+                    'project=03-invoices command=compose pull web scheduler mcp',
                     'project=03-invoices command=compose up -d web',
                     'project=03-invoices command=compose up -d scheduler',
+                    'project=03-invoices command=compose up -d mcp',
                 ],
             )
 
@@ -232,9 +233,10 @@ class ChunkValidationTests(unittest.TestCase):
                 docker_log.read_text().splitlines(),
                 [
                     'project=03-invoices command=login git.ultramac.work -u phase-user --password-stdin',
-                    'project=03-invoices command=compose pull web scheduler',
+                    'project=03-invoices command=compose pull web scheduler mcp',
                     'project=03-invoices command=compose up -d web',
                     'project=03-invoices command=compose up -d scheduler',
+                    'project=03-invoices command=compose up -d mcp',
                 ],
             )
             self.assertEqual(
@@ -508,6 +510,12 @@ class ChunkValidationTests(unittest.TestCase):
                 "  printf 'Scheduler tick completed without startup errors\\n'\n"
                 "  exit 0\n"
                 "fi\n"
+                "if [ \"$1\" = compose ] && [ \"$2\" = exec ] && [ \"$3\" = -T ] && [ \"$4\" = mcp ]; then\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [ \"$1\" = compose ] && [ \"$2\" = exec ] && [ \"$3\" = -T ] && [ \"$4\" = mcp ]; then\n"
+                "  exit 0\n"
+                "fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = -q ]; then\n"
                 "  printf 'container-%s\\n' \"$4\"\n"
                 "  exit 0\n"
@@ -556,6 +564,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'SHA_TAG': 'abc1234',
                     'WEB_VERIFY_ATTEMPTS': '1',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'deploy-client-token',
                 }
             )
 
@@ -576,9 +585,10 @@ class ChunkValidationTests(unittest.TestCase):
             self.assertEqual(
                 docker_log.read_text().splitlines(),
                 [
-                    'project=03-invoices command=compose pull web scheduler',
+                    'project=03-invoices command=compose pull web scheduler mcp',
                     'project=03-invoices command=compose up -d web',
                     'project=03-invoices command=compose up -d scheduler',
+                    'project=03-invoices command=compose up -d mcp',
                     'project=03-invoices command=compose ps --services --status running web',
                     'project=03-invoices command=compose ps -q web',
                     'project=03-invoices command=inspect -f {{ index .Config.Labels "com.docker.compose.project" }} container-web',
@@ -591,7 +601,14 @@ class ChunkValidationTests(unittest.TestCase):
                     'project=03-invoices command=inspect -f {{ .Name }} container-scheduler',
                     'project=03-invoices command=inspect -f {{ .State.Status }} container-scheduler',
                     'project=03-invoices command=inspect -f {{ .RestartCount }} container-scheduler',
+                    'project=03-invoices command=compose ps --services --status running mcp',
+                    'project=03-invoices command=compose ps -q mcp',
+                    'project=03-invoices command=inspect -f {{ index .Config.Labels "com.docker.compose.project" }} container-mcp',
+                    'project=03-invoices command=inspect -f {{ .Name }} container-mcp',
+                    'project=03-invoices command=inspect -f {{ .State.Status }} container-mcp',
+                    'project=03-invoices command=inspect -f {{ .RestartCount }} container-mcp',
                     'project=03-invoices command=compose logs --no-color --tail 50 scheduler',
+                    'project=03-invoices command=compose exec -T mcp python scripts/mcp_probe.py --url http://127.0.0.1:8765/mcp/ --token deploy-client-token',
                 ],
             )
             self.assertEqual(
@@ -641,6 +658,7 @@ class ChunkValidationTests(unittest.TestCase):
                 "  printf 'Scheduler tick completed without startup errors\\n'\n"
                 "  exit 0\n"
                 "fi\n"
+                "if [ \"$1\" = compose ] && [ \"$2\" = exec ] && [ \"$3\" = -T ] && [ \"$4\" = mcp ]; then exit 0; fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = -q ]; then\n"
                 "  printf 'container-%s\\n' \"$4\"\n"
                 "  exit 0\n"
@@ -684,6 +702,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'PYTHON_LOG': str(python_log),
                     'PYTHON_ATTEMPTS': str(python_attempts),
                     'RENDER_EXTERNAL_HOSTNAME': 'invoices.ultramac.work',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'verify-client-token',
                     'WEB_VERIFY_ATTEMPTS': '2',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
                 }
@@ -714,7 +733,14 @@ class ChunkValidationTests(unittest.TestCase):
                     'inspect -f {{ .Name }} container-scheduler',
                     'inspect -f {{ .State.Status }} container-scheduler',
                     'inspect -f {{ .RestartCount }} container-scheduler',
+                    'compose ps --services --status running mcp',
+                    'compose ps -q mcp',
+                    'inspect -f {{ index .Config.Labels "com.docker.compose.project" }} container-mcp',
+                    'inspect -f {{ .Name }} container-mcp',
+                    'inspect -f {{ .State.Status }} container-mcp',
+                    'inspect -f {{ .RestartCount }} container-mcp',
                     'compose logs --no-color --tail 50 scheduler',
+                    'compose exec -T mcp python scripts/mcp_probe.py --url http://127.0.0.1:8765/mcp/ --token verify-client-token',
                 ],
             )
             self.assertEqual(
@@ -732,7 +758,7 @@ class ChunkValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             runtime_env_file = temp_path / '.env'
-            runtime_env_file.write_text('DEBUG=0\nRENDER_EXTERNAL_HOSTNAME=invoices.ultramac.work\n')
+            runtime_env_file.write_text('DEBUG=0\nRENDER_EXTERNAL_HOSTNAME=invoices.ultramac.work\nINVOICES_MCP_AUTH_TEST_TOKENS=runtime-env-client-token\n')
             docker_log = temp_path / 'docker.log'
             python_log = temp_path / 'python.log'
             fake_docker = temp_path / 'docker'
@@ -744,6 +770,7 @@ class ChunkValidationTests(unittest.TestCase):
                 "printf '%s\n' \"$*\" >> \"${DOCKER_LOG}\"\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = --services ] && [ \"$4\" = --status ] && [ \"$5\" = running ]; then printf '%s\\n' \"$6\"; exit 0; fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = logs ]; then printf 'Scheduler healthy\\n'; exit 0; fi\n"
+                "if [ \"$1\" = compose ] && [ \"$2\" = exec ] && [ \"$3\" = -T ] && [ \"$4\" = mcp ]; then exit 0; fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = -q ]; then printf 'container-%s\\n' \"$4\"; exit 0; fi\n"
                 "if [ \"$1\" = inspect ] && [ \"$2\" = -f ]; then\n"
                 "  case \"$3\" in *com.docker.compose.project*) printf '%s\\n' \"${COMPOSE_PROJECT_NAME}\" ;; *'.Name'*) printf '/%s\\n' \"${COMPOSE_PROJECT_NAME}-${4#container-}-1\" ;; *'.State.Status'*) printf 'running\\n' ;; *'.RestartCount'*) printf '0\\n' ;; *) exit 1 ;; esac; exit 0\n"
@@ -802,6 +829,7 @@ class ChunkValidationTests(unittest.TestCase):
                 "set -euo pipefail\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = --services ] && [ \"$4\" = --status ] && [ \"$5\" = running ]; then printf '%s\\n' \"$6\"; exit 0; fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = logs ]; then printf 'Scheduler healthy\\n'; exit 0; fi\n"
+                "if [ \"$1\" = compose ] && [ \"$2\" = exec ] && [ \"$3\" = -T ] && [ \"$4\" = mcp ]; then exit 0; fi\n"
                 "if [ \"$1\" = compose ] && [ \"$2\" = ps ] && [ \"$3\" = -q ]; then printf 'container-%s\\n' \"$4\"; exit 0; fi\n"
                 "if [ \"$1\" = inspect ] && [ \"$2\" = -f ]; then\n"
                 "  case \"$3\" in *com.docker.compose.project*) printf '%s\\n' \"${COMPOSE_PROJECT_NAME}\" ;; *'.Name'*) printf '/%s\\n' \"${COMPOSE_PROJECT_NAME}-${4#container-}-1\" ;; *'.State.Status'*) printf 'running\\n' ;; *'.RestartCount'*) printf '0\\n' ;; *) exit 1 ;; esac; exit 0\n"
@@ -823,6 +851,7 @@ class ChunkValidationTests(unittest.TestCase):
                     'DOCKER_BIN': str(fake_docker),
                     'PYTHON_BIN': str(fake_python),
                     'WEB_VERIFY_HOST': 'invoices.ultramac.work',
+                    'INVOICES_MCP_AUTH_TEST_TOKENS': 'verify-client-token',
                     'WEB_VERIFY_ATTEMPTS': '1',
                     'WEB_VERIFY_DELAY_SECONDS': '0',
                 }
@@ -1156,7 +1185,7 @@ class ChunkValidationTests(unittest.TestCase):
             ],
             'canonical deploy path includes verification of both services after rollout': [
                 '"${REPO_ROOT}/scripts/verify_deploy.sh"',
-                'EXPECTED_SERVICES=(web scheduler)',
+                'EXPECTED_SERVICES=(web scheduler mcp)',
             ],
             'production rollout no longer depends on undocumented manual container handling': [
                 'should not require any separate manual container recreation commands',
@@ -1172,7 +1201,7 @@ class ChunkValidationTests(unittest.TestCase):
                 'def test_verify_deploy_script_checks_canonical_stack_and_both_services(self):',
             ],
             'validation confirms compose invocation targets 03-invoices consistently': [
-                'project=03-invoices command=compose pull web scheduler',
+                'project=03-invoices command=compose pull web scheduler mcp',
                 'project=03-invoices command=compose up -d scheduler',
             ],
             'validation confirms both services are recreated against intended image reference': [

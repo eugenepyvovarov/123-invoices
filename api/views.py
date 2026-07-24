@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import FileResponse
 from django.utils import timezone
@@ -21,6 +21,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.pagination import DefaultPagination
 from api.scoping import accessible_issuer_ids_for_user, accessible_issuers_for_user
 from api.serializers import (
     AccountSerializer,
@@ -33,7 +34,7 @@ from api.serializers import (
     PaymentSerializer,
     ProjectSerializer,
 )
-from invoices.models import Customer, Expense, Invoice, IssuerBankAccount, Payment, PaymentApplication, Project
+from invoices.models import Customer, Expense, Invoice, IssuerBankAccount, OrderLine, Payment, PaymentApplication, Project
 from invoices.services.cached_totals import recalc_invoice_amounts
 from invoices.views import invalidate_dashboard_cache, save_invoice_pdf
 
@@ -237,7 +238,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Invoice.objects.select_related(
             'issuer', 'customer', 'customer__company', 'project', 'bank_account', 'currency'
-        ).prefetch_related('orderline_set').filter(
+        ).prefetch_related('orderline_set', 'payment_applications__payment').filter(
             issuer_id__in=accessible_issuer_ids_for_user(self.request.user)
         )
 
@@ -322,6 +323,39 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
         except FileNotFoundError as exc:
             raise NotFound('PDF is not available for this invoice.') from exc
+
+    @extend_schema(
+        summary='Return PDF metadata or download an authenticated invoice PDF artifact',
+        parameters=[
+            OpenApiParameter(
+                name='mode',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Use mode=metadata to return JSON metadata instead of the PDF stream.',
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description='PDF metadata or file stream.'),
+            404: OpenApiResponse(description='PDF is not available or invoice is outside the account scope.'),
+        },
+        tags=['invoices'],
+    )
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        invoice = self.get_object()
+        has_pdf = bool(getattr(invoice, 'pdf_document', None) and invoice.pdf_document.name)
+        if request.query_params.get('mode') == 'metadata':
+            return Response({
+                'invoice_id': invoice.pk,
+                'pdf': {
+                    'available': has_pdf,
+                    'filename': invoice.pdf_document.name.rsplit('/', 1)[-1] if has_pdf else None,
+                    'content_type': 'application/pdf' if has_pdf else None,
+                    'size': invoice.pdf_document.size if has_pdf else None,
+                    'retrieval': 'Use the authenticated invoice PDF endpoint or MCP artifact content mode.',
+                },
+            })
+        return self.download_pdf(request, pk=pk)
 
 
 class PaymentFilter(filters.FilterSet):
@@ -505,6 +539,57 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             )
         except FileNotFoundError as exc:
             raise NotFound('Attachment is not available for this expense.') from exc
+
+
+class InvoiceLineSuggestionListView(APIView):
+    """Return reusable recent invoice order-line suggestions for MCP product lookup."""
+
+    @extend_schema(
+        summary='List recent reusable invoice order-line suggestions',
+        parameters=[
+            OpenApiParameter(name='search', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name='issuer', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name='customer', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY),
+        ],
+        responses={200: OpenApiResponse(description='Paginated order-line suggestions.')},
+        tags=['invoices'],
+    )
+    def get(self, request):
+        lines = OrderLine.objects.filter(
+            invoice__issuer_id__in=accessible_issuer_ids_for_user(request.user)
+        ).select_related('invoice', 'invoice__customer')
+        search = request.query_params.get('search')
+        customer_id = request.query_params.get('customer')
+        issuer_id = request.query_params.get('issuer')
+        if search:
+            lines = lines.filter(
+                Q(description__icontains=search)
+                | Q(notes__icontains=search)
+                | Q(invoice__customer__company__name__icontains=search)
+            )
+        if customer_id:
+            lines = lines.filter(invoice__customer_id=customer_id)
+        if issuer_id:
+            lines = lines.filter(invoice__issuer_id=issuer_id)
+        lines = lines.order_by('-updated_at', '-id')
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(lines, request, view=self)
+        payload = [
+            {
+                'id': line.pk,
+                'invoice_id': line.invoice_id,
+                'customer_id': line.invoice.customer_id if line.invoice_id else None,
+                'line_type': line.line_type,
+                'description': line.description,
+                'quantity': str(line.quantity),
+                'unit_price': str(line.unit_price),
+                'line_total': str(line.line_total),
+                'manual_total': line.manual_total,
+                'notes': line.notes,
+            }
+            for line in page
+        ]
+        return paginator.get_paginated_response(payload)
 
 
 def _decimal(value):
