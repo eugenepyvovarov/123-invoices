@@ -123,16 +123,16 @@
     </div>
   </div>
 
-  <section class="drawer-section drawer-section--flat stack-gap-md" data-testid="invoices-api-token-settings">
+  <section class="drawer-section drawer-section--flat stack-gap-md api-token-settings" data-testid="invoices-api-token-settings">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
       <div>
         <h2 class="section-title mb-1">Invoices API tokens</h2>
         <p class="text-muted small mb-0">Create Bearer tokens for the Invoices REST API. These are separate from the Expense import AI provider key below.</p>
       </div>
       {% if api_tokens %}
-        <span class="badge bg-success text-uppercase">{{ api_tokens|length }} token{{ api_tokens|length|pluralize }}</span>
+        <span class="badge bg-success text-uppercase api-token-settings__count-badge">{{ api_tokens|length }} token{{ api_tokens|length|pluralize }}</span>
       {% else %}
-        <span class="badge bg-secondary text-uppercase">No tokens</span>
+        <span class="badge bg-secondary text-uppercase api-token-settings__count-badge">No tokens</span>
       {% endif %}
     </div>
 
@@ -153,8 +153,8 @@
       </div>
     {% endif %}
 
-    <div class="row g-4">
-      <div class="col-xl-4 col-lg-12">
+    <div class="api-token-settings__layout">
+      <div class="api-token-settings__create-column">
         <article class="api-token-settings__panel h-100 stack-gap-sm">
           <div>
             <h3 class="section-title mb-1">Create token</h3>
@@ -189,15 +189,15 @@
         </article>
       </div>
 
-      <div class="col-xl-8 col-lg-12">
+      <div class="api-token-settings__list-column">
         <article class="api-token-settings__panel h-100 stack-gap-sm">
           <div>
             <h3 class="section-title mb-1">Token list</h3>
             <p class="text-muted small mb-0">Review token metadata, last-use activity, expiry, and revoke access when an integration no longer needs the API.</p>
           </div>
           {% if api_tokens %}
-            <div class="table-responsive">
-              <table class="table align-middle mb-0" data-testid="api-token-list">
+            <div class="table-responsive api-token-settings__table-wrap">
+              <table class="table align-middle mb-0 api-token-settings__table" data-testid="api-token-list">
                 <thead>
                   <tr>
                     <th scope="col">Name</th>
@@ -232,7 +232,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="revoke_api_token" />
                             <input type="hidden" name="token_id" value="{{ token.id }}" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm api-token-settings__revoke-button">Revoke</button>
                           </form>
                         {% else %}
                           <span class="text-muted small">Revoked {{ token.revoked_at|date:"Y-m-d H:i" }}</span>
