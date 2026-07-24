@@ -183,6 +183,49 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
 
     @override_settings(
         DEBUG=False,
+        MCP_OAUTH_RESOURCE_URL='https://mcp.example.test/mcp',
+        MCP_OAUTH_ISSUER_URL='https://invoices.example.test/',
+        MCP_OAUTH_CIMD_ENABLED=True,
+        OAUTH2_PROVIDER={
+            'SCOPES': {
+                'invoices:mcp:read': 'Read invoice data through MCP tools',
+            },
+        },
+    )
+    def test_get_renders_api_mcp_integration_tabs_and_controls(self):
+        api_token, _ = ApiToken.issue(owner=self.user, name='Reviewer token')
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-testid="integrations-settings"')
+        self.assertContains(response, 'href="#integrations-api-panel"')
+        self.assertContains(response, 'aria-controls="integrations-api-panel"')
+        self.assertContains(response, '>API</a>', html=False)
+        self.assertContains(response, 'href="#integrations-mcp-panel"')
+        self.assertContains(response, 'aria-controls="integrations-mcp-panel"')
+        self.assertContains(response, '>MCP</a>', html=False)
+        self.assertContains(response, 'id="integrations-api-panel"')
+        self.assertContains(response, 'data-testid="invoices-api-token-settings"')
+        self.assertContains(response, 'name="action" value="create_api_token"')
+        self.assertContains(response, 'name="action" value="revoke_api_token"')
+        self.assertContains(response, api_token.prefix)
+        self.assertContains(response, 'id="integrations-mcp-panel"')
+        self.assertContains(response, 'data-testid="mcp-connection-settings"')
+        self.assertContains(response, 'data-testid="mcp-status-badge"')
+        self.assertContains(response, 'Configured')
+        self.assertContains(response, 'value="https://mcp.example.test/mcp/"')
+        self.assertContains(response, 'data-copy-public-value-button')
+        self.assertContains(response, 'OAuth 2.1 + PKCE')
+        self.assertContains(response, 'Hermes, Codex')
+        self.assertContains(response, 'CIMD')
+        self.assertContains(response, 'invoices:mcp:read')
+        self.assertContains(response, 'Expense import AI provider')
+        self.assertContains(response, 'data-testid="expense-ai-provider-settings"')
+
+    @override_settings(
+        DEBUG=False,
         MCP_OAUTH_RESOURCE_URL='http://localhost:8765/mcp/',
         MCP_OAUTH_ISSUER_URL='http://localhost:8000',
     )

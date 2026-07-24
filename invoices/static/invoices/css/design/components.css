@@ -1949,6 +1949,7 @@ select.form-select {
 }
 .tab-nav {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0;
 }
 
