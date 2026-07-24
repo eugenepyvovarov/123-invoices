@@ -25,8 +25,13 @@ case "${SCENARIO}" in
     export OPENCODE_DEMO_SCENARIO="${SCENARIO}"
     exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/api-token-settings.spec.js --project=chromium
     ;;
+  user-settings-api-mcp-tabs)
+    export PLAYWRIGHT_VIDEO="${PLAYWRIGHT_VIDEO:-on}"
+    export OPENCODE_DEMO_SCENARIO="${SCENARIO}"
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/user-settings-integrations.spec.js --project=chromium
+    ;;
   "")
-    echo "Usage: ./scripts/demo-evidence.sh {incoming-invoice-review-conversion|rolling-year-period-default|customer-payment-notes-override|api-token-settings-management}" >&2
+    echo "Usage: ./scripts/demo-evidence.sh {incoming-invoice-review-conversion|rolling-year-period-default|customer-payment-notes-override|api-token-settings-management|user-settings-api-mcp-tabs}" >&2
     exit 2
     ;;
   *)

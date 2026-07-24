@@ -50,8 +50,18 @@ case "${IDENTIFIER}" in
     fi
     exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/api-token-settings.spec.js --project=chromium
     ;;
+  user-settings-api-mcp-tabs)
+    export OPENCODE_VISUAL_VALIDATION_TARGET="${OPENCODE_VISUAL_VALIDATION_TARGET:-current}"
+    export OPENCODE_VISUAL_VALIDATION_IDENTIFIER="${IDENTIFIER}"
+    if [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "baseline" ] \
+      && [ "${OPENCODE_VISUAL_VALIDATION_TARGET}" != "current" ]; then
+      echo "OPENCODE_VISUAL_VALIDATION_TARGET must be baseline or current." >&2
+      exit 2
+    fi
+    exec /bin/bash "${REPO_ROOT}/scripts/e2e.sh" tests/e2e/user-settings-integrations.spec.js --project=chromium
+    ;;
   "")
-    echo "Usage: ./scripts/visual-validation.sh {incoming-invoice-inbox|rolling-year-period-default|customer-payment-notes-billing-defaults|bulk-toolbar-spacing|api-token-settings}" >&2
+    echo "Usage: ./scripts/visual-validation.sh {incoming-invoice-inbox|rolling-year-period-default|customer-payment-notes-billing-defaults|bulk-toolbar-spacing|api-token-settings|user-settings-api-mcp-tabs}" >&2
     exit 2
     ;;
   *)

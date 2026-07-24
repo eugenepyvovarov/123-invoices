@@ -19,11 +19,14 @@ session.
 ### User settings workflow
 
 Authenticated users can manage their own REST API Bearer tokens from **User
-settings** at `/accounts/user-settings/` in the **Invoices API tokens** section.
-This section is separate from the **Expense import AI provider** key, which is
-only used for statement-import mapping inference and is not accepted by `/api/`.
+settings** at `/accounts/user-settings/` in the **Integrations** hub. Use the
+**API** tab for REST Bearer token creation, listing, and revocation. The adjacent
+**MCP** tab is for OAuth-based MCP client connection guidance; it does not
+create or reveal REST API tokens. The integrations hub is also separate from the
+**Expense import AI provider** key, which is only used for statement-import
+mapping inference and is not accepted by `/api/`.
 
-From User settings, create a token by entering a required token name and,
+From the **API** tab in User settings, create a token by entering a required token name and,
 optionally, an expiry date/time. The plaintext token is shown once immediately
 after creation in a copy-friendly field. Copy it into the calling system's secret
 store before leaving the page; later visits list only metadata such as name,
