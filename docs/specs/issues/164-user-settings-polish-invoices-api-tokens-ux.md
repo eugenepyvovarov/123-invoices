@@ -72,11 +72,11 @@ Assumption: keep the existing owned-token list with status rows rather than addi
   - [x] Replace the empty table state with an intentional empty-state panel.
   - [x] Preserve accessible labels, form actions, CSRF handling, and existing stable test hooks where practical.
 
-- [ ] Add focused settings-page styling
-  - [ ] Add scoped component classes for the token block only where utilities are not enough.
-  - [ ] Use existing spacing, border, badge, table, and form design tokens from `DESIGN.md`.
-  - [ ] Ensure desktop layout avoids cramped columns and narrow layout stacks form above list.
-  - [ ] Keep destructive revoke actions visually distinct without overpowering routine settings actions.
+- [x] Add focused settings-page styling
+  - [x] Add scoped component classes for the token block only where utilities are not enough.
+  - [x] Use existing spacing, border, badge, table, and form design tokens from `DESIGN.md`.
+  - [x] Ensure desktop layout avoids cramped columns and narrow layout stacks form above list.
+  - [x] Keep destructive revoke actions visually distinct without overpowering routine settings actions.
 
 - [ ] Preserve behavior with tests
   - [ ] Update `accounts/tests/test_user_settings.py` assertions for the polished empty state and token metadata presentation.
