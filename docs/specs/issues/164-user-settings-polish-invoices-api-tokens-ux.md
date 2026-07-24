@@ -168,6 +168,11 @@ api-token-settings
 - The `user-settings-api-tokens-narrow` baseline/current pair should show the token form stacking above the list and remaining readable on narrower widths.
 - The Expense import AI provider section should remain visually separate from REST API token management.
 
+### Baseline SHA
+
+`50fb6dc52087dfa6bceb7b3438303b1fd7fada6c`
+
+
 ## Open Questions
 
 None.
