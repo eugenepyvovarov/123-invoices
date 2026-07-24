@@ -120,6 +120,22 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.user.profile.refresh_from_db()
         self.assertEqual(self.user.profile.expense_ai_provider_base_url, '')
 
+    def test_get_renders_api_token_empty_state(self):
+        self.login_with_active_company(self.user, issuer=self.issuer_a)
+
+        response = self.client.get(self.settings_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Invoices API tokens')
+        self.assertContains(response, 'Create token')
+        self.assertContains(response, 'Token list')
+        self.assertContains(response, 'No tokens')
+        self.assertContains(response, 'data-testid="api-token-empty-state"')
+        self.assertContains(response, 'No Invoices API tokens yet')
+        self.assertContains(response, 'The token secret will be shown once after creation.')
+        self.assertContains(response, 'data-testid="api-token-create-form"')
+        self.assertNotContains(response, 'data-testid="api-token-list"')
+
     def test_get_lists_only_owned_api_tokens(self):
         owned_token, _ = ApiToken.issue(owner=self.user, name='Owned token')
         other_user = self.create_user_with_issuers(username='other-api-user', email='other-api@example.com')
@@ -136,10 +152,15 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertContains(response, 'Owned token')
         self.assertContains(response, owned_token.prefix)
         self.assertContains(response, 'Active')
+        self.assertContains(response, '1 token')
+        self.assertContains(response, 'data-testid="api-token-list"')
+        self.assertNotContains(response, 'data-testid="api-token-empty-state"')
         self.assertNotContains(response, 'Other token')
 
     def test_get_renders_api_token_status_badges_and_expense_ai_label(self):
         active_token, _ = ApiToken.issue(owner=self.user, name='Active token')
+        active_token.last_used_at = timezone.now() - timedelta(hours=2)
+        active_token.save(update_fields=['last_used_at'])
         expired_token, _ = ApiToken.issue(
             owner=self.user,
             name='Expired token',
@@ -155,12 +176,23 @@ class UserSettingsViewTests(AuthenticatedCompanyTestCase):
         self.assertContains(response, 'Invoices API tokens')
         self.assertContains(response, 'Expense import AI provider')
         self.assertContains(response, 'This provider API key is not an Invoices REST API token.')
+        self.assertContains(response, 'Name')
+        self.assertContains(response, 'Prefix')
+        self.assertContains(response, 'Created')
+        self.assertContains(response, 'Last used')
+        self.assertContains(response, 'Expires')
+        self.assertContains(response, 'Status')
+        self.assertContains(response, 'Actions')
         self.assertContains(response, active_token.prefix)
         self.assertContains(response, expired_token.prefix)
         self.assertContains(response, revoked_token.prefix)
+        self.assertContains(response, 'No expiry')
+        self.assertContains(response, 'Never')
         self.assertContains(response, 'Active')
         self.assertContains(response, 'Expired')
         self.assertContains(response, 'Revoked')
+        self.assertContains(response, 'Revoke')
+        self.assertContains(response, 'Revoked ')
 
     def test_create_api_token_uses_form_and_reveals_plaintext_once(self):
         self.login_with_active_company(self.user, issuer=self.issuer_a)
