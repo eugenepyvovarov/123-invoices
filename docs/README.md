@@ -19,6 +19,9 @@ for current setup or operations.
   rollback guidance.
 - [Spanish SIF / VERI*FACTU foundation](sif.md): issuer-scoped Spanish-only
   applicability, dual SIF modes, and downstream issue boundaries.
+- [EU e-invoicing and tax-authority reporting](eu-e-invoicing/index.md):
+  ViDA/EN 16931 overview, comparison table for all 27 member states, and
+  per-country notes with official links (planning source for fiscal adapters).
 - [Automation](automation.md): OpenCode/Gitea automation contract, managed files,
   preview/evidence behavior, and production artifact publication.
 - [Design contract](../DESIGN.md): UI tokens, layout conventions, component

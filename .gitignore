@@ -30,6 +30,9 @@ db/*.sqlite3-*
 # AWS User-specific
 .idea/**/aws.xml
 
+# Never nest another git repo under docs snapshots
+docs/eu-e-invoicing/_vendor/**/.git/
+
 # Generated files
 .idea/**/contentModel.xml
 

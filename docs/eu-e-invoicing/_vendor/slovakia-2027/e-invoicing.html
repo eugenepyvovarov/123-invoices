@@ -1,0 +1,966 @@
+
+
+<!DOCTYPE html>
+<html lang="sk">
+<head><title>
+	eInvoicing - PFS
+</title><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <meta name="description" content=""  />
+    <meta name="keywords" content="" />
+    <meta name="author" content="www.financnasprava.sk" /><meta property="og:type" content="website" /><meta property="og:url" content="http://www.financnasprava.sk/en/businesses/taxes-businesses/value-added-tax/e-invoicing" /><meta property="og:title" content="Finančná správa" /><meta property="og:image" content="/Img/pfsedit/Dokumenty_PFS/FB_Obrazok/FB_obrazok.jpg" />  
+	<meta property="og:description" content="" /> 
+
+    <!-- ICONS -->
+	<link rel="shortcut icon" href="/img/favicon.png" />
+             
+    <!-- CSS --> 
+    <link rel="stylesheet" type="text/css" media="screen" href="/Css/bootstrap.min.css" /><link rel="stylesheet" type="text/css" media="screen" href="/Css/styles.css" /><link rel="stylesheet" type="text/css" media="screen" href="/Css/colorbox.css" /><link rel="stylesheet" type="text/css" media="screen" href="/Css/flexslider.css" /><link rel="stylesheet" type="text/css" media="print" href="/Css/print.css" />
+ 
+    <!-- FONTS --> 
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700,800&amp;subset=latin-ext" rel="stylesheet" />
+
+    <script src="/Scripts/jquery.min.js"></script>
+    <script src="/Scripts/jquery.colorbox-min.js"></script>
+    <script src="/Scripts/jquery.cookie.js"></script>
+    <script src="/Scripts/jquery.flexslider.js"></script>
+    <script src="/Scripts/jquery.autocomplete.min.js"></script>
+    <script src="/Scripts/bootstrap.bundle.min.js"></script>
+    
+    <script src="/Scripts/sticky.js"></script>
+    <script src="/Scripts/main.js"></script>
+    <script src="/Scripts/scripts.js"></script>
+	<script type="text/javascript" id="cookiebanner" src="/Scripts/cookiebanner-prod.min.js" data-cookie="CookieInfoScript" data-text-align="left"></script>
+</head>
+<body>    
+    <script type="text/javascript">
+        var localize = {
+            ShowMore_button: 'Show more',
+            Collapse_button: 'Collapse'
+        }
+        var g_selectedCategory = 'podnikatelia';
+        var g_siteLng = "en";
+    </script>
+	<script src='https://cse.google.com/cse.js?cx=d44861141f6eb4728'></script>
+
+    <!--<a class="hidden-href" href="#content">Preskočiť na hlavný obsah</a> presunute do <header> -->
+
+    
+
+     <header class="header">
+    <a class="hidden-href" href="#content">Preskočiť na hlavný obsah</a>
+
+    
+
+<div class="flashnews">
+        
+    
+        
+
+           <button class="flashnews__close" title="Zavrieť"></button>
+</div>
+		 <div class="server-id" aria-hidden="true">Server TA08</div>
+        <div class="container-fluid container--wrapper">
+        <div class="row">
+            
+            <div class="col-sm-12">
+
+                <div class="header__logo">
+                     
+                        <a href="/en"><img src="/Img/logo_en.png" class="logo" alt="Financial service" /></a>
+                       
+                </div>
+
+                <div class="header__mobile-btn"></div>
+                <div class="header__rightbar">
+                    <div class="header__mobile-content">
+                        
+
+
+<div class="header__tablet-content">
+    
+
+   
+
+
+
+
+
+
+        
+        <ul class="header__nav">
+    
+        <li >
+            <a href="/en/financial-administration" onclick="return confirmReset(this);">Financial Administration</a>
+        </li>
+    
+        <li >
+            <a href="/en/contact" onclick="return confirmReset(this);">Contacts</a>
+        </li>
+    
+        </ul>
+        
+    
+    
+<ul class="header__lng">
+
+    <li><a href="/sk/titulna-stranka" hreflang="sk" lang="sk">Slovenčina</a></li>
+ 
+</ul> 
+</div>
+<div class="header__tablet-btn"></div>
+<div class="bell__container">
+	
+
+<div class="header__flashalert">
+    <div class="flashalert">
+		
+			<div class="flashalert__count" title="Počet technických informácií.">0</div>
+		
+    </div>
+</div>
+
+</div>
+
+
+<style type="text/css">
+    #kb-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #myPopup {
+        position: relative;
+        background: #fff;
+        max-width: 960px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 4px;
+    }
+</style>
+
+<script type="text/javascript">
+
+	function showDialog() {
+		var hiddenDiv = $('#M1_LoginBox_hiddenDiv');
+		if (hiddenDiv) {
+			var popupId = hiddenDiv.attr('data-id');
+			var popupHtml = hiddenDiv.attr('data-html');
+			if (popupId && popupHtml) {
+				if (localStorage.getItem("neverShow_" + popupId)) {
+					return; // užívateľ si zvolil "Uz nezobrazovat"
+				}
+				var lastShownTs = +localStorage.getItem("lastShown_" + popupId);
+				var currentDate = new Date();
+				currentDate.setHours(0, 0, 0, 0);
+				var lastShown = null;
+				if (!isNaN(lastShownTs)) {
+					lastShown = new Date(lastShownTs);
+					lastShown.setHours(0, 0, 0, 0);
+				}
+				if (lastShown == null || lastShown.getTime() != currentDate.getTime()) {
+					localStorage.setItem("lastShown_" + popupId, currentDate.getTime());
+					var $overlay = $('<div id="kb-overlay"></div>');
+					$overlay.html(popupHtml);
+					$('body').append($overlay);
+					$('#myPopup').show();
+				}
+			}
+		}
+	}
+
+	// zachytenie close eventu cez event delegation
+	$(document).on('click', '.modal-kb-close', function () {
+		var $modal = $(this).closest('#myPopup');
+
+		if ($modal.find('#cbDontShowAgain').is(':checked')) {
+			var hiddenDiv = $('#M1_LoginBox_hiddenDiv');
+			if (hiddenDiv) {
+				var popupId = hiddenDiv.attr('data-id');
+				localStorage.setItem("neverShow_" + popupId, "true");
+			}
+		}
+		$('#kb-overlay').remove();
+		$modal.hide();
+	});
+
+	$(function () {
+		if (window.location.href.indexOf('/en/') === -1) {
+			showDialog();
+		}
+	});
+
+</script>
+
+
+
+    <ul class="header__login" id="loginbox">
+        <li id="login">
+            <a id="M1_LoginBox_lLogIn" class="ui-btn ui-btn--login" href="javascript:{window.document.forms[&#39;myForm&#39;].target=&#39;_self&#39;;__doPostBack(&#39;lLogIn&#39;,&#39;&#39;)}">Login</a>
+        </li>
+        <li id="registration">
+            <a id="M1_LoginBox_lRegister" class="ui-btn ui-btn--registration" href="/en/registration-index">Registration</a>
+        </li>
+    </ul>
+	<div id="M1_LoginBox_hiddenDiv" data-id="1 - Digitálny poštár" data-html="&lt;!DOCTYPE html>
+&lt;html lang=&quot;sk&quot;>
+&lt;head>
+	&lt;meta charset=&quot;UTF-8&quot;>
+	&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
+
+	&lt;title>Popup PFS&lt;/title>
+
+	&lt;style>
+		body {
+			font-family: Arial, sans-serif;
+			margin: 0;
+			/*padding: 10px;*/
+		}
+
+		/* POPUP */
+		.modal-kb-content {
+			width: 100%;
+			max-width: 960px;
+			margin: 0 auto;
+			box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+			overflow: hidden;
+			position: relative;
+		}
+
+		/* HLAVIČKA */
+		.modal-kb-header {
+			padding: 10px;
+			color: white;
+			position: relative;
+			display: block;
+			text-align: center;
+			background-color: #166131;
+		}
+
+		.modal-kb-close {
+			cursor: pointer;
+			color: #eee;
+			font-size: 28px;
+			text-align: right;
+			position: absolute;
+			top: 5px;
+			right: 10px;
+			z-index: 10;
+		}
+
+		/* LOGO */
+		.pfs_modal_logo {
+			display: block;
+		}
+
+			.pfs_modal_logo img {
+				width: 70px;
+				max-width: 100%;
+				height: auto;
+			}
+
+		/* HLAVNÝ NADPIS */
+		.modal-kb-title {
+			padding: 10px 15px;
+			line-height: 1.3;
+			font-weight: 700;
+			margin: 0;
+			display: none;
+			color: #FFFFFF;
+			background-color: #FFFFFF;
+			font-family: Arial, sans-serif;
+			font-size: 5px;
+			text-align: left;
+		}
+
+		.modal-kb-title b {
+			color: #FFFFFF !important;
+		}
+
+		/* TELO */
+		.modal-kb-body {
+			padding: 15px;
+			line-height: 1.6;
+			display: block;
+			font-size: 18px;
+			font-family: Open Sans;
+			color: #ffffff;
+			background-color: #166131;
+			text-align: center;
+		}
+
+		.modal-kb-body b {
+			color: #ffffff !important;
+		}
+
+		/* BUTTON */
+		.modal-kb-actions {
+			margin-top: 15px;
+			display: block;
+		}
+
+		.modal-kb-actions b {
+			color: #231f20 !important;
+		}
+
+		.modal-kb-button {
+			display: inline-block;
+			width: auto;
+			padding: 4px 20px;
+			font-weight: 700;
+			cursor: pointer;
+			text-decoration: none;
+			font-size: 18px;
+			font-family: Open Sans;
+			color: #231f20;
+			background-color: #f4bd2e;
+			border-radius: 2px !important;
+		}
+
+			.modal-kb-button:hover {
+				opacity: 0.9;
+				text-decoration: none;
+				color: #231f20 !important;
+			}
+
+		/* SPODNÁ LIŠTA */
+		.modal-kb-bottom {
+			/*padding: 10px;*/
+			color: #FFFFFF;
+			background-color: #FFFFFF;
+			font-family: Arial, sans-serif;
+			font-size: 5px;
+			text-align: left;
+		}
+
+		.modal-kb-bottom b {
+			color: #FFFFFF !important;
+		}
+
+		.bottom-optional-text {
+			/*margin-bottom: 10px;*/
+			display: none;
+		}
+
+		.bottom-kb-flex {
+			display: inline-block;
+			/*justify-content: space-between;*/
+			/*align-items: center;*/
+			/*flex-wrap: wrap;*/
+			/*gap: 10px;*/
+		}
+
+		/* CLOSE INFO */
+		.close-text {
+			opacity: 0.9;
+		}
+
+		/* CHECKBOX */
+		.dontShowAgain {
+			display: block;
+			background-color: #166131;
+		}
+
+		.hide-checkbox {
+			display: inline-block;
+			/*align-items: center;*/
+
+			cursor: pointer;
+			color: #ffffff;
+			font-family: Open Sans;
+			font-size: 12px;
+			vertical-align: middle;
+		}
+
+			.bottom-kb-flex input {
+				cursor: pointer;
+				margin-left: 6px !important;
+				margin-right: 6px !important;
+			}
+
+
+	&lt;/style>
+&lt;/head>
+&lt;body>
+	&lt;div id=&quot;myPopup&quot;>
+		&lt;div class=&quot;modal-kb-content&quot;>
+			&lt;div class=&quot;modal-kb-header&quot;>
+				&lt;div class=&quot;modal-kb-close&quot; onclick=&quot;document.getElementById(&#39;myPopup&#39;).style.display=&#39;none&#39;&quot;>&amp;times;&lt;/div>
+				&lt;!-- LOGO -->
+				&lt;div class=&quot;pfs_modal_logo&quot;>
+					&lt;img src=&quot;https://www.financnasprava.sk/Modules/PFS/Img/logo_fs.png&quot;
+						 alt=&quot;Finančná správa&quot;>
+				&lt;/div>
+			&lt;/div>
+			&lt;!-- HLAVNÝ NADPIS -->
+			&lt;h1 class=&quot;modal-kb-title&quot;>
+				
+			&lt;/h1>
+			&lt;!-- TELO -->
+			&lt;div class=&quot;modal-kb-body&quot;>
+				Povinnosť registrácie u &lt;b>„Digitálneho poštára“&lt;/b> sa blíži.&lt;br> Živnostníci a drobní podnikatelia si môžu vybrať z jednoduchých riešení, &lt;br>ktoré umožňujú prijímať elektronické faktúry cez webovú schránku.&lt;br>&lt;br> Prijatie e-faktúry je rovnako jednoduché ako prijatie e-mailu.&lt;br>Viac informácii nájdete na: 
+				&lt;!-- BUTTON -->
+				&lt;div class=&quot;modal-kb-actions&quot;>
+					&lt;a class=&quot;modal-kb-button&quot; target=&quot;_blank&quot; href=&quot;http://www.info-efaktura.sk&quot;>
+						www.info-efaktura.sk
+					&lt;/a>
+				&lt;/div>
+				&lt;!-- BOTTOM -->
+			&lt;/div>
+			&lt;div class=&quot;modal-kb-bottom&quot;>
+				&lt;div class=&quot;bottom-optional-text&quot;>
+					
+				&lt;/div>
+			&lt;/div>
+			&lt;div class=&quot;dontShowAgain&quot;>
+					&lt;div class=&quot;bottom-kb-flex&quot;>
+						&lt;!--&lt;div class=&quot;close-text&quot;>
+							Pre zrušenie kliknite mimo okna
+						&lt;/div>-->
+						&lt;input id=&quot;cbDontShowAgain&quot; type=&quot;checkbox&quot; />
+						&lt;label for=&quot;cbDontShowAgain&quot; class=&quot;hide-checkbox&quot;>
+							Už nezobrazovať
+						&lt;/label>
+					&lt;/div>
+				&lt;/div>
+		&lt;/div>
+	&lt;/div>
+&lt;/body>
+&lt;/html>"></div>
+
+
+ 
+                    </div>
+                </div>
+                
+            </div>
+
+        </div>
+        </div>
+		 
+    </header>
+
+    <div class="searchbox searchbox--subpage" id="searchbox">
+            
+    
+        <div class="container-fluid container--content">
+            <div class="row">
+
+                    <div class="col-sm-12 col-md-2"></div>
+
+                    <div class="col-sm-12 col-md-8">
+                        
+                          <div class="searchbox__input">
+
+                    
+
+                            <form action="/en/search" method="POST" role="search"> 
+                                <div class="searchbox__input">
+                                <div class="gcse-searchbox-only" enableAutoComplete="true" data-resultsUrl="/en/search"  data-gname="PFS.SK" ></div>
+                                </div>
+                            </form>
+
+                      
+
+                        </div>
+                        
+                    </div>
+
+                    <div class="col-sm-12 col-md-2"></div>
+
+            </div>
+        </div>                                
+           
+    </div>
+
+    <nav class="subnav" aria-label="top navigation">
+<div class="container-fluid container--content">
+<div class="row">
+<div class="col-sm-12">
+<ul>
+<li class="podnikatelia" id="podnikatelia"><a href="/en/businesses">Businesses</a></li>
+<li class="obcania" id="obcania"><a href="/en/individuals/">Individuals</a></li>
+<li class="specialisti" id="danovi-colni"><a href="/en/electronic-communication/moss-scheme">Electronic communication</a></li>
+<li class="esluzby" id="eSluzby"><a href="/en/electronic-services">Electronic services</a></li>
+</ul>
+</div>
+</div>
+</div>
+</nav>
+
+<nav aria-label="breadcrumb navigácia"> <!-- doplneny <nav> -->
+<div class="breadcrumb">
+    <div class="container-fluid container--content">
+            <div class="row">
+                <div class="col-sm-12">
+
+                            
+                                <ul>
+                                    <li  class="isHome"><a href="/en"><img src="/img/icon-breadcrumb-home.png" alt="Home" /></a></li>
+                                    <li class="isSpacer"></li>
+                        
+                                    <li><a id="M7_rptBreadCrumb_ctl01_hpLink" href="/en/businesses">Businesses</a></li>
+                                    <li class="isSpacer"></li>
+                        
+                                    <li><a id="M7_rptBreadCrumb_ctl02_hpLink" href="/en/businesses/taxes-businesses">General Information on Taxes</a></li>
+                                    <li class="isSpacer"></li>
+                        
+                                    <li><a id="M7_rptBreadCrumb_ctl03_hpLink" href="/en/businesses/taxes-businesses/value-added-tax">Value added tax</a></li>
+                                    <li class="isSpacer"></li>
+                        
+                                    <li>eInvoicing</li>
+                                    <li class="isSpacer"></li>
+                        
+                                </ul>                   
+                        
+
+
+
+            </div>
+        </div>
+    </div>
+</div>
+</nav>
+
+		<div class="col-xs-12 col-sm-12 col-md-12">
+			<div class="container-fluid container--content">
+	<div class="row">
+				<div class="col-xs-12 col-sm-4 col-md-4">
+
+					<aside class="leftpanel" id="leftpanel">
+						
+<nav class="asidenav asidenav-categories"  aria-label="ľavá navigácia"> 
+     
+</nav>
+<div class="widgetFastlinks">
+<h4>Quick links</h4>
+<ul>
+<li><a href="/en/ask-financial-administration">Ask Financial Administration</a></li>
+<li><a href="/en/infoservice">Infoservice</a></li>
+<li><a href="/en/electronic-communication/moss-scheme" title="MOSS Scheme">MOSS Scheme</a></li>
+</ul>
+</div>
+					</aside>
+				</div>
+				<!--</div>-->
+				<div class="col-xs-12 col-sm-8 col-md-8">
+					<!-- doplnene -->
+					<main class="subpage">
+
+						<form method="post" action="/en/businesses/taxes-businesses/value-added-tax/e-invoicing" id="myForm">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUJNjc3MjIyNDgyD2QWBAIBD2QWAgIHDxYCHgRUZXh0BXw8bWV0YSBwcm9wZXJ0eT0ib2c6dXJsIiBjb250ZW50PSJodHRwOi8vd3d3LmZpbmFuY25hc3ByYXZhLnNrL2VuL2J1c2luZXNzZXMvdGF4ZXMtYnVzaW5lc3Nlcy92YWx1ZS1hZGRlZC10YXgvZS1pbnZvaWNpbmciIC8+ZAIDD2QWAgIEEGRkFgRmD2QWAmYPZBYCZg9kFgZmD2QWAgIDDw8WAh4HVmlzaWJsZWhkZAIKDw8WAh8BaGRkAgsPDxYCHwFoZBYCZg9kFgYCAQ8WAh8BaGQCAg8WAh8BZ2QCAw8WAh4LXyFJdGVtQ291bnRmZAIBD2QWAgICD2QWAmYPZBYEAgEPDxYCHhNWYWxpZGF0ZVJlcXVlc3RNb2RlAgJkZAIFDw8WAh8DAgJkZBgJBRpNMSRIZWxwTmF2aSRycHRTdWJDYXRlZ29yeQ8UKwAGZGZmAv////8PZWZkBStNMyRTdXZpc2lhY2VFU2VydmljZTEkcnB0SW5mb3JtYXRpb25Db250ZW50DxQrAAZkZmYC/////w9lZmQFKU0zJFN1dmlzaWFjZUFnZW5keTEkcnB0SW5mb3JtYXRpb25Db250ZW50DxQrAAZkZmYC/////w9lZmQFLE0zJFN1dmlzaWFjZUxpZmVFdmVudDEkcnB0SW5mb3JtYXRpb25Db250ZW50DxQrAAZkZmYC/////w9lZmQFFEJlbGxMaXN0JHJwdE5ld3NMaXN0DxQrAAZkZmYC/////w9lZmQFEE03JHJwdEJyZWFkQ3J1bWIPFCsABmRmZgL/////D2VmZAUVTTMkU3V2aXNpYWNlMSRycExpc3QyDxQrAAZkZmYC/////w8FAklkZmQFFU0zJFN1dmlzaWFjZTEkcnBMaXN0Mw8UKwAGZGZmAv////8PBQJJZGZkBRVNMyRTdXZpc2lhY2UxJHJwTGlzdDEPFCsABmRmZgL/////DwUCSWRmZL22knhaT4dBimKkSYysTwxu6hx1" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['myForm'];
+if (!theForm) {
+    theForm = document.myForm;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=eZJKCrWvkpcl65p8DDqot700KxSaZ7i89Te0BxODJ7dRqfTfeEoXwL866WdTagsBIO3ZYmnpoo2JKol7V3lr37tiRIg1&amp;t=638901608248157332" type="text/javascript"></script>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="6A91091E" />
+	<input type="hidden" name="__SCROLLPOSITIONX" id="__SCROLLPOSITIONX" value="0" />
+	<input type="hidden" name="__SCROLLPOSITIONY" id="__SCROLLPOSITIONY" value="0" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAAL9m829Ifn2cSG8f/8EHeixUTZ7G5VsYjwNUx+zFacWdYAEjCaIGqpoZXmYUjpKawat/AA1" />
+</div>
+
+							<article id="content">
+
+								<div id="M3_divNazov" class="wrapper wrapper-icon">
+        
+
+<h1>eInvoicing</h1>
+
+ 
+
+        
+    </div>
+    <div class='perex clr noImg' >
+        <div class='inner'>
+            
+        </div>
+    </div>
+
+
+<div class="eServiceBtn">
+    
+
+    
+</div><div class="infoContent">
+<p>We provide the information in the following structure:</p>
+<ul>
+<li><a href="#ListCertServProvid" title="Transferred to Part List of certified service providers">List of certified service providers</a></li>
+<li><a href="#TransitionModernEfficElInvSys" title="Transferred to Part eInvoice: Transitioning to a Modern and Efficient Electronic Invoicing System">eInvoice: Transitioning to a Modern and Efficient Electronic Invoicing System</a>
+<ul>
+<li><a href="#WhatElectrInv" title="Transferred to Part What is an electronic invoice?">What is an electronic invoice?</a></li>
+<li><a href="#BenefElectrInv" title="Transferred to Part Benefits of eInvoice">Benefits of eInvoice</a></li>
+<li><a href="#WhoRequirReceiElectrInv" title="Transferred to Part Who is required to receive electronic invoices?">Who is required to receive electronic invoices?</a></li>
+<li><a href="#ElectrInvViaCertSrvProv" title="Transferred to Part Electronic Invoicing via a Certified Service Provider">Electronic Invoicing via a Certified Service Provider</a></li>
+</ul>
+</li>
+<li><a href="#WhatPeppol" title="Transferred to Part What is Peppol?">What is Peppol?</a>
+<ul>
+<li><a href="#PeppolEDelivNet" title="Transferred to Part Peppol eDelivery Network">Peppol eDelivery Network</a></li>
+<li><a href="#PeppolBisForm" title="Transferred to Part Peppol BIS Formát">Peppol BIS Formát</a></li>
+<li><a href="#EuropIntegr" title="Transferred to Part European integration">European integration</a></li>
+</ul>
+</li>
+<li><a href="#ImplemSched" title="Transferred to Part Implementation Schedule">Implementation Schedule</a></li>
+<li><a href="#InfoCertServProvidInterm" title="Transfered tp Part Information for certified service providers/intermediaries">Information for certified service providers/intermediaries</a>
+<ul>
+<li><a href="#RightsObligCertServProvid" title="Transfered tp Part Rights and obligations of certified service providers">Rights and obligations of certified service providers</a></li>
+</ul>
+</li>
+<li><a href="#InfoAccSoftProvidPortal" title="Transfered to Part Information for accounting software providers/portals">Information for accounting software providers/portals</a></li>
+<li><a href="#Infor_administr" title="Information for public administration">Information for public administration</a></li>
+<li><a href="#Qeustions" title="Frequently Asked Questions">Frequently Asked Quest</a></li>
+</ul>
+<div class="graphicItem6">
+<ul>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.08.10_zoznam_certifik.pdf" title="List of certified delivery service providers [.pdf; 197 kB; nové okno]" target="_blank"> List of certified delivery service providers</a> [.pdf; 197 kB; nové okno]</li>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.08.10_zoznam_cert_akreditacie.pdf" title="List of service providers in the accreditation process [.pdf; 215 kB; nové okno]" target="_blank">List of service providers in the accreditation process</a> [.pdf; 215 kB; nové okno]</li>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.06.01_prirucka_PDS_v02.pdf" title="SP Service Provider) Selection User Guide [.pdf; 897 kB; new window; Slovak version]" target="_blank" style="background-color: initial;">SP Service Provider) Selection Userúide</a> [.pdf; 897 kB; new window; Slovak version]</li>
+<li><a href="https://vpds.financnasprava.sk/" title="SP (Service Provider) Selection functionality">SP (Service Provider) Selection functionality</a></li>
+</ul>
+</div>
+<h2><a id="TransitionModernEfficElInvSys"></a>eInvoice: Transitioning to a Modern and Efficient Electronic Invoicing System</h2>
+<p><img src="/_img/pfsedit/Dokumenty_PFS/Bannery/2026/2026.05.15_PB_eInvoicing.png" width="200" height="276" style="float: right;" />In cooperation with experts, software companies, accounting system providers and the business sector, the Financial Administration is launching the eInvoice project. The project's goal is to implement electronic invoicing, enabling automated processing and simplifying administrative procedures to increase efficiency. From the second quarter of 2026, companies and entrepreneurs will be able to voluntarily implement eInvoice. This approach is based on a successful European model that has already been adopted by more than twenty EU countries and other states, providing a stable, secure and efficient solution for hundreds of thousands of companies. The introduction of eInvoice in Slovakia is a significant step towards digitising and streamlining business processes. This transition to a modern invoicing method offers many advantages, including reduced administrative burdens, greater security, and increased transparency.</p>
+<h3>What is an electronic invoice?</h3>
+<p><img src="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2025/2025.12.10_xml.png" width="140" height="140" style="float: right; margin-right: 5px; margin-left: 5px;" alt="Image of XML document pictogram" title="Image of XML document pictogram" />It is not just a regular PDF file or a digital photograph of a paper invoice. It is a structured XML file containing all the necessary information, such as the invoice number, issue date, item description, amount and recipient details. This format is designed to be machine-readable and processable, thereby eliminating errors caused by manual data entry. For companies and entrepreneurs, eInvoicing enables accurate and efficient communication with the authorities and business partners across the entire European market.</p>
+<h3><a id="BenefElectrInv"></a>Benefits of eInvoice</h3>
+<p>Using eInvoice offers many advantages, including:</p>
+<ul>
+<li><strong>Automated invoice processing:</strong> Elimination of manual data entry and transcription errors.</li>
+<li><strong>Time savings and reduced errors:</strong> Automatic data processing reduces the risk of mistakes.</li>
+<li><strong>Secure and efficient data transmission:</strong> Electronic invoices are securely transmitted through encrypted channels, ensuring their protection.</li>
+<li><strong>Invoicing across the entire EU:</strong> eInvoice uses the Peppol system to enable seamless invoicing across EU member states.</li>
+<li><strong>Compliance with Slovak and EU legislation:</strong> The system meets the legal requirements for electronic invoicing.</li>
+</ul>
+<p><strong>The European delivery standard that meets the requirements specified in Section 76a of <a href="https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2004/222/" title="Transferred to Slov-Lex legal and information portal [new window]">Amendment No. 222/2004 Coll.</a> [new window] to the Value Added Tax Act is the OpenPeppol AISBL</strong></p>
+<p>More info at <a href="https://peppol.org/" title="Transferred to Peppol website [new window]" target="_blank">The Future Is Open - OpenPeppol</a> [new window].</p>
+<h3><a id="WhoRequirReceiElectrInv"></a>Who is required to receive electronic invoices?</h3>
+<p>All legal entities and entrepreneurs who are taxable persons under Slovak law will be required to receive electronic invoices. This includes, for example:</p>
+<ul>
+<li>self-employed individuals; and</li>
+<li>those with a business licence.</li>
+<li>People practising liberal professions (e.g. lawyers, notaries, architects).</li>
+<li>Independently operating farmers</li>
+<li>Property owners renting out properties&nbsp;</li>
+</ul>
+<p>In order to receive electronic invoices, it is necessary to contract a certified service provider, who will ensure that invoices are received correctly and in compliance with legal norms.</p>
+<h4><a id="ElectrInvViaCertSrvProv"></a>Electronic Invoicing via a Certified Service Provider</h4>
+<p>Electronic invoices will be sent and received via a certified service provider, which ensures the secure and efficient distribution of invoices between senders and recipients. You can use a certified service provider through an accounting programme, website or mobile application. This tool allows you to send and receive invoices, which is necessary to meet legal requirements. Entrepreneurs can choose from several certified service providers on the market that meet all technical and security requirements set by legislation.</p>
+<h2><a id="WhatPeppol"></a>What is Peppol?</h2>
+<p><img src="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2025/2025.12.10_peppol.jpg" width="200" height="48" style="float: right; margin-top: 5px; margin-bottom: 5px;" alt="Peppol company logo" title="Peppol company logo" /> Peppol is a secure European network for the electronic exchange of business documents between companies. It operates like a digital mail system for invoices, orders and other documents.</p>
+<h3><a id="PeppolEDelivNet"></a>The Peppol eDelivery Network</h3>
+<p>A secure and reliable network for the real-time delivery of electronic documents with guaranteed delivery.</p>
+<h3><a id="PeppolBisForm"></a>Peppol BIS Format</h3>
+<p>A standardised invoice format based on the European standard EN 16931, ensuring compatibility across Europe.</p>
+<h3><a id="EuropIntegr"></a>European integration</h3>
+<p>Peppol enables connection with 21 countries across Europe, allowing seamless electronic invoicing across borders.</p>
+<h4>Important Dates</h4>
+<ul>
+<li><strong>January 1, 2026</strong>: The validity of the electronic invoicing legislation</li>
+<li><strong>January 1, 2027</strong>: The effectiveness of the electronic invoicing legislation</li>
+</ul>
+<h4>Approved version of the law</h4>
+<p><a href="https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2004/222/" title="Transferred to Slov-Lex legal and information portal [new window; slovak version]">222/2004 Z. z.</a> [new window; slovak version] - Value Added Tax Act</p>
+<h2><a id="ImplemSched"></a>Implementation Schedule</h2>
+<p><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.03.19_eFak_harmonogram_EN.pdf" title="Schedule for the implementation of the e-Invoice system[.pdf; 84 kB; new window]" target="_blank"><img src="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.01.19_eFaktura.png" width="690" height="564" alt="Infographic depicting the e-Invoicing implementation timeline. Detailed information from the graphic is accessible in PDF format through a hyperlink embedded in the image." title="Infographic depicting the e-Invoicing implementation timeline." /></a></p>
+<h2><a id="InfoCertServProvidInterm"></a>Information for certified service providers/intermediaries</h2>
+<h4>Accreditation conditions</h4>
+<ul>
+<li>OpenPeppol certification for einvoicing and e-reporting: a certified service provider must present a valid OpenPeppol certificate.</li>
+<li>Company headquarters in the EU: a certified service provider must prove that their headquarters or place of business is located in an EU member state.</li>
+<li>Integrity: the person and their statutory body or a member of the statutory body must be without a criminal record.</li>
+</ul>
+<div class="graphicItem6">
+<h4>Documents</h4>
+<ul>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.06.17_Ziad_vymaz_sprostredkovatel_EN.pdf" title="Application for removal from the list of intermediaries [.pdf; 91 kB; nové okno]" target="_blank">Application for removal from the list of intermediaries</a> [.pdf; 91 kB; nové okno]</li>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.04.17_detailed_step_by_step.pdf" title="Detailed step-by-step instructions for accrediting service providers Slovak republic [.pdf; 565 kB; new window]" target="_blank">Detailed step-by-step instructions for accrediting service providers Slovak republic</a>&nbsp;[.pdf; 565 kB; new window]</li>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.03.30_Slov_Solution_Architect2.pdf" target="_blank" title="Document SK Solution Architecture v1.2 [.pdf; 1,78 MB; new window]">Document SK Solution Architecture v1.2</a> [.pdf; 1,78 MB; new window] (last update: March 19th, 2026)</li>
+<li><a href="https://docs.peppol.eu/tdd/sk/tdd-sk/" target="_blank" title="Transferred to Peppol website [new window]">SK TDD (Tax Data Document) Specification</a> [new window]</li>
+<li>Links to the Peppol Slovakia's conformance testing environment documentation:
+<ul>
+<li><a href="https://www.testbed.peppol.org/assets/documentation/SK-Billing-eInvoicing-and-Tax-Reporting-User-Guide-v1.2.pdf" target="_blank" title="Slovak Republic C2-C3 (BIS Billing) testing user guide [.pdf; 1,39 MB; new window]">Slovak Republic C2-C3 (BIS Billing) testing user guide</a> [.pdf; 1,39 MB; new window]</li>
+<li><a href="https://www.testbed.peppol.org/assets/documentation/SK-Billing-eInvoicing-and-Tax-Reporting-Environment-Description-v1.1.pdf" target="_blank" title="Slovak Republic C2-C3 (BIS Billing) testing environment description [.pdf; 433 kB; new window]">Slovak Republic C2-C3 (BIS Billing) testing environment description</a> [.pdf; 433 kB; new window]</li>
+<li><a href="https://www.testbed.peppol.org/assets/documentation/SK-Self-Billing-eInvoicing-and-Tax-Reporting-User-Guide-v1.0.pdf" target="_blank" title="Slovak Republic C2-C3 (BIS Self-Billing) testing user guide [.pdf; 2,44 MB; new window]">Slovak Republic C2-C3 (BIS Self-Billing) testing user guide</a> [.pdf; 2,44 MB; new window]</li>
+<li><a href="https://www.testbed.peppol.org/assets/documentation/SK-Self-Billing-eInvoicing-and-Tax-Reporting-Environment-Description-v1.0.pdf" target="_blank" title="Slovak Republic C2-C3 (BIS Self-Billing) testing environment description [.pdf; 435 kB; new window]">Slovak Republic C2-C3 (BIS Self-Billing) testing environment description</a> [.pdf; 435 kB; new window]</li>
+</ul>
+</li>
+</ul>
+</div>
+<h4>Start of accreditation for certified service providers</h4>
+<p><img src="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.05.15_eInvoicing.png" width="200" height="168" alt="logo e-Invoicing" title="logo e-Invoicing" style="float: right; margin-left: 5px; margin-right: 5px;" />A person can provide a delivery service in Slovakia as a certified service provider if they are registered in the registry. From 1 January 2026, the registry will be managed by the Financial Administration on its website.</p>
+<p>Certified service providers can already apply to OpenPeppol for membership, certification of their software and issuance of the OpenPeppol certificate.</p>
+<p>Further information can be found on the <a href="https://peppol.org/" title="Transferred to Peppol website [new window]" target="_blank">'The Future Is Open' – OpenPeppol website</a> [new window].</p>
+<h4>Readability of Invoices</h4>
+<p>In accordance with § 76a, paragraph 2c of the VAT Act, readability of invoices in XML BIS format must be ensured. This format is mandatory for all electronic invoices and must enable clear and comprehensible display of data.</p>
+<h4>Log security</h4>
+<p>Certified service providers must store logs of invoice delivery and receipt for at least six months. This step is necessary to ensure transparency and enable checks if needed.</p>
+<h3><a id="RightsObligCertServProvid"></a>Rights and obligations of certified service providers</h3>
+<h4>Basic duties</h4>
+<p>Compliance with Peppol standards, providing user support and maintaining activity logs and incident reports.</p>
+<div class="graphicItem1">
+<h4>Important:</h4>
+<p>The certified provider must obtain authorisation from the user via an application provided by the Financial Administration of the Slova&nbsp;&nbsp;</p>
+</div>
+<h4>Sanctions</h4>
+<p>Failure to comply with the conditions will result in non-monetary sanctions, such as publication of status, suspension of access or withdrawal of authorisation.</p>
+<h4>Fees and costs</h4>
+<p>Each party bears their own costs. Certified service providers set their own prices for end users.</p>
+<h4>For intermediaries</h4>
+<p>Certified service providers can offer their services either directly or through intermediaries. Intermediaries use the services of certified service providers and sell them on their behalf.</p>
+<h2><a id="InfoAccSoftProvidPortal"></a>Information for accounting software providers/portals</h2>
+<h4>EN 16931: European standard for electronic invoices</h4>
+<p>This standardised format for electronic invoices in the EU defines the basic elements and structure of invoices to ensure interoperability between different systems.</p>
+<div class="graphicItem6">
+<h4>Documents</h4>
+<ul>
+<li><a title="European standard for electronic invoices [.pdf; 11,9 MB; new window]" href="https://www.normoff.gov.sk/files/docs/e-fakturacia-stn-en-16931-1-a1-614d692fbcaa2.pdf" target="_blank">EN 16931</a> [.pdf; 11,9 MB; new window] - European standard for electronic invoices</li>
+</ul>
+</div>
+<h4>Peppol BIS Format</h4>
+<p>A standardised format for electronic invoices based on UBL 2.1 that defines the structure, rules and limitations for electronic invoices on the Peppol network, in compliance with the European standard EN 16931.</p>
+<div class="graphicItem6">
+<h4>Official Peppol BIS documentation</h4>
+<ul>
+<li><a href="https://peppol.org/documentation/technical-documentation/post-award-documentation/" title="Transferred to Peppol website [new window]" target="_blank">Post Award Documentation</a> - OpenPeppol [new window]</li>
+</ul>
+</div>
+<h4>Implementation Guide</h4>
+<p>Comprehensive guide to implementing the Peppol BIS format, including the history of standards, an explanation of the structure of the documentation, how to read the specifications, how to validate documents, and practical steps for implementation.</p>
+<div class="graphicItem3">
+<ul>
+<li><a href="https://ionite.net/news-articles/2025-03-07_peppol_document_formats/" title="Transferred to Peppol website [new window]" target="_blank">Implementation Guide</a> [new window]</li>
+</ul>
+</div>
+<h4>Testing materials</h4>
+<p>Detailed manual and test cases for implementing Peppol BIS in Slovakia, created in cooperation with partners.</p>
+<h4>Test scenarios</h4>
+<div class="graphicItem6">
+<h4>Validation rules:</h4>
+<ul>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.06.25_Peppol_Bis3_v1_10.xlsx" target="_blank" title="Transposition of the Peppol BIS standard in the conditions of Slovak legislation [.xlsx; 586 kB; nové okno]">Transposition of the Peppol BIS standard in the conditions of Slovak legislation</a>&nbsp;[.xlsx; 586 kB; new window] - Last update: June 26, 2026 (version 1.10)</li>
+</ul>
+</div>
+<h4>Accreditation scheme in Slovakia</h4>
+<div class="graphicItem6">
+<h4>Documents</h4>
+<ul>
+<li><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.04.17_Accreditation_scheme.pdf" title="Accreditation scheme Peppol Authority of the Slovak Republic [.pdf; 370 kB; new window]" target="_blank">Accreditation scheme Peppol Authority of the Slovak Republic</a> [.pdf; 370 kB; new window]</li>
+</ul>
+</div>
+<h4>Application for Accreditation of a Service Provider</h4>
+<p><a href="/sk/elektronicke-sluzby/verejne-sluzby/katalog-danovych-a-colnych/katalog-formularov">Elektronické form... - PFS</a></p>
+<p><img src="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.01.15_e_Invoicing.png" width="690" height="314" alt="Preview of the Electronic Forms section" title="Preview of the Electronic Forms section" /></p>
+<h4>Sample Document „Letter of Authorization to deliver docum</h4>
+<p><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.01.21_Letter_of_Authorization.docx" title="Letter of Authorization to deliver documents [.docx; 19 kB; nové okno]" target="_blank">Letter of Authorization to deliver documents</a>&nbsp;[.docx; 19 kB; nové okno]</p>
+<p><b>Slovakia – Peppol Authority Specific Requirements</b></p>
+<p><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.01.23_Peppol_Authority.pdf" title="Slovakia – Peppol Authority Specific Requirements [.pdf; 318 kB; nové okno]" target="_blank">Slovakia – Peppol Authority Specific Requirements</a>&nbsp;[.pdf; 318 kB; nové okno]</p>
+<p><strong>Information for business owners:</strong></p>
+<p><strong>How to get started:</strong></p>
+<ol>
+<li>Contact the manufacturer of your accounting software. Check that they are ready to create and receive invoices in Peppol BIS format.</li>
+<li>Choose a certified service provider for the Peppol network (intermediary or a directly certified service provider).</li>
+<li>Testing and launch. Test sending and receiving invoices before the full launch.</li>
+</ol>
+<p><strong>List of certified delivery service providers</strong></p>
+<p>This list will be available after 1 January 2026.</p>
+<p><strong>Information for accountants:</strong></p>
+<p><strong>Demo:</strong></p>
+<p>Try out the fully integrated accounting software (mock-up), which is connected to the real Peppol network (test network).</p>
+<p><a href="https://v0-elala-seven.vercel.app/">Accounting software demo</a></p>
+<p><strong><a id="Infor_administr"></a>Information for public administration:</strong></p>
+<p><strong>How to get started:</strong></p>
+<ol>
+<li>Contact the manufacturer of your financial software. Verify that you are ready to create and receive invoices in Peppol BIS format.</li>
+<li>Submit a public procurement request to a certified service provider for the Peppol network (intermediary or a directly certified service provider).</li>
+<li>Testing and launch. Test sending and receiving invoices before the full launch.</li>
+</ol>
+<p><strong>List of certified delivery service providers</strong></p>
+<p>This list will be available after 1 January 2026.</p>
+<p><strong><a id="Qeustions"></a>Frequently Asked Questions </strong></p>
+<p><a href="/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.07.09_FAQ__eFaktura.pdf">eInvoice FAQs</a></p>
+<p><strong><a id="Webinar"></a>Webinar recordings and presentations</strong></p>
+<ul>
+<li><a href="https://vzdelavanie.financnasprava.sk/course/section.php?id=839" title="Redirecting to the Peppol website [new window]" target="_blank">Webinar 05 March 2026</a>&nbsp;[new window; Slovak language]</li>
+<li><a href="https://vzdelavanie.financnasprava.sk/course/section.php?id=779" title="Redirecting to the Financial Administration Academy portal [new window]" target="_blank">Webinar 10 December 2025</a>&nbsp;[new window; Slovak language]</li>
+<li><a href="https://vzdelavanie.financnasprava.sk/course/section.php?id=786" title="Redirecting to the Financial Administration Academy portal [new window]" target="_blank">Webinar 17 December 2025</a>&nbsp;[new window; Slovak language]</li>
+<li><a href="https://vzdelavanie.financnasprava.sk/course/section.php?id=778" title="Redirecting to the Financial Administration Academy portal [new window]" target="_blank">Webinar:</a> [new window] eInvoice for accounting firms, invoicing software manufacturers and accounting portals – 26 November 2025 (EDT)</li>
+<li><a href="https://vzdelavanie.financnasprava.sk/course/section.php?id=750" title="Redirecting to the Financial Administration Academy portal [new window]" target="_blank">Webinar recording from 29 October 2025:</a> [new window] Electronic Invoicing and Digital Reporting</li>
+<li><a href="https://www.info-efaktura.sk/" title="Redirecting to the eInvoicing SK website [new window]" target="_blank">Electronic Invoicing in Slovakia (eInvoicing SK)</a></li>
+<li><a href="https://www.youtube.com/watch?v=hw9SpfanjFM" title="Redirect to YouTube [new window]" target="_blank">Electronic invoicing in Slovakia + demo</a></li>
+<li><a href="https://www.youtube.com/watch?v=0Lpmoatkc9s" title="Redirect to YouTube [new window]" target="_blank">Electronic invoicing in Slovakia – discussion</a></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+<div id="M3_divDatumy" class="article__modified">
+           
+    </div>
+
+
+
+								<div class="article__footer">
+
+									<div class="article__actions">
+
+										<ul>
+											<li><a href="javascript:window.print()">Print</a></li>
+											<li>
+												<div id="OdporucitZnamemu_pnlOdporucitZnamemu" class="recommendform-link">
+	
+            <a id="OdporucitZnamemu_lbtOdporucitZnamemu" href="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;OdporucitZnamemu$lbtOdporucitZnamemu&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, true))">Odporučiť známemu</a>
+        
+</div>
+
+    
+
+    
+
+    
+
+											</li>
+											<li>
+												<a id="OpytatSaKTeme_LinkButton1" onclick="openForm(&#39;514928d8&#39;); return false;">Opýtať sa k téme</a>
+											</li>
+											<li>
+												
+											</li>
+										</ul>
+									</div>
+
+									<div class="article__share">
+										
+
+<!-- Go to www.addthis.com/dashboard to customize your tools --> 
+<script src="//s7.addthis.com/js/300/addthis_widget.js#pubid=ra-58355996d620f9c2"></script> 
+<div class="addthis_inline_share_toolbox"></div>
+									</div>
+
+								</div>
+
+							</article>
+
+						
+
+<script type="text/javascript">
+//<![CDATA[
+
+theForm.oldSubmit = theForm.submit;
+theForm.submit = WebForm_SaveScrollPositionSubmit;
+
+theForm.oldOnSubmit = theForm.onsubmit;
+theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit;
+//]]>
+</script>
+</form>
+
+					</main>
+				</div>
+			</div>
+		</div>
+	</div>
+    <footer class="footer" id="footer">
+<div class="container-fluid container--content">
+<div class="row footer__nav">
+<div class="col-xs-12 col-sm-4">
+<ul>
+<li><a href="/en/financial-administration">Financial Administration</a></li>
+<li><a href="/en/media-centre/speaker">Media centre</a></li>
+<li><a href="/en/contact" id="contact-us" title="Contact">Contacts</a></li>
+</ul>
+</div>
+<div class="col-xs-12 col-sm-4">
+<ul>
+<li><a href="/en/about-financial-office-portal" title="Informations about Financial Office portal">About Financial Administration Portal</a></li>
+<li><a title="Ministry of finance of the Slovak Republic [nové okno] " href="https://www.finance.gov.sk/en/" target="_blank">Ministry of finance of the Slovak Republic</a></li>
+</ul>
+</div>
+<div class="col-xs-12 col-sm-4">
+<ul>
+<li><a href="/en/sitemap">Sitemap</a></li>
+<li><a href="/en/declaration-of-accessibility">Declaration of Accessibility</a></li>
+</ul>
+<ul id="footerFacebook">
+<li><a id="rssIcon" href="/sk/rss" title="RSS pre novinky a aktuality">RSS</a></li>
+<li><a id="facebookIcon" href="http://www.facebook.com/FinancnaSprava" title="Facebook PFS">Facebook</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="container-fluid container--content">
+<div class="row footer__credits">
+<div class="col-sm-12 col-md-6">
+<p>Copyright © 2026 The Financial Directorate of the SR<br /> Operation of the website and its content administration provides The FD of the SR</p>
+</div>
+<div class="col-sm-12 col-md-6">
+<div class="footer__logos">
+<ul>
+<li><a href="https://mirri.gov.sk/sekcie/informatizacia/dokumenty/strategicke-dokumenty-2/operacny-program-informatizacia-spolocnosti/" title="Presmerovanie na portál Ministerstva investícií, regionálneho rozvoja a informatizácie SR [nové okno]" target="_blank"><img style="color: white;" alt="Logo OPIS Project" src="/_img/pfsedit/Dokumenty_PFS/Paticka/2014/2014.02.03_OPIS.gif" title="OPIS Project" width="100" height="30" /></a></li>
+<li><a href="https://huskroua-cbc.eu/" title="Hungary-Slovakia-Romania-Ukraine ENPI Cross-border Cooperation Programme 2007-2013" target="_blank"><img title="Hungary-Slovakia-Romania-Ukraine ENPI Cross-border Cooperation Programme 2007-2013" style="color: white;" alt="Logo Hungary-Slovakia-Romania-Ukraine ENPI Cross-border Cooperation Programme 2007-2013" src="/_img/pfsedit/Dokumenty_PFS/Paticka/2014/2014.05.16_logo_enpi.jpg" width="100" height="26" /></a></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+    <div id="scrolltop"></div>
+    
+</body>
+</html>
